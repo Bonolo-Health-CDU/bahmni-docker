@@ -66,6 +66,22 @@
                                 </group>
                             </group>
                         </page>
+                        <page string="Clinical">
+                            <group>
+                                <group string="Diagnosis">
+                                    <field name="diagnosis_asthma_copd"/>
+                                    <field name="diagnosis_diabetes_type_2"/>
+                                    <field name="diagnosis_family_planning"/>
+                                    <field name="diagnosis_hypertension"/>
+                                    <field name="diagnosis_hiv"/>
+                                    <field name="diagnosis_arthritis"/>
+                                </group>
+                                <group string="Date Taken">
+                                    <field name="viral_load_date_taken"/>
+                                    <field name="cd4_count_date_taken"/>
+                                </group>
+                            </group>
+                        </page>
                         <page string="Collection">
                             <group>
                                 <group>
