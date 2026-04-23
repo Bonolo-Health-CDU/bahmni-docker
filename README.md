@@ -1,38 +1,88 @@
 # Bahmni Docker
 
-Refer this [Wiki Page](https://bahmni.atlassian.net/wiki/spaces/BAH/pages/299630726/Running+Bahmni+on+Docker) for Running Bahmni on Docker for detailed instructions.
+Refer to the official wiki for full documentation:
+[Running Bahmni on Docker](https://bahmni.atlassian.net/wiki/spaces/BAH/pages/299630726/Running+Bahmni+on+Docker)
 
-## Running Bahmni LITE or STANDARD using docker compose: 
-1. Navigate to the relevant subfolder for your desired configuration. For example: `cd bahmni-lite`.
-2. Execute the script: `./run-bahmni.sh`. This script provides various options such as start, stop, view logs, pull updates, reset, etc.
-3. Before executing the above commands, ensure that your `.env` file in the sub-folder is correctly configured with the appropriate PROFILE.
+## Run Bahmni (Lite or Standard)
 
-Alternatively, if you wish to use docker compose commands directly, you can use the --env-file option to pass the environment variables files:
+1. Go to the relevant folder:
 ```shell
-docker compose up --env-file .env
+cd bahmni-lite
+# or
+cd bahmni-standard
 ```
 
-## Environment Variable Configuration For Bahmni Lite
-The `.env` and `.env.dev` files are used for configuring environment variables for the Bahmni Lite Docker setup. 
+2. Ensure the selected `.env` file has the expected profile (`COMPOSE_PROFILES`).
 
-The `.env` file points to the `1.0.0` image tag, which represents the stable and tested version of Bahmni Lite v1.0.0. We recommend using these images for production purposes. 
-The `.env.dev` file points to the `latest` image version, which provides the most recent updates for development and testing purposes.
-
-- By default `run-bahmni.sh` script runs with the `.env`, that uses the `1.0.0` images
+3. Start services using either script or docker compose:
 ```shell
-run-bahmni.sh
+./run-bahmni.sh
+```
+```shell
+docker compose --env-file .env up -d
 ```
 
-- Instead if you wish to use the `latest` images, run the `run-bahmni.sh` script with the argument `.env.dev`
+## Environment Files
+
+- `.env` typically points to stable/tested tags.
+- `.env.dev` typically points to `latest` tags for development/testing.
+- You can also use a custom file (for example `.env.local`).
+
+Examples:
 ```shell
-run-bahmni.sh .env.dev
+./run-bahmni.sh
+./run-bahmni.sh .env.dev
+./run-bahmni.sh .env.local
 ```
 
-- Additionally, you have the flexibility to create your own environment variable configuration. To do this, create a custom a `.env` file (eg: `.env.local`) and run the run-bahmni.sh script with the `.env.local` argument:
+## Odoo-Only Instance (bahmni-standard)
+
+If you want an Odoo-only setup, set this in `bahmni-standard/.env`:
 ```shell
-run-bahmni.sh .env.local
+COMPOSE_PROFILES=odoo
 ```
 
-Please choose the appropriate environment variables file based on your requirements and make sure the respective `.env` or `.env-dev` file is properly configured before running the commands.
+Then start:
+```shell
+cd bahmni-standard
+mkdir -p extra-odoo-addons
+docker compose --env-file .env up -d
+```
 
-For detailed instructions and further information, please refer to the [Wiki Page](https://bahmni.atlassian.net/wiki/spaces/BAH/pages/299630726/Running+Bahmni+on+Docker) mentioned above.
+Check status:
+```shell
+docker compose --env-file .env ps
+```
+
+Verify Odoo endpoint:
+```shell
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8069/web/login
+```
+Expected response: `200`.
+
+## Troubleshooting: Odoo Permission Error on Filestore
+
+### Symptom
+
+Odoo container is running but UI is not accessible, and logs show:
+- `PermissionError: [Errno 13] Permission denied`
+- path under `/var/lib/odoo/filestore/...`
+
+### Cause
+
+The shared filestore volume is owned by `root:root`, while Odoo runs as `odoo` (`uid=101`).
+
+### Fix
+
+From `bahmni-standard`:
+```shell
+docker compose --env-file .env logs --tail=120 odoo
+docker compose --env-file .env exec odoo id
+docker compose --env-file .env exec odoo ls -ld /var/lib/odoo/filestore /var/lib/odoo/filestore/odoo
+docker compose --env-file .env exec --user root odoo chown -R odoo:odoo /var/lib/odoo/filestore
+docker compose --env-file .env restart odoo
+docker compose --env-file .env ps
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8069/web/login
+```
+
+Expected response after fix: `200`.
