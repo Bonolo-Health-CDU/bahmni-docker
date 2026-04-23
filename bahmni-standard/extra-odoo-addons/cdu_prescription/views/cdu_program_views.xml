@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_program_tree" model="ir.ui.view">
+        <field name="name">cdu.program.tree</field>
+        <field name="model">cdu.program</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_program_form" model="ir.ui.view">
+        <field name="name">cdu.program.form</field>
+        <field name="model">cdu.program</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="sequence"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_program" model="ir.actions.act_window">
+        <field name="name">CDU Programs</field>
+        <field name="res_model">cdu.program</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>

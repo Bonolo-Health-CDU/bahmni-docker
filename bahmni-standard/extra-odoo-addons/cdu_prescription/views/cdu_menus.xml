@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <menuitem
+        id="menu_cdu_root"
+        name="Central Dispensing Unit"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_cdu_prescription_operations"
+        name="Operations"
+        parent="menu_cdu_root"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_cdu_prescriptions"
+        name="Prescriptions"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_prescription"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_cdu_configuration"
+        name="Configuration"
+        parent="menu_cdu_root"
+        sequence="90"/>
+
+    <menuitem
+        id="menu_cdu_programs"
+        name="Programs"
+        parent="menu_cdu_configuration"
+        action="action_cdu_program"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_cdu_collection_points"
+        name="Collection Points"
+        parent="menu_cdu_configuration"
+        action="action_cdu_collection_point"
+        sequence="20"/>
+</odoo>
