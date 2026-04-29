@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="seq_cdu_prescription" model="ir.sequence">
+        <field name="name">CDU Prescription</field>
+        <field name="code">cdu.prescription</field>
+        <field name="prefix">CDU/RX/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>
