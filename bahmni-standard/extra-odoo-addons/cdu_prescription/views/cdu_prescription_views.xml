@@ -9,7 +9,6 @@
                 <field name="barcode"/>
                 <field name="facility_name"/>
                 <field name="patient_identifier"/>
-                <field name="program_id"/>
                 <field name="repeat_count"/>
                 <field name="refill_date"/>
                 <field name="collection_point_id"/>
@@ -39,11 +38,12 @@
                         <group string="Source">
                             <field name="barcode"/>
                             <field name="source_document_ref"/>
+                            <field name="facility_id"/>
                             <field name="facility_name"/>
+                            <field name="facility_code"/>
                             <field name="prescription_date"/>
                         </group>
                         <group string="Workflow">
-                            <field name="program_id"/>
                             <field name="repeat_count"/>
                             <field name="refill_date"/>
                             <field name="clinical_review_only"/>
@@ -60,6 +60,7 @@
                                 </group>
                                 <group>
                                     <field name="patient_date_of_birth"/>
+                                    <field name="patient_language"/>
                                     <field name="patient_gender"/>
                                     <field name="patient_phone"/>
                                     <field name="patient_address"/>
@@ -69,6 +70,7 @@
                         <page string="Clinical">
                             <group>
                                 <group string="Diagnosis">
+                                    <field name="allergies"/>
                                     <field name="diagnosis_asthma_copd"/>
                                     <field name="diagnosis_diabetes_type_2"/>
                                     <field name="diagnosis_family_planning"/>
@@ -144,13 +146,11 @@
                 <field name="barcode"/>
                 <field name="patient_identifier"/>
                 <field name="facility_name"/>
-                <field name="program_id"/>
                 <field name="collection_point_id"/>
                 <filter string="Captured" name="captured" domain="[('state', '=', 'captured')]"/>
                 <filter string="Validation Failed" name="validation_failed" domain="[('state', '=', 'validation_failed')]"/>
                 <filter string="Validated" name="validated" domain="[('state', '=', 'validated')]"/>
                 <group expand="0" string="Group By">
-                    <filter string="Program" name="group_program" context="{'group_by': 'program_id'}"/>
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
                     <filter string="Refill Date" name="group_refill_date" context="{'group_by': 'refill_date'}"/>
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>

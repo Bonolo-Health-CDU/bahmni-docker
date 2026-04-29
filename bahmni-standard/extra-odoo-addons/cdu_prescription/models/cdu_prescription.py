@@ -16,7 +16,9 @@ class CduPrescription(models.Model):
     )
     source_document_ref = fields.Char(string="Source Document Reference")
     barcode = fields.Char(string="Prescription Barcode", copy=False, tracking=True)
+    facility_id = fields.Many2one("cdu.facility", string="Facility", tracking=True)
     facility_name = fields.Char(required=True, tracking=True)
+    facility_code = fields.Char(tracking=True)
     prescription_date = fields.Date(required=True, tracking=True)
     patient_id = fields.Many2one(
         "res.partner",
@@ -28,11 +30,20 @@ class CduPrescription(models.Model):
     patient_surname = fields.Char()
     patient_first_name = fields.Char()
     patient_date_of_birth = fields.Date()
+    patient_language = fields.Selection(
+        [
+            ("english", "English"),
+            ("sesotho", "Sesotho"),
+            ("isixhosa", "isiXhosa"),
+        ],
+        string="Language",
+    )
     patient_gender = fields.Selection(
         [("male", "Male"), ("female", "Female"), ("other", "Other")]
     )
     patient_phone = fields.Char()
     patient_address = fields.Text()
+    allergies = fields.Char()
     diagnosis_asthma_copd = fields.Boolean(string="Asthma/COPD")
     diagnosis_diabetes_type_2 = fields.Boolean(string="Diabetes Mellitus - Type 2")
     diagnosis_family_planning = fields.Boolean(string="Family Planning")
@@ -41,7 +52,6 @@ class CduPrescription(models.Model):
     diagnosis_arthritis = fields.Boolean(string="Arthritis")
     viral_load_date_taken = fields.Date(string="Viral Load Date Taken")
     cd4_count_date_taken = fields.Date(string="CD4 Count Date Taken")
-    program_id = fields.Many2one("cdu.program", tracking=True)
     repeat_count = fields.Integer(string="Repeat Count", tracking=True)
     refill_date = fields.Date(string="Refill / Next Collection Date", tracking=True)
     collection_point_id = fields.Many2one(
@@ -88,7 +98,17 @@ class CduPrescription(models.Model):
     def create(self, vals):
         if vals.get("name", "/") == "/":
             vals["name"] = self.env["ir.sequence"].next_by_code("cdu.prescription") or "/"
+        if vals.get("facility_id"):
+            facility = self.env["cdu.facility"].browse(vals["facility_id"])
+            vals.setdefault("facility_name", facility.name)
+            vals.setdefault("facility_code", facility.code)
         return super().create(vals)
+
+    @api.onchange("facility_id")
+    def _onchange_facility_id(self):
+        if self.facility_id:
+            self.facility_name = self.facility_id.name
+            self.facility_code = self.facility_id.code
 
     def action_mark_captured(self):
         self.write({"state": "captured"})

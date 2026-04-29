@@ -25,16 +25,16 @@
         sequence="90"/>
 
     <menuitem
-        id="menu_cdu_programs"
-        name="Programs"
-        parent="menu_cdu_configuration"
-        action="action_cdu_program"
-        sequence="10"/>
-
-    <menuitem
         id="menu_cdu_collection_points"
         name="Collection Points"
         parent="menu_cdu_configuration"
         action="action_cdu_collection_point"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_cdu_facilities"
+        name="Facilities"
+        parent="menu_cdu_configuration"
+        action="action_cdu_facility"
         sequence="20"/>
 </odoo>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_facility_tree" model="ir.ui.view">
+        <field name="name">cdu.facility.tree</field>
+        <field name="model">cdu.facility</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="enabled"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_facility_form" model="ir.ui.view">
+        <field name="name">cdu.facility.form</field>
+        <field name="model">cdu.facility</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="enabled"/>
+                        </group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_facility" model="ir.actions.act_window">
+        <field name="name">CDU Facilities</field>
+        <field name="res_model">cdu.facility</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>
