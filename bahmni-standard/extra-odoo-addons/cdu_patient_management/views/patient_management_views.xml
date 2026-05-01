@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <record id="contacts.menu_contacts" model="ir.ui.menu">
+            <field name="name">Patient Management</field>
+        </record>
+
+        <record id="view_patient_management_tree" model="ir.ui.view">
+            <field name="name">cdu.patient.management.tree</field>
+            <field name="model">res.partner</field>
+            <field name="arch" type="xml">
+                <tree string="Patients">
+                    <field name="name" string="Patient"/>
+                    <field name="ref" string="Patient ID"/>
+                    <field name="cdu_national_id"/>
+                    <field name="cdu_age"/>
+                    <field name="cdu_gender"/>
+                    <field name="cdu_patient_status"/>
+                    <field name="cdu_program"/>
+                    <field name="cdu_facility"/>
+                    <field name="cdu_next_refill_date"/>
+                    <field name="mobile"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="view_patient_management_form" model="ir.ui.view">
+            <field name="name">cdu.patient.management.form</field>
+            <field name="model">res.partner</field>
+            <field name="arch" type="xml">
+                <form string="Patient">
+                    <sheet>
+                        <group>
+                            <group string="Patient">
+                                <field name="is_company" invisible="1"/>
+                                <field name="type" invisible="1"/>
+                                <field name="name" string="Patient Name" required="1"/>
+                                <field name="ref" string="Patient ID"/>
+                                <field name="cdu_national_id"/>
+                                <field name="cdu_birthdate"/>
+                                <field name="cdu_age"/>
+                                <field name="cdu_gender"/>
+                                <field name="cdu_patient_status"/>
+                                <field name="cdu_facility"/>
+                                <field name="cdu_program"/>
+                            </group>
+                            <group string="Contact">
+                                <field name="phone"/>
+                                <field name="mobile"/>
+                                <field name="email"/>
+                                <field name="cdu_sms_consent"/>
+                                <field name="cdu_preferred_contact_method"/>
+                            </group>
+                        </group>
+                        <group string="Address">
+                            <field name="street" placeholder="Street"/>
+                            <field name="street2" placeholder="Street 2"/>
+                            <field name="city"/>
+                            <field name="state_id"/>
+                            <field name="zip"/>
+                            <field name="country_id"/>
+                        </group>
+                        <group string="Clinical Details">
+                            <field name="cdu_diagnosis" placeholder="Diagnosis"/>
+                            <field name="cdu_allergies" placeholder="Allergies"/>
+                            <field name="cdu_medication_history" placeholder="Medication history"/>
+                            <field name="cdu_current_treatment" placeholder="Current treatment"/>
+                        </group>
+                        <group string="Dispensing">
+                            <field name="cdu_last_dispensing_date"/>
+                            <field name="cdu_next_refill_date"/>
+                            <field name="cdu_preferred_pickup_facility"/>
+                            <field name="cdu_dispensing_notes" placeholder="Dispensing notes"/>
+                        </group>
+                        <group string="Next of Kin">
+                            <field name="cdu_next_of_kin_name"/>
+                            <field name="cdu_next_of_kin_relationship"/>
+                            <field name="cdu_next_of_kin_phone"/>
+                            <field name="cdu_emergency_contact_is_next_of_kin"/>
+                            <field name="cdu_next_of_kin_address" placeholder="Next of kin address"/>
+                        </group>
+                        <group string="Notes">
+                            <field name="comment" nolabel="1" placeholder="Patient notes"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_patient_management_search" model="ir.ui.view">
+            <field name="name">cdu.patient.management.search</field>
+            <field name="model">res.partner</field>
+            <field name="arch" type="xml">
+                <search string="Search Patients">
+                    <field name="name" string="Patient"/>
+                    <field name="ref" string="Patient ID"/>
+                    <field name="cdu_national_id"/>
+                    <field name="cdu_facility"/>
+                    <field name="cdu_program"/>
+                    <field name="cdu_patient_status"/>
+                    <field name="cdu_next_of_kin_name"/>
+                    <field name="cdu_next_of_kin_phone"/>
+                    <field name="phone"/>
+                    <field name="mobile"/>
+                    <separator/>
+                    <filter name="due_for_refill" string="Due for Refill" domain="[('cdu_next_refill_date', '&lt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                    <filter name="missing_phone" string="Missing Phone" domain="[('phone', '=', False), ('mobile', '=', False)]"/>
+                    <filter name="active_patients" string="Active Patients" domain="[('cdu_patient_status', '=', 'active')]"/>
+                    <filter name="archived" string="Archived" domain="[('active', '=', False)]" context="{'active_test': False}"/>
+                    <group expand="0" string="Group By">
+                        <filter name="group_by_facility" string="Facility" context="{'group_by': 'cdu_facility'}"/>
+                        <filter name="group_by_program" string="Program" context="{'group_by': 'cdu_program'}"/>
+                        <filter name="group_by_status" string="Patient Status" context="{'group_by': 'cdu_patient_status'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_patient_management" model="ir.actions.act_window">
+            <field name="name">Patients</field>
+            <field name="res_model">res.partner</field>
+            <field name="view_mode">tree,form</field>
+            <field name="search_view_id" ref="view_patient_management_search"/>
+            <field name="domain">[("is_company", "=", False)]</field>
+            <field name="context">{"default_is_company": False, "default_type": "contact"}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">Create a patient</p>
+            </field>
+        </record>
+
+        <record id="action_patient_management_tree" model="ir.actions.act_window.view">
+            <field name="sequence" eval="1"/>
+            <field name="view_mode">tree</field>
+            <field name="view_id" ref="view_patient_management_tree"/>
+            <field name="act_window_id" ref="action_patient_management"/>
+        </record>
+
+        <record id="action_patient_management_form" model="ir.actions.act_window.view">
+            <field name="sequence" eval="2"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_patient_management_form"/>
+            <field name="act_window_id" ref="action_patient_management"/>
+        </record>
+
+        <record id="contacts.res_partner_menu_contacts" model="ir.ui.menu">
+            <field name="name">Patients</field>
+            <field name="action" ref="action_patient_management"/>
+        </record>
+    </data>
+</odoo>

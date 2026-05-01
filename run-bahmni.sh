@@ -1,18 +1,46 @@
 #!/bin/bash
 
 
+# function checkDockerAndDockerComposeVersion {
+    
+#     # Check if docker is installed
+#     if ! [ -x "$(command -v docker)" ]; then
+#     echo 'Error: docker is not installed. Please install docker first!' >&2
+#     exit 1
+#     fi
+
+#     DOCKER_SERVER_VERSION=$(docker version -f "{{.Server.Version}}")
+#     DOCKER_SERVER_VERSION_MAJOR=$(echo "$DOCKER_SERVER_VERSION"| cut -d'.' -f 1)
+#     DOCKER_SERVER_VERSION_MINOR=$(echo "$DOCKER_SERVER_VERSION"| cut -d'.' -f 2)
+#     DOCKER_SERVER_VERSION_BUILD=$(echo "$DOCKER_SERVER_VERSION"| cut -d'.' -f 3)
+
+#     if [ "${DOCKER_SERVER_VERSION_MAJOR}" -ge 20 ]; then
+#         echo 'Docker version >= 20.10.13, using Docker Compose V2'
+#     else
+#         echo 'Docker versions < 20.x are not supported' >&2 
+#         exit 1
+#     fi
+
+#     # Check the version of Docker Compose
+#     if ! [ -x "$(command -v docker compose version)" ]; then
+#     echo 'Error: docker compose is not installed. Please install docker compose.' >&2
+#     exit 1
+#     fi
+#     version=$(docker compose version)
+#     echo "Docker Compose version: $version"
+#     echo "---"
+# }
+
 function checkDockerAndDockerComposeVersion {
     
     # Check if docker is installed
-    if ! [ -x "$(command -v docker)" ]; then
-    echo 'Error: docker is not installed. Please install docker first!' >&2
-    exit 1
+    if ! command -v docker >/dev/null 2>&1; then
+        echo 'Error: docker is not installed. Please install docker first!' >&2
+        exit 1
     fi
 
     DOCKER_SERVER_VERSION=$(docker version -f "{{.Server.Version}}")
-    DOCKER_SERVER_VERSION_MAJOR=$(echo "$DOCKER_SERVER_VERSION"| cut -d'.' -f 1)
-    DOCKER_SERVER_VERSION_MINOR=$(echo "$DOCKER_SERVER_VERSION"| cut -d'.' -f 2)
-    DOCKER_SERVER_VERSION_BUILD=$(echo "$DOCKER_SERVER_VERSION"| cut -d'.' -f 3)
+    DOCKER_SERVER_VERSION_MAJOR=$(echo "$DOCKER_SERVER_VERSION" | cut -d'.' -f 1)
 
     if [ "${DOCKER_SERVER_VERSION_MAJOR}" -ge 20 ]; then
         echo 'Docker version >= 20.10.13, using Docker Compose V2'
@@ -21,11 +49,12 @@ function checkDockerAndDockerComposeVersion {
         exit 1
     fi
 
-    # Check the version of Docker Compose
-    if ! [ -x "$(command -v docker compose version)" ]; then
-    echo 'Error: docker compose is not installed. Please install docker compose.' >&2
-    exit 1
+    # Correct Docker Compose check
+    if ! docker compose version >/dev/null 2>&1; then
+        echo 'Error: docker compose is not installed. Please install docker compose.' >&2
+        exit 1
     fi
+
     version=$(docker compose version)
     echo "Docker Compose version: $version"
     echo "---"

@@ -5,7 +5,7 @@
     "category": "Localization",
     "author": "Ministry of Health",
     "license": "LGPL-3",
-    "depends": ["base", "web"],
+    "depends": ["base", "web", "cdu_patient_management"],
     "data": [
         "views/login_template.xml",
     ],
