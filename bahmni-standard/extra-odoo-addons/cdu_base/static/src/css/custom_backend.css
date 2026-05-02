@@ -6,3 +6,46 @@
     background-color: #005baa !important;
     border-color: #005baa !important;
 }
+.rx_statusbar {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    overflow-x: auto;
+}
+
+.rx_statusbar .step {
+    position: relative;
+    background: #e5e5e5;
+    padding: 12px 35px;
+    margin-right: 25px;
+    font-weight: 600;
+    color: #555;
+    clip-path: polygon(
+        0 0,
+        90% 0,
+        100% 50%,
+        90% 100%,
+        0 100%,
+        10% 50%
+    );
+}
+
+.rx_statusbar .step.active {
+    background: #6c63ff;
+    color: white;
+}
+
+.rx_statusbar .step.reject {
+    background: #d9534f;
+    color: white;
+}
+
+.rx_statusbar .step.cancel {
+    background: #777;
+    color: white;
+}
+
+.rx_statusbar .step.complete {
+    background: #28a745;
+    color: white;
+}

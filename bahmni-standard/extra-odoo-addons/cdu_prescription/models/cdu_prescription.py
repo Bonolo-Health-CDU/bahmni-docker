@@ -179,3 +179,15 @@ class CduPrescriptionLine(models.Model):
                 raise ValidationError("Medicine quantity must be greater than zero.")
             if line.refill_number < 0:
                 raise ValidationError("Refill number cannot be negative.")
+    
+    state = fields.Selection([
+        ('awaiting_verification', 'Awaiting Verification'),
+        ('awaiting_validation', 'Awaiting Validation'),
+        ('rejected_callcentre', 'Rejected To Call Centre'),
+        ('awaiting_batching', 'Awaiting Batching'),
+        ('bagging', 'Bagging'),
+        ('boxing', 'Boxing'),
+        ('rejected_facility', 'Rejected To Facility'),
+        ('cancelled', 'Cancelled'),
+        ('completed', 'Completed')], 
+        default='awaiting_verification', tracking=True)

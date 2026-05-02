@@ -22,13 +22,81 @@
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
             <form>
-                <header>
+                <!-- <header>
                     <button name="action_mark_captured" string="Mark Captured" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'draft_capture')]}"/>
                     <button name="action_validate_prescription" string="Validate" type="object" class="btn-primary" attrs="{'invisible': [('state', 'not in', ('captured', 'validation_failed'))]}"/>
                     <button name="action_put_on_hold" string="Put On Hold" type="object" attrs="{'invisible': [('state', 'in', ('cancelled', 'on_hold'))]}"/>
                     <button name="action_cancel" string="Cancel" type="object" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft_capture,captured,validated"/>
-                </header>
+                </header> -->
+        <header>
+            <field name="state" invisible="1"/>
+            <!-- Action Buttons -->
+            <button name="action_mark_captured"
+                string="Mark Captured"
+                type="object"
+                class="btn-primary"
+                attrs="{'invisible':[('state','!=','draft_capture')]}"/>
+
+            <button name="action_validate_prescription"
+                string="Validate"
+                type="object"
+                class="btn-primary"
+                attrs="{'invisible':[('state','not in',('captured','validation_failed'))]}"/>
+
+            <button name="action_put_on_hold"
+                string="Put On Hold"
+                type="object"
+                attrs="{'invisible':[('state','in',('cancelled','on_hold'))]}"/>
+
+            <button name="action_cancel"
+                string="Cancel"
+                type="object"
+                attrs="{'invisible':[('state','=','cancelled')]}"/>
+
+
+            <!-- Custom Prescription Lifecycle Ribbon -->
+            <div class="rx_statusbar">
+
+            <div class="step active">
+                Awaiting Verification
+            </div>
+
+            <div class="step">
+                Awaiting Validation
+            </div>
+
+            <div class="step reject">
+                Rejected To Call Centre
+            </div>
+
+            <div class="step">
+                Awaiting Batching
+            </div>
+
+            <div class="step">
+                Bagging
+            </div>
+
+            <div class="step">
+                Boxing
+            </div>
+
+            <div class="step reject">
+                Rejected To Facility
+            </div>
+
+            <div class="step cancel">
+                Cancelled
+            </div>
+
+            <div class="step complete">
+                Completed
+            </div>
+
+            </div>
+
+        </header>
                 <sheet>
                     <div class="oe_title">
                         <label for="name"/>
