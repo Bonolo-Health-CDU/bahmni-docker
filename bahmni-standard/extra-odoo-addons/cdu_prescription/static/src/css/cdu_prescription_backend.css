@@ -1,0 +1,42 @@
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) .o_input,
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) input,
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) textarea,
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) select {
+    background-color: #fffdf7;
+    border: 1px solid #b7c7d9;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 2px rgba(15, 38, 64, 0.08);
+    min-height: 32px;
+    padding: 5px 8px;
+}
+
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) .o_input:focus,
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) input:focus,
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) textarea:focus,
+.o_cdu_prescription_form .o_field_widget:not(.o_readonly_modifier) select:focus {
+    background-color: #ffffff;
+    border-color: #005baa;
+    box-shadow: 0 0 0 2px rgba(0, 91, 170, 0.16);
+    outline: none;
+}
+
+.o_cdu_prescription_form .o_field_widget.o_readonly_modifier {
+    color: #4f5b66;
+}
+
+.o_cdu_prescription_form .o_field_widget.o_readonly_modifier .o_input,
+.o_cdu_prescription_form .o_field_widget.o_readonly_modifier input,
+.o_cdu_prescription_form .o_field_widget.o_readonly_modifier textarea,
+.o_cdu_prescription_form .o_field_widget.o_readonly_modifier select {
+    background-color: #f3f5f7;
+    border: 1px solid #d8dee6;
+    border-radius: 4px;
+    color: #4f5b66;
+}
+
+.o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) .o_input,
+.o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) input,
+.o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) textarea,
+.o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) select {
+    border-left: 4px solid #005baa;
+}
