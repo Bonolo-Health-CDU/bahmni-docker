@@ -12,11 +12,46 @@
         sequence="10"/>
 
     <menuitem
+        id="menu_cdu_report_imports"
+        name="Report Imports"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_report_run"
+        sequence="5"/>
+
+    <menuitem
         id="menu_cdu_prescriptions"
         name="Prescriptions"
         parent="menu_cdu_prescription_operations"
         action="action_cdu_prescription"
         sequence="10"/>
+
+    <menuitem
+        id="menu_cdu_patients"
+        name="Patients"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_patient"
+        sequence="15"/>
+
+    <menuitem
+        id="menu_cdu_awaiting_verification"
+        name="Awaiting Verification"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_prescription_awaiting_verification"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_cdu_awaiting_validation"
+        name="Awaiting Validation"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_prescription_awaiting_validation"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_cdu_awaiting_batching"
+        name="Awaiting Batching"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_prescription_awaiting_batching"
+        sequence="40"/>
 
     <menuitem
         id="menu_cdu_configuration"
