@@ -2,4 +2,5 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_cdu_collection_point_user,cdu.collection.point user,model_cdu_collection_point,base.group_user,1,1,1,0
 access_cdu_facility_user,cdu.facility user,model_cdu_facility,base.group_user,1,1,1,0
 access_cdu_prescription_user,cdu.prescription user,model_cdu_prescription,base.group_user,1,1,1,0
-access_cdu_prescription_line_user,cdu.prescription.line user,model_cdu_prescription_line,base.group_user,1,1,1,0
+access_cdu_report_run_user,cdu.report.run user,model_cdu_report_run,base.group_user,1,1,1,0
+access_cdu_report_row_user,cdu.report.row user,model_cdu_report_row,base.group_user,1,1,1,0
