@@ -7,4 +7,12 @@
         <field name="padding">5</field>
         <field name="company_id" eval="False"/>
     </record>
+
+    <record id="seq_cdu_report_run" model="ir.sequence">
+        <field name="name">CDU Report Run</field>
+        <field name="code">cdu.report.run</field>
+        <field name="prefix">CDU/IMPORT/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>
