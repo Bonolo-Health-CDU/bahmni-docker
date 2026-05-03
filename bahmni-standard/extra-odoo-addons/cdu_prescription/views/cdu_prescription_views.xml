@@ -4,13 +4,14 @@
         <field name="name">cdu.prescription.tree</field>
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
-            <tree decoration-danger="state == 'validation_failed'" decoration-muted="state in ('cancelled', 'on_hold')">
+            <tree decoration-muted="state in ('cancelled', 'on_hold')">
                 <field name="name"/>
-                <field name="barcode"/>
                 <field name="facility_name"/>
                 <field name="patient_identifier"/>
-                <field name="repeat_count"/>
-                <field name="refill_date"/>
+                <field name="patient_first_name"/>
+                <field name="prescription_date"/>
+                <field name="regimen_prescribed_raw"/>
+                <field name="drug_pickup_point_raw"/>
                 <field name="collection_point_id"/>
                 <field name="state"/>
             </tree>
@@ -21,13 +22,13 @@
         <field name="name">cdu.prescription.form</field>
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_cdu_prescription_form">
                 <header>
-                    <button name="action_mark_captured" string="Mark Captured" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'draft_capture')]}"/>
-                    <button name="action_validate_prescription" string="Validate" type="object" class="btn-primary" attrs="{'invisible': [('state', 'not in', ('captured', 'validation_failed'))]}"/>
+                    <button name="action_mark_patient_verified" string="Verify Patient Details" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
+                    <button name="action_mark_medicine_validated" string="Validate Medicine Details" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
                     <button name="action_put_on_hold" string="Put On Hold" type="object" attrs="{'invisible': [('state', 'in', ('cancelled', 'on_hold'))]}"/>
                     <button name="action_cancel" string="Cancel" type="object" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft_capture,captured,validated"/>
+                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -36,94 +37,72 @@
                     </div>
                     <group>
                         <group string="Source">
-                            <field name="barcode"/>
-                            <field name="source_document_ref"/>
+                            <field name="report_run_id"/>
+                            <field name="source_file_name"/>
+                            <field name="source_row_number"/>
+                            <field name="source_report_generated_at"/>
                             <field name="facility_id"/>
                             <field name="facility_name"/>
                             <field name="facility_code"/>
                             <field name="prescription_date"/>
                         </group>
                         <group string="Workflow">
-                            <field name="repeat_count"/>
-                            <field name="refill_date"/>
-                            <field name="clinical_review_only"/>
+                            <field name="state"/>
+                            <field name="verified_by"/>
+                            <field name="verified_at"/>
+                            <field name="validated_by"/>
+                            <field name="validated_at"/>
                         </group>
                     </group>
                     <notebook>
                         <page string="Patient">
                             <group>
                                 <group>
-                                    <field name="patient_id"/>
-                                    <field name="patient_identifier"/>
-                                    <field name="patient_surname"/>
-                                    <field name="patient_first_name"/>
+                                    <field name="patient_id" context="{'default_customer_rank': 1}"/>
+                                    <field name="patient_identifier" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
+                                    <field name="patient_first_name" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
+                                    <field name="hiv_program_id" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
+                                    <field name="national_id" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                 </group>
                                 <group>
-                                    <field name="patient_date_of_birth"/>
-                                    <field name="patient_language"/>
-                                    <field name="patient_gender"/>
-                                    <field name="patient_phone"/>
-                                    <field name="patient_address"/>
+                                    <field name="patient_date_of_birth" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
+                                    <field name="patient_gender" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
+                                    <field name="patient_phone" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
+                                    <field name="secondary_contact" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
+                                    <field name="patient_address" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                 </group>
                             </group>
                         </page>
                         <page string="Clinical">
                             <group>
-                                <group string="Diagnosis">
+                                <group string="Clinical Details">
+                                    <field name="hiv_diagnosis_date"/>
+                                    <field name="new_or_revisit"/>
+                                    <field name="next_clinical_visit_date"/>
                                     <field name="allergies"/>
-                                    <field name="diagnosis_asthma_copd"/>
-                                    <field name="diagnosis_diabetes_type_2"/>
-                                    <field name="diagnosis_family_planning"/>
-                                    <field name="diagnosis_hypertension"/>
-                                    <field name="diagnosis_hiv"/>
-                                    <field name="diagnosis_arthritis"/>
+                                    <field name="has_allergies"/>
                                 </group>
-                                <group string="Date Taken">
-                                    <field name="viral_load_date_taken"/>
-                                    <field name="cd4_count_date_taken"/>
+                                <group string="Viral Load">
+                                    <field name="latest_vl_collection_date"/>
+                                    <field name="latest_vl_result"/>
                                 </group>
                             </group>
                         </page>
-                        <page string="Collection">
+                        <page string="Prescription">
                             <group>
                                 <group>
+                                    <field name="regimen_prescribed_raw"/>
+                                    <field name="prescriber_name"/>
+                                    <field name="next_drug_pickup_date"/>
+                                </group>
+                                <group>
+                                    <field name="drug_pickup_point_raw"/>
                                     <field name="collection_point_id"/>
-                                    <field name="new_patient"/>
-                                    <field name="repeat_patient"/>
-                                    <field name="next_clinical_visit_date"/>
-                                </group>
-                                <group string="Nominated Collector">
-                                    <field name="nominated_person_name"/>
-                                    <field name="nominated_person_id_number"/>
-                                    <field name="nominated_person_relationship"/>
-                                    <field name="nominated_person_phone"/>
+                                    <field name="e_locker_district"/>
                                 </group>
                             </group>
                         </page>
-                        <page string="Medicines">
-                            <field name="line_ids">
-                                <tree editable="bottom">
-                                    <field name="sequence" widget="handle"/>
-                                    <field name="product_id"/>
-                                    <field name="medicine_text"/>
-                                    <field name="directions"/>
-                                    <field name="form"/>
-                                    <field name="strength"/>
-                                    <field name="quantity"/>
-                                    <field name="product_uom_id"/>
-                                    <field name="refill_number"/>
-                                    <field name="one_time_use_only"/>
-                                </tree>
-                            </field>
-                        </page>
-                        <page string="Prescriber">
-                            <group>
-                                <field name="prescriber_name"/>
-                                <field name="prescriber_contact"/>
-                                <field name="prescriber_registration_number"/>
-                            </group>
-                        </page>
-                        <page string="Validation">
+                        <page string="Review Notes">
                             <field name="validation_notes"/>
                         </page>
                     </notebook>
@@ -143,16 +122,17 @@
         <field name="arch" type="xml">
             <search>
                 <field name="name"/>
-                <field name="barcode"/>
                 <field name="patient_identifier"/>
+                <field name="patient_first_name"/>
                 <field name="facility_name"/>
                 <field name="collection_point_id"/>
-                <filter string="Captured" name="captured" domain="[('state', '=', 'captured')]"/>
-                <filter string="Validation Failed" name="validation_failed" domain="[('state', '=', 'validation_failed')]"/>
-                <filter string="Validated" name="validated" domain="[('state', '=', 'validated')]"/>
+                <filter string="Awaiting Verification" name="awaiting_verification" domain="[('state', '=', 'awaiting_verification')]"/>
+                <filter string="Awaiting Validation" name="awaiting_validation" domain="[('state', '=', 'awaiting_validation')]"/>
+                <filter string="Awaiting Batching" name="awaiting_batching" domain="[('state', '=', 'awaiting_batching')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
-                    <filter string="Refill Date" name="group_refill_date" context="{'group_by': 'refill_date'}"/>
+                    <filter string="Facility" name="group_facility" context="{'group_by': 'facility_id'}"/>
+                    <filter string="Prescription Date" name="group_prescription_date" context="{'group_by': 'prescription_date'}"/>
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                 </group>
             </search>
@@ -164,5 +144,29 @@
         <field name="res_model">cdu.prescription</field>
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
+    </record>
+
+    <record id="action_cdu_prescription_awaiting_verification" model="ir.actions.act_window">
+        <field name="name">Awaiting Verification</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_verification')]</field>
+    </record>
+
+    <record id="action_cdu_prescription_awaiting_validation" model="ir.actions.act_window">
+        <field name="name">Awaiting Validation</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_validation')]</field>
+    </record>
+
+    <record id="action_cdu_prescription_awaiting_batching" model="ir.actions.act_window">
+        <field name="name">Awaiting Batching</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_batching')]</field>
     </record>
 </odoo>
