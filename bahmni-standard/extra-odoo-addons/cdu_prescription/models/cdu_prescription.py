@@ -1,12 +1,11 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
 
 
 class CduPrescription(models.Model):
     _name = "cdu.prescription"
     _description = "CDU Prescription"
     _inherit = ["mail.thread", "mail.activity.mixin"]
-    _order = "refill_date, create_date desc"
+    _order = "prescription_date desc, create_date desc"
 
     name = fields.Char(
         default="/",
@@ -14,11 +13,16 @@ class CduPrescription(models.Model):
         readonly=True,
         tracking=True,
     )
-    source_document_ref = fields.Char(string="Source Document Reference")
-    barcode = fields.Char(string="Prescription Barcode", copy=False, tracking=True)
+    source_key = fields.Char(copy=False, readonly=True, index=True)
+    row_hash = fields.Char(copy=False, readonly=True, index=True)
+    report_run_id = fields.Many2one("cdu.report.run", string="Report Run", readonly=True)
+    report_row_id = fields.Many2one("cdu.report.row", string="Report Row", readonly=True)
+    source_file_name = fields.Char(readonly=True)
+    source_row_number = fields.Integer(readonly=True)
+    source_report_generated_at = fields.Datetime(readonly=True)
     facility_id = fields.Many2one("cdu.facility", string="Facility", tracking=True)
-    facility_name = fields.Char(required=True, tracking=True)
-    facility_code = fields.Char(tracking=True)
+    facility_name = fields.Char(string="Location", required=True, tracking=True)
+    facility_code = fields.Char(string="Facility Code", tracking=True)
     prescription_date = fields.Date(required=True, tracking=True)
     patient_id = fields.Many2one(
         "res.partner",
@@ -26,72 +30,59 @@ class CduPrescription(models.Model):
         domain=[("customer_rank", ">", 0)],
         tracking=True,
     )
-    patient_identifier = fields.Char(string="Patient ID", tracking=True)
-    patient_surname = fields.Char()
-    patient_first_name = fields.Char()
-    patient_date_of_birth = fields.Date()
-    patient_language = fields.Selection(
-        [
-            ("english", "English"),
-            ("sesotho", "Sesotho"),
-            ("isixhosa", "isiXhosa"),
-        ],
-        string="Language",
-    )
+    patient_identifier = fields.Char(string="eRegister ID", tracking=True)
+    hiv_program_id = fields.Char(string="HIV Program ID")
+    national_id = fields.Char(string="National ID")
+    patient_first_name = fields.Char(string="Patient Name")
+    patient_date_of_birth = fields.Date(string="DOB")
     patient_gender = fields.Selection(
         [("male", "Male"), ("female", "Female"), ("other", "Other")]
     )
-    patient_phone = fields.Char()
-    patient_address = fields.Text()
+    patient_phone = fields.Char(string="Primary Contact")
+    patient_address = fields.Text(string="Address")
     allergies = fields.Char()
-    diagnosis_asthma_copd = fields.Boolean(string="Asthma/COPD")
-    diagnosis_diabetes_type_2 = fields.Boolean(string="Diabetes Mellitus - Type 2")
-    diagnosis_family_planning = fields.Boolean(string="Family Planning")
-    diagnosis_hypertension = fields.Boolean(string="Hypertension")
-    diagnosis_hiv = fields.Boolean(string="HIV")
-    diagnosis_arthritis = fields.Boolean(string="Arthritis")
-    viral_load_date_taken = fields.Date(string="Viral Load Date Taken")
-    cd4_count_date_taken = fields.Date(string="CD4 Count Date Taken")
-    repeat_count = fields.Integer(string="Repeat Count", tracking=True)
-    refill_date = fields.Date(string="Refill / Next Collection Date", tracking=True)
+    has_allergies = fields.Selection(
+        [("yes", "Yes"), ("no", "No"), ("unknown", "Unknown")],
+        string="Has Allergies",
+    )
+    hiv_diagnosis_date = fields.Date(string="HIV Diagnosis Date")
+    latest_vl_collection_date = fields.Date(string="Latest VL Collection Date")
+    latest_vl_result = fields.Char(string="Latest VL Result")
+    regimen_prescribed_raw = fields.Char(string="Regimen Prescribed")
+    new_or_revisit = fields.Selection(
+        [("new", "New"), ("revisit", "Revisit"), ("restarted", "Restarted")],
+        string="New or Revisit",
+    )
+    next_drug_pickup_date = fields.Date(string="Next Drug Pickup Date")
+    drug_pickup_point_raw = fields.Char(string="Drug Pickup Point")
+    e_locker_district = fields.Char(string="E-locker District")
     collection_point_id = fields.Many2one(
         "cdu.collection.point",
-        required=True,
         tracking=True,
     )
-    nominated_person_name = fields.Char()
-    nominated_person_id_number = fields.Char()
-    nominated_person_relationship = fields.Char()
-    nominated_person_phone = fields.Char()
-    prescriber_name = fields.Char()
-    prescriber_contact = fields.Char()
-    prescriber_registration_number = fields.Char()
-    clinical_review_only = fields.Boolean(tracking=True)
-    new_patient = fields.Boolean(tracking=True)
-    repeat_patient = fields.Boolean(tracking=True)
-    next_clinical_visit_date = fields.Date()
-    line_ids = fields.One2many(
-        "cdu.prescription.line",
-        "prescription_id",
-        string="Medicines",
-    )
+    secondary_contact = fields.Char(string="Secondary Contact")
+    prescriber_name = fields.Char(string="Prescriber Name")
+    next_clinical_visit_date = fields.Date(string="Next Clinical Appointment Date")
     state = fields.Selection(
         [
-            ("draft_capture", "Draft Capture"),
-            ("captured", "Captured"),
-            ("validation_failed", "Validation Failed"),
-            ("validated", "Validated"),
+            ("awaiting_verification", "AWAITING_VERIFICATION"),
+            ("awaiting_validation", "AWAITING_VALIDATION"),
+            ("awaiting_batching", "AWAITING_BATCHING"),
             ("on_hold", "On Hold"),
             ("cancelled", "Cancelled"),
         ],
-        default="draft_capture",
+        default="awaiting_verification",
         required=True,
         tracking=True,
     )
-    validation_notes = fields.Text(tracking=True)
+    verified_by = fields.Many2one("res.users", readonly=True)
+    verified_at = fields.Datetime(readonly=True)
+    validated_by = fields.Many2one("res.users", readonly=True)
+    validated_at = fields.Datetime(readonly=True)
+    validation_notes = fields.Text(string="Review Notes", tracking=True)
 
     _sql_constraints = [
-        ("unique_barcode", "unique(barcode)", "Prescription barcode must be unique."),
+        ("unique_source_key", "unique(source_key)", "This eRegister prescription has already been ingested."),
     ]
 
     @api.model
@@ -102,7 +93,37 @@ class CduPrescription(models.Model):
             facility = self.env["cdu.facility"].browse(vals["facility_id"])
             vals.setdefault("facility_name", facility.name)
             vals.setdefault("facility_code", facility.code)
+        if vals.get("patient_id"):
+            vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
         return super().create(vals)
+
+    def write(self, vals):
+        if vals.get("patient_id"):
+            vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
+        return super().write(vals)
+
+    def _patient_snapshot_values(self, patient_id, existing_vals=None):
+        patient = self.env["res.partner"].browse(patient_id).exists()
+        if not patient:
+            return {}
+
+        snapshot = {
+            "patient_identifier": patient.cdu_eregister_id or patient.ref,
+            "hiv_program_id": patient.cdu_hiv_program_id,
+            "national_id": patient.cdu_national_id,
+            "patient_first_name": patient.name,
+            "patient_date_of_birth": patient.cdu_date_of_birth,
+            "patient_gender": patient.cdu_gender,
+            "patient_phone": patient.phone or patient.mobile,
+            "secondary_contact": patient.cdu_secondary_contact,
+            "patient_address": patient.street,
+        }
+        existing_vals = existing_vals or {}
+        return {
+            field_name: value
+            for field_name, value in snapshot.items()
+            if field_name not in existing_vals
+        }
 
     @api.onchange("facility_id")
     def _onchange_facility_id(self):
@@ -110,20 +131,24 @@ class CduPrescription(models.Model):
             self.facility_name = self.facility_id.name
             self.facility_code = self.facility_id.code
 
-    def action_mark_captured(self):
-        self.write({"state": "captured"})
+    @api.onchange("patient_id")
+    def _onchange_patient_id(self):
+        if self.patient_id:
+            self.update(self._patient_snapshot_values(self.patient_id.id))
 
-    def action_validate_prescription(self):
-        for prescription in self:
-            validation_errors = prescription._get_validation_errors()
-            if validation_errors:
-                prescription.write({
-                    "state": "validation_failed",
-                    "validation_notes": "Missing or invalid: %s" % ", ".join(validation_errors),
-                })
-                continue
-            prescription.state = "validated"
-            prescription.validation_notes = False
+    def action_mark_patient_verified(self):
+        self.write({
+            "state": "awaiting_validation",
+            "verified_by": self.env.user.id,
+            "verified_at": fields.Datetime.now(),
+        })
+
+    def action_mark_medicine_validated(self):
+        self.write({
+            "state": "awaiting_batching",
+            "validated_by": self.env.user.id,
+            "validated_at": fields.Datetime.now(),
+        })
 
     def action_put_on_hold(self):
         self.write({"state": "on_hold"})
@@ -136,46 +161,8 @@ class CduPrescription(models.Model):
         missing = []
         if not self.patient_id and not self.patient_identifier:
             missing.append("patient")
-        if not self.collection_point_id:
-            missing.append("collection point")
-        if not self.clinical_review_only and not self.line_ids:
-            missing.append("at least one medicine line")
-        if self.repeat_count < 0:
-            missing.append("valid repeat count")
+        if not self.drug_pickup_point_raw and not self.collection_point_id:
+            missing.append("drug pickup point")
+        if not self.regimen_prescribed_raw:
+            missing.append("regimen prescribed")
         return missing
-
-
-class CduPrescriptionLine(models.Model):
-    _name = "cdu.prescription.line"
-    _description = "CDU Prescription Line"
-    _order = "sequence, id"
-
-    prescription_id = fields.Many2one(
-        "cdu.prescription",
-        required=True,
-        ondelete="cascade",
-    )
-    sequence = fields.Integer(default=10)
-    product_id = fields.Many2one("product.product", string="Medicine")
-    medicine_text = fields.Char(
-        string="Medicine as Written",
-        help="Raw medicine text captured from the prescription form.",
-    )
-    directions = fields.Char(string="Directions / Abbreviation")
-    one_time_use_only = fields.Boolean()
-    form = fields.Char()
-    strength = fields.Char()
-    quantity = fields.Float(required=True, default=1.0)
-    product_uom_id = fields.Many2one("uom.uom", string="Unit of Measure")
-    initial_issue = fields.Boolean()
-    refill_number = fields.Integer()
-    lot_id = fields.Many2one("stock.lot", string="Batch / Lot")
-    expiry_date = fields.Datetime(related="lot_id.expiration_date", store=True)
-
-    @api.constrains("quantity", "refill_number")
-    def _check_positive_values(self):
-        for line in self:
-            if line.quantity <= 0:
-                raise ValidationError("Medicine quantity must be greater than zero.")
-            if line.refill_number < 0:
-                raise ValidationError("Refill number cannot be negative.")
