@@ -18,6 +18,13 @@
         action="action_cdu_prescription"
         sequence="10"/>
 
+        <menuitem
+        id="menu_cdu_batches"
+        name="Workload Batches"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_batch"
+        sequence="20"/>
+
     <menuitem
         id="menu_cdu_configuration"
         name="Configuration"

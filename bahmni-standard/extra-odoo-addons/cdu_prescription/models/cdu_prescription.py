@@ -19,6 +19,7 @@ class CduPrescription(models.Model):
     facility_id = fields.Many2one("cdu.facility", string="Facility", tracking=True)
     facility_name = fields.Char(required=True, tracking=True)
     facility_code = fields.Char(tracking=True)
+    batch_id = fields.Many2one("cdu.batch", string="Workload Batch", ondelete='set null', copy=False, tracking=True)
     prescription_date = fields.Date(required=True, tracking=True)
     patient_id = fields.Many2one(
         "res.partner",
@@ -77,14 +78,21 @@ class CduPrescription(models.Model):
     )
     state = fields.Selection(
         [
-            ("draft_capture", "Draft Capture"),
-            ("captured", "Captured"),
+            # ("draft_capture", "Draft Capture"),
+            # ("captured", "Captured"),
+            ("awaiting_verification", "Awaiting Verification"),
+            ("awaiting_validation", "Awaiting Validation"),
+            ("rejected_to_call_center", "Rejected to Call Centre"),
+            ("rejected_to_facility", "Rejected to Facility"),
             ("validation_failed", "Validation Failed"),
-            ("validated", "Validated"),
+            ("awaiting_batching", "Awaiting Batching"),
+            # ("validated", "Validated"),
             ("on_hold", "On Hold"),
             ("cancelled", "Cancelled"),
+
         ],
-        default="draft_capture",
+        # default="draft_capture",
+        default="awaiting_verification",
         required=True,
         tracking=True,
     )
@@ -110,26 +118,39 @@ class CduPrescription(models.Model):
             self.facility_name = self.facility_id.name
             self.facility_code = self.facility_id.code
 
-    def action_mark_captured(self):
-        self.write({"state": "captured"})
+    # def action_mark_captured(self):
+    #     self.write({"state": "captured"})
+    def action_verify(self):
+        self.write({"state": "awaiting_validation"})
 
     def action_validate_prescription(self):
-        for prescription in self:
-            validation_errors = prescription._get_validation_errors()
-            if validation_errors:
-                prescription.write({
-                    "state": "validation_failed",
-                    "validation_notes": "Missing or invalid: %s" % ", ".join(validation_errors),
-                })
-                continue
-            prescription.state = "validated"
-            prescription.validation_notes = False
+        self.write({"state": "awaiting_batching"})
+        # for prescription in self:
+        #     validation_errors = prescription._get_validation_errors()
+        #     if validation_errors:
+        #         prescription.write({
+        #             "state": "validation_failed",
+        #             "validation_notes": "Missing or invalid: %s" % ", ".join(validation_errors),
+        #         })
+        #         continue
+        #     prescription.state = "validated"
+        #     prescription.validation_notes = False
 
-    def action_put_on_hold(self):
-        self.write({"state": "on_hold"})
+    # def action_put_on_hold(self):
+    #     self.write({"state": "on_hold"})
 
-    def action_cancel(self):
-        self.write({"state": "cancelled"})
+    def action_reject_to_call_center(self):
+        """Transition to rejected state from either Verify or Validate stages"""
+        self.write({'state': 'rejected_to_call_center'})
+        # self.message_post(body="Prescription rejected to Call Centre.")
+
+    # def action_cancel(self):
+    #     self.write({"state": "cancelled"})
+
+    def action_reject_to_facility(self):
+        """Transition to rejected state from either Verify or Validate stages"""
+        self.write({'state': 'rejected_to_facility'})
+        # self.message_post(body="Prescription rejected to Facility.")
 
     def _get_validation_errors(self):
         self.ensure_one()
@@ -180,14 +201,3 @@ class CduPrescriptionLine(models.Model):
             if line.refill_number < 0:
                 raise ValidationError("Refill number cannot be negative.")
     
-    state = fields.Selection([
-        ('awaiting_verification', 'Awaiting Verification'),
-        ('awaiting_validation', 'Awaiting Validation'),
-        ('rejected_callcentre', 'Rejected To Call Centre'),
-        ('awaiting_batching', 'Awaiting Batching'),
-        ('bagging', 'Bagging'),
-        ('boxing', 'Boxing'),
-        ('rejected_facility', 'Rejected To Facility'),
-        ('cancelled', 'Cancelled'),
-        ('completed', 'Completed')], 
-        default='awaiting_verification', tracking=True)

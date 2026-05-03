@@ -22,81 +22,27 @@
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
             <form>
-                <!-- <header>
-                    <button name="action_mark_captured" string="Mark Captured" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'draft_capture')]}"/>
-                    <button name="action_validate_prescription" string="Validate" type="object" class="btn-primary" attrs="{'invisible': [('state', 'not in', ('captured', 'validation_failed'))]}"/>
-                    <button name="action_put_on_hold" string="Put On Hold" type="object" attrs="{'invisible': [('state', 'in', ('cancelled', 'on_hold'))]}"/>
-                    <button name="action_cancel" string="Cancel" type="object" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft_capture,captured,validated"/>
-                </header> -->
-        <header>
-            <field name="state" invisible="1"/>
-            <!-- Action Buttons -->
-            <button name="action_mark_captured"
-                string="Mark Captured"
-                type="object"
-                class="btn-primary"
-                attrs="{'invisible':[('state','!=','draft_capture')]}"/>
+                <header>
+                    <!-- Verify: Visible in 'awaiting_verification' OR if returning from 'rejected_to_call_center' -->
+                    <button name="action_verify" string="Verify" type="object" class="btn-primary" 
+                            attrs="{'invisible': [('state', 'not in', ['awaiting_verification', 'rejected_to_call_center'])]}"/>
 
-            <button name="action_validate_prescription"
-                string="Validate"
-                type="object"
-                class="btn-primary"
-                attrs="{'invisible':[('state','not in',('captured','validation_failed'))]}"/>
+                    <!-- Validate: Only visible during normal validation flow -->
+                    <button name="action_validate_prescription" string="Validate" type="object" class="btn-primary" 
+                            attrs="{'invisible': [('state', 'not in', ['awaiting_validation', 'validation_failed'])]}"/>
 
-            <button name="action_put_on_hold"
-                string="Put On Hold"
-                type="object"
-                attrs="{'invisible':[('state','in',('cancelled','on_hold'))]}"/>
+                    <!-- Reject to Call Center: Visible during Verification and Validation phases -->
+                    <button name="action_reject_to_call_center" string="Reject to Call Center" type="object" class="btn-danger" 
+                            attrs="{'invisible': [('state', 'not in', ['awaiting_verification', 'awaiting_validation'])]}"/>
 
-            <button name="action_cancel"
-                string="Cancel"
-                type="object"
-                attrs="{'invisible':[('state','=','cancelled')]}"/>
+                    <!-- Reject to Facility: Visible during Verification, Validation, or specifically in rejected_to_call_center -->
+                    <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" 
+                            attrs="{'invisible': [('state', 'not in', ['awaiting_verification', 'awaiting_validation', 'rejected_to_call_center'])]}"/>
 
-
-            <!-- Custom Prescription Lifecycle Ribbon -->
-            <div class="rx_statusbar">
-
-            <div class="step active">
-                Awaiting Verification
-            </div>
-
-            <div class="step">
-                Awaiting Validation
-            </div>
-
-            <div class="step reject">
-                Rejected To Call Centre
-            </div>
-
-            <div class="step">
-                Awaiting Batching
-            </div>
-
-            <div class="step">
-                Bagging
-            </div>
-
-            <div class="step">
-                Boxing
-            </div>
-
-            <div class="step reject">
-                Rejected To Facility
-            </div>
-
-            <div class="step cancel">
-                Cancelled
-            </div>
-
-            <div class="step complete">
-                Completed
-            </div>
-
-            </div>
-
-        </header>
+                    <!-- Statusbar: Only show the main flow states. 
+                        Rejected states will ONLY appear when the record is actually in that state. -->
+                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching"/>
+                </header>
                 <sheet>
                     <div class="oe_title">
                         <label for="name"/>
@@ -215,9 +161,9 @@
                 <field name="patient_identifier"/>
                 <field name="facility_name"/>
                 <field name="collection_point_id"/>
-                <filter string="Captured" name="captured" domain="[('state', '=', 'captured')]"/>
+                <filter string="Awaiting Validation" name="awaiting_validation" domain="[('state', '=', 'awaiting_validation')]"/>
                 <filter string="Validation Failed" name="validation_failed" domain="[('state', '=', 'validation_failed')]"/>
-                <filter string="Validated" name="validated" domain="[('state', '=', 'validated')]"/>
+                <filter string="Awaiting Batching" name="awaiting_batching" domain="[('state', '=', 'awaiting_batching')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
                     <filter string="Refill Date" name="group_refill_date" context="{'group_by': 'refill_date'}"/>
