@@ -53,8 +53,7 @@
                             <field name="prescription_date"/>
                         </group>
                         <group string="Workflow">
-                            <field name="state"/>
-                            <field name="batch_id"/>
+                            <field name="batch_id" readonly="1"/>
                             <field name="verified_by"/>
                             <field name="verified_at"/>
                             <field name="validated_by"/>
@@ -109,7 +108,7 @@
                                 </group>
                             </group>
                         </page>
-                        <page string="Review Notes">
+                        <page string="Comments">
                             <field name="validation_notes"/>
                         </page>
                     </notebook>
