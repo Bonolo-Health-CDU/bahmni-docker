@@ -3,5 +3,7 @@ access_cdu_collection_point_user,cdu.collection.point user,model_cdu_collection_
 access_cdu_batch_user,cdu.batch user,model_cdu_batch,base.group_user,1,1,1,0
 access_cdu_facility_user,cdu.facility user,model_cdu_facility,base.group_user,1,1,1,0
 access_cdu_prescription_user,cdu.prescription user,model_cdu_prescription,base.group_user,1,1,1,0
+access_cdu_prescription_admin,cdu.prescription admin,model_cdu_prescription,base.group_system,1,1,1,1
 access_cdu_report_run_user,cdu.report.run user,model_cdu_report_run,base.group_user,1,1,1,0
+access_cdu_report_run_admin,cdu.report.run admin,model_cdu_report_run,base.group_system,1,1,1,1
 access_cdu_report_row_user,cdu.report.row user,model_cdu_report_row,base.group_user,1,1,1,0
