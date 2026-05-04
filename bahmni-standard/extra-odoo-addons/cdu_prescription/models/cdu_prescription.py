@@ -23,6 +23,13 @@ class CduPrescription(models.Model):
     facility_id = fields.Many2one("cdu.facility", string="Facility", tracking=True)
     facility_name = fields.Char(string="Location", required=True, tracking=True)
     facility_code = fields.Char(string="Facility Code", tracking=True)
+    batch_id = fields.Many2one(
+        "cdu.batch",
+        string="Workload Batch",
+        ondelete="set null",
+        copy=False,
+        tracking=True,
+    )
     prescription_date = fields.Date(required=True, tracking=True)
     patient_id = fields.Many2one(
         "res.partner",
@@ -65,10 +72,11 @@ class CduPrescription(models.Model):
     next_clinical_visit_date = fields.Date(string="Next Clinical Appointment Date")
     state = fields.Selection(
         [
-            ("awaiting_verification", "AWAITING_VERIFICATION"),
-            ("awaiting_validation", "AWAITING_VALIDATION"),
-            ("awaiting_batching", "AWAITING_BATCHING"),
-            ("on_hold", "On Hold"),
+            ("awaiting_verification", "Awaiting verification"),
+            ("awaiting_validation", "Awaiting validation"),
+            ("rejected_to_call_center", "Rejected to call center"),
+            ("rejected_to_facility", "Rejected to facility"),
+            ("awaiting_batching", "Awaiting batching"),
             ("cancelled", "Cancelled"),
         ],
         default="awaiting_verification",
@@ -150,8 +158,17 @@ class CduPrescription(models.Model):
             "validated_at": fields.Datetime.now(),
         })
 
-    def action_put_on_hold(self):
-        self.write({"state": "on_hold"})
+    def action_reject_to_call_center(self):
+        self.write({"state": "rejected_to_call_center"})
+
+    def action_reject_to_facility(self):
+        self.write({"state": "rejected_to_facility"})
+
+    def action_return_to_verification(self):
+        self.write({"state": "awaiting_verification"})
+
+    def action_return_to_validation(self):
+        self.write({"state": "awaiting_validation"})
 
     def action_cancel(self):
         self.write({"state": "cancelled"})

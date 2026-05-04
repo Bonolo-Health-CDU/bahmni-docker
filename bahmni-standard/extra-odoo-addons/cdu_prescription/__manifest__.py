@@ -19,6 +19,7 @@
     "data": [
         "security/ir.model.access.csv",
         "data/cdu_sequence.xml",
+        "views/cdu_batch_views.xml",
         "views/cdu_collection_point_views.xml",
         "views/cdu_facility_views.xml",
         "views/cdu_patient_views.xml",

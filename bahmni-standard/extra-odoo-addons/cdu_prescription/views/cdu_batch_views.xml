@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_batch_tree" model="ir.ui.view">
+        <field name="name">cdu.batch.tree</field>
+        <field name="model">cdu.batch</field>
+        <field name="arch" type="xml">
+            <tree decoration-info="state == 'draft'" decoration-success="state == 'done'">
+                <field name="name"/>
+                <field name="filter_facility_id"/>
+                <field name="filter_collection_point_id"/>
+                <field name="filter_next_drug_pickup_date"/>
+                <field name="filter_hiv_program_id"/>
+                <field name="prescription_count"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_batch_form" model="ir.ui.view">
+        <field name="name">cdu.batch.form</field>
+        <field name="model">cdu.batch</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_confirm_batch" string="Confirm Batch" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_mark_printed" string="Mark Picking List Printed" type="object" attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
+                    <button name="action_mark_done" string="Mark Done" type="object" attrs="{'invisible': [('state', 'not in', ('confirmed', 'printed'))]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,printed,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Batch Filters">
+                            <field name="filter_facility_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="filter_collection_point_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="filter_next_drug_pickup_date" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="filter_hiv_program_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                        </group>
+                        <group string="Summary">
+                            <field name="prescription_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Prescriptions in Batch">
+                            <field name="prescription_ids" attrs="{'readonly': [('state', '!=', 'draft')]}">
+                                <tree create="false" delete="true">
+                                    <field name="name"/>
+                                    <field name="patient_identifier"/>
+                                    <field name="patient_first_name"/>
+                                    <field name="facility_name"/>
+                                    <field name="collection_point_id"/>
+                                    <field name="next_drug_pickup_date"/>
+                                    <field name="hiv_program_id"/>
+                                    <field name="state"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_batch" model="ir.actions.act_window">
+        <field name="name">Workload Batches</field>
+        <field name="res_model">cdu.batch</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>
