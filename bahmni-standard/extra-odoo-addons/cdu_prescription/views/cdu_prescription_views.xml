@@ -32,7 +32,9 @@
                     <button name="action_return_to_validation" string="Back to Awaiting Validation" type="object" class="oe_highlight" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" attrs="{'invisible': [('state', 'not in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center'))]}"/>
                     <button name="action_cancel" string="Cancel" type="object" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching,rejected_to_call_center,rejected_to_facility"/>
+                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching" attrs="{'invisible': [('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="rejected_to_call_center" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="rejected_to_facility" attrs="{'invisible': [('state', '!=', 'rejected_to_facility')]}"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
