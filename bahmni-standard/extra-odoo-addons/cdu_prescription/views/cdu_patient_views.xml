@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_patient_tree" model="ir.ui.view">
+        <field name="name">cdu.patient.tree</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <tree string="CDU Patients">
+                <field name="name"/>
+                <field name="cdu_eregister_id"/>
+                <field name="cdu_hiv_program_id"/>
+                <field name="cdu_national_id"/>
+                <field name="cdu_gender"/>
+                <field name="cdu_date_of_birth"/>
+                <field name="phone"/>
+                <field name="cdu_secondary_contact"/>
+                <field name="cdu_source_facility_id"/>
+                <field name="cdu_prescription_count"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_patient_form" model="ir.ui.view">
+        <field name="name">cdu.patient.form</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <form string="CDU Patient">
+                <sheet>
+                    <div name="button_box" class="oe_button_box">
+                        <button name="action_view_cdu_prescriptions" type="object" class="oe_stat_button" icon="fa-medkit">
+                            <field name="cdu_prescription_count" widget="statinfo" string="Prescriptions"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Patient name"/></h1>
+                    </div>
+                    <group>
+                        <group string="eRegister Identity">
+                            <field name="customer_rank" invisible="1"/>
+                            <field name="cdu_eregister_id"/>
+                            <field name="cdu_hiv_program_id"/>
+                            <field name="cdu_national_id"/>
+                        </group>
+                        <group string="Demographics">
+                            <field name="cdu_gender"/>
+                            <field name="cdu_date_of_birth"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Contact &amp; Address">
+                            <group>
+                                <group string="Contact">
+                                    <field name="phone" string="Primary Contact"/>
+                                    <field name="mobile"/>
+                                    <field name="cdu_secondary_contact"/>
+                                </group>
+                                <group string="Address">
+                                    <field name="street" placeholder="Address"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Source">
+                            <group>
+                                <group string="Facility">
+                                    <field name="cdu_source_facility_id"/>
+                                </group>
+                                <group string="Last eRegister Report">
+                                    <field name="cdu_last_report_run_id" readonly="1"/>
+                                    <field name="cdu_last_report_file_name"/>
+                                    <field name="cdu_last_report_generated_at"/>
+                                    <field name="cdu_last_ingested_at"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Prescriptions">
+                            <field name="cdu_prescription_ids" readonly="1">
+                                <tree string="CDU Prescriptions">
+                                    <field name="name"/>
+                                    <field name="prescription_date"/>
+                                    <field name="state"/>
+                                    <field name="regimen_prescribed_raw"/>
+                                    <field name="drug_pickup_point_raw"/>
+                                    <field name="facility_name"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cdu_patient_search" model="ir.ui.view">
+        <field name="name">cdu.patient.search</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <search string="CDU Patients">
+                <field name="name"/>
+                <field name="cdu_eregister_id"/>
+                <field name="cdu_hiv_program_id"/>
+                <field name="cdu_national_id"/>
+                <field name="phone"/>
+                <field name="cdu_secondary_contact"/>
+                <field name="cdu_source_facility_id"/>
+                <filter string="Has eRegister ID" name="has_eregister_id" domain="[('cdu_eregister_id', '!=', False)]"/>
+                <filter string="Has HIV Program ID" name="has_hiv_program_id" domain="[('cdu_hiv_program_id', '!=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Facility" name="group_facility" context="{'group_by': 'cdu_source_facility_id'}"/>
+                    <filter string="Gender" name="group_gender" context="{'group_by': 'cdu_gender'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cdu_patient" model="ir.actions.act_window">
+        <field name="name">Patients</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">['|', '|', ('cdu_eregister_id', '!=', False), ('cdu_hiv_program_id', '!=', False), ('cdu_last_report_run_id', '!=', False)]</field>
+        <field name="context">{'default_customer_rank': 1}</field>
+        <field name="search_view_id" ref="view_cdu_patient_search"/>
+    </record>
+
+    <record id="action_cdu_patient_tree_view" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">tree</field>
+        <field name="view_id" ref="view_cdu_patient_tree"/>
+        <field name="act_window_id" ref="action_cdu_patient"/>
+    </record>
+
+    <record id="action_cdu_patient_form_view" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cdu_patient_form"/>
+        <field name="act_window_id" ref="action_cdu_patient"/>
+    </record>
+</odoo>

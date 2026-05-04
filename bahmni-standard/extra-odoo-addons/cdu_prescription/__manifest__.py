@@ -7,6 +7,7 @@
     "license": "LGPL-3",
     "depends": [
         "base",
+        "web",
         "mail",
         "product",
         "stock",
@@ -18,11 +19,19 @@
     "data": [
         "security/ir.model.access.csv",
         "data/cdu_sequence.xml",
+        "views/cdu_batch_views.xml",
         "views/cdu_collection_point_views.xml",
         "views/cdu_facility_views.xml",
+        "views/cdu_patient_views.xml",
+        "views/cdu_report_import_views.xml",
         "views/cdu_prescription_views.xml",
         "views/cdu_menus.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "cdu_prescription/static/src/css/cdu_prescription_backend.css",
+        ],
+    },
     "installable": True,
     "application": True,
 }
