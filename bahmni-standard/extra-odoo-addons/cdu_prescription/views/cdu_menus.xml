@@ -64,7 +64,8 @@
         id="menu_cdu_configuration"
         name="Configuration"
         parent="menu_cdu_root"
-        sequence="90"/>
+        sequence="90"
+        groups="base.group_system"/>
 
     <menuitem
         id="menu_cdu_collection_points"
@@ -79,4 +80,18 @@
         parent="menu_cdu_configuration"
         action="action_cdu_facility"
         sequence="20"/>
+
+    <menuitem
+        id="menu_cdu_onedrive_sources"
+        name="OneDrive Sources"
+        parent="menu_cdu_configuration"
+        action="action_cdu_onedrive_source"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_cdu_onedrive_poll_logs"
+        name="OneDrive Poll Logs"
+        parent="menu_cdu_configuration"
+        action="action_cdu_onedrive_poll_log"
+        sequence="40"/>
 </odoo>

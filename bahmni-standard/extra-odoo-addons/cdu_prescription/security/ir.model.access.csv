@@ -7,3 +7,5 @@ access_cdu_prescription_admin,cdu.prescription admin,model_cdu_prescription,base
 access_cdu_report_run_user,cdu.report.run user,model_cdu_report_run,base.group_user,1,1,1,0
 access_cdu_report_run_admin,cdu.report.run admin,model_cdu_report_run,base.group_system,1,1,1,1
 access_cdu_report_row_user,cdu.report.row user,model_cdu_report_row,base.group_user,1,1,1,0
+access_cdu_onedrive_source_admin,cdu.onedrive.source admin,model_cdu_onedrive_source,base.group_system,1,1,1,1
+access_cdu_onedrive_poll_log_admin,cdu.onedrive.poll.log admin,model_cdu_onedrive_poll_log,base.group_system,1,1,1,1

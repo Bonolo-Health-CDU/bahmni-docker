@@ -48,6 +48,18 @@ class CduReportRun(models.Model):
     source_facility_id = fields.Many2one("cdu.facility", string="Source Facility")
     source_file = fields.Binary(string="Report File", attachment=True)
     source_file_name = fields.Char(string="File Name")
+    ingestion_channel = fields.Selection(
+        [("manual", "Manual"), ("onedrive", "OneDrive")],
+        default="manual",
+        readonly=True,
+        tracking=True,
+    )
+    remote_file_id = fields.Char(readonly=True, copy=False, index=True)
+    remote_file_etag = fields.Char(readonly=True, copy=False)
+    remote_folder_name = fields.Char(readonly=True)
+    remote_folder_path = fields.Char(readonly=True)
+    poll_log_id = fields.Many2one("cdu.onedrive.poll.log", readonly=True)
+    poll_triggered_at = fields.Datetime(readonly=True)
     file_hash = fields.Char(readonly=True, copy=False)
     report_title = fields.Char(readonly=True)
     report_period = fields.Char(readonly=True)
@@ -76,18 +88,19 @@ class CduReportRun(models.Model):
     def create(self, vals):
         if vals.get("name", "/") == "/":
             vals["name"] = self.env["ir.sequence"].next_by_code("cdu.report.run") or "/"
+        vals.setdefault("ingestion_channel", "manual")
         return super().create(vals)
 
     def action_import_file(self):
         for run in self:
             run._import_file()
 
-    def _import_file(self):
+    def _import_file(self, file_bytes=None):
         self.ensure_one()
         if not self.source_file:
             raise UserError(_("Please upload a report file before importing."))
 
-        file_bytes = base64.b64decode(self.source_file)
+        file_bytes = file_bytes or base64.b64decode(self.source_file)
         file_hash = hashlib.sha256(file_bytes).hexdigest()
         duplicate_run = self.search([
             ("id", "!=", self.id),

@@ -48,8 +48,7 @@
                             <field name="source_row_number"/>
                             <field name="source_report_generated_at"/>
                             <field name="facility_id"/>
-                            <field name="facility_name"/>
-                            <field name="facility_code"/>
+                            <field name="facility_code" readonly="1"/>
                             <field name="prescription_date"/>
                         </group>
                         <group string="Workflow">

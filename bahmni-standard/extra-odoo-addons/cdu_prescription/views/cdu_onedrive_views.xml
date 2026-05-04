@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_onedrive_source_tree" model="ir.ui.view">
+        <field name="name">cdu.onedrive.source.tree</field>
+        <field name="model">cdu.onedrive.source</field>
+        <field name="arch" type="xml">
+            <tree decoration-muted="not enabled">
+                <field name="name"/>
+                <field name="enabled"/>
+                <field name="connected"/>
+                <field name="connected_account_label"/>
+                <field name="drive_id"/>
+                <field name="root_folder_id"/>
+                <field name="root_folder_path"/>
+                <field name="poll_interval_minutes"/>
+                <field name="last_successful_poll_at"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_onedrive_source_form" model="ir.ui.view">
+        <field name="name">cdu.onedrive.source.form</field>
+        <field name="model">cdu.onedrive.source</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_authorize_account" string="Connect OneDrive" type="object" class="btn-primary" attrs="{'invisible': [('connected', '=', True)]}"/>
+                    <button name="action_disconnect_account" string="Disconnect" type="object" attrs="{'invisible': [('connected', '=', False)]}"/>
+                    <button name="action_fetch_now" string="Fetch Now" type="object" class="btn-primary" attrs="{'invisible': [('connected', '=', False)]}"/>
+                    <field name="enabled"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Microsoft App Credentials">
+                            <field name="client_id"/>
+                            <field name="client_secret" password="True"/>
+                            <field name="connected" readonly="1"/>
+                            <field name="connected_at" readonly="1"/>
+                            <field name="connected_account_label" readonly="1"/>
+                        </group>
+                        <group string="OneDrive Target">
+                            <field name="drive_id" readonly="1"/>
+                            <field name="root_folder_id"/>
+                            <field name="root_folder_path"/>
+                            <field name="filename_pattern"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Polling">
+                            <field name="poll_interval_minutes"/>
+                            <field name="last_polled_at" readonly="1"/>
+                            <field name="last_successful_poll_at" readonly="1"/>
+                            <field name="last_poll_log_id" readonly="1"/>
+                        </group>
+                        <group string="Latest Result">
+                            <field name="last_poll_result" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Setup">
+                            <group>
+                                <group string="App Registration">
+                                    <div class="o_form_label">Register a Microsoft app that supports personal Microsoft accounts and set the redirect URI to the value below.</div>
+                                    <field name="client_id"/>
+                                    <field name="client_secret" password="True"/>
+                                </group>
+                                <group string="Redirect URI">
+                                    <div class="o_form_label">Use this exact redirect URI in the Microsoft app registration.</div>
+                                    <field name="redirect_uri" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Poll Logs">
+                            <field name="poll_log_ids" readonly="1">
+                                <tree decoration-danger="state == 'failed'" decoration-warning="state == 'completed_with_errors'">
+                                    <field name="started_at"/>
+                                    <field name="finished_at"/>
+                                    <field name="trigger_mode"/>
+                                    <field name="state"/>
+                                    <field name="imports_created"/>
+                                    <field name="duplicates_skipped"/>
+                                    <field name="failed_files"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_onedrive_source" model="ir.actions.act_window">
+        <field name="name">OneDrive Sources</field>
+        <field name="res_model">cdu.onedrive.source</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="view_cdu_onedrive_poll_log_tree" model="ir.ui.view">
+        <field name="name">cdu.onedrive.poll.log.tree</field>
+        <field name="model">cdu.onedrive.poll.log</field>
+        <field name="arch" type="xml">
+            <tree decoration-danger="state == 'failed'" decoration-warning="state == 'completed_with_errors'">
+                <field name="name"/>
+                <field name="source_id"/>
+                <field name="trigger_mode"/>
+                <field name="started_at"/>
+                <field name="finished_at"/>
+                <field name="folders_seen"/>
+                <field name="files_discovered"/>
+                <field name="imports_created"/>
+                <field name="duplicates_skipped"/>
+                <field name="failed_files"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_onedrive_poll_log_form" model="ir.ui.view">
+        <field name="name">cdu.onedrive.poll.log.form</field>
+        <field name="model">cdu.onedrive.poll.log</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="running,completed,completed_with_errors,failed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Run Details">
+                            <field name="source_id" readonly="1"/>
+                            <field name="trigger_mode" readonly="1"/>
+                            <field name="started_at" readonly="1"/>
+                            <field name="finished_at" readonly="1"/>
+                        </group>
+                        <group string="Summary">
+                            <field name="folders_seen" readonly="1"/>
+                            <field name="matched_folders" readonly="1"/>
+                            <field name="unmatched_folders" readonly="1"/>
+                            <field name="files_discovered" readonly="1"/>
+                            <field name="files_downloaded" readonly="1"/>
+                            <field name="imports_created" readonly="1"/>
+                            <field name="duplicates_skipped" readonly="1"/>
+                            <field name="failed_files" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Summary">
+                            <field name="result_summary" readonly="1"/>
+                        </page>
+                        <page string="Unmatched Folders">
+                            <field name="unmatched_folder_names" readonly="1"/>
+                        </page>
+                        <page string="Skipped Files">
+                            <field name="skipped_file_names" readonly="1"/>
+                        </page>
+                        <page string="Errors">
+                            <field name="error_message" readonly="1"/>
+                        </page>
+                        <page string="Imported Reports">
+                            <field name="report_run_ids" readonly="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="source_file_name"/>
+                                    <field name="source_facility_id"/>
+                                    <field name="ingested_at"/>
+                                    <field name="state"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_onedrive_poll_log" model="ir.actions.act_window">
+        <field name="name">OneDrive Poll Logs</field>
+        <field name="res_model">cdu.onedrive.poll.log</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>
