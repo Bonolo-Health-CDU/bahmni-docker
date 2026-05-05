@@ -75,6 +75,20 @@
         sequence="10"/>
 
     <menuitem
+        id="menu_cdu_collection_point_sync"
+        name="Pickup Point Sync"
+        parent="menu_cdu_configuration"
+        action="action_cdu_collection_point_sync_config"
+        sequence="15"/>
+
+    <menuitem
+        id="menu_cdu_collection_point_sync_logs"
+        name="Pickup Point Sync Logs"
+        parent="menu_cdu_configuration"
+        action="action_cdu_collection_point_sync_log"
+        sequence="16"/>
+
+    <menuitem
         id="menu_cdu_facilities"
         name="Facilities"
         parent="menu_cdu_configuration"
