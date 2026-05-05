@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_collection_point_sync_config_tree" model="ir.ui.view">
+        <field name="name">cdu.collection.point.sync.config.tree</field>
+        <field name="model">cdu.collection.point.sync.config</field>
+        <field name="arch" type="xml">
+            <tree decoration-muted="not enabled">
+                <field name="name"/>
+                <field name="enabled"/>
+                <field name="request_endpoint"/>
+                <field name="request_method"/>
+                <field name="last_sync_at"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_collection_point_sync_config_form" model="ir.ui.view">
+        <field name="name">cdu.collection.point.sync.config.form</field>
+        <field name="model">cdu.collection.point.sync.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_sync_now" string="Sync Pickup Points" type="object" class="btn-primary"/>
+                    <field name="enabled"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Request">
+                            <field name="request_endpoint"/>
+                            <field name="request_type"/>
+                            <field name="request_method"/>
+                        </group>
+                        <group string="Response Polling">
+                            <field name="response_endpoint_template"/>
+                            <field name="poll_attempts"/>
+                            <field name="poll_interval_seconds"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Latest Sync">
+                            <field name="last_sync_at" readonly="1"/>
+                            <field name="last_sync_log_id" readonly="1"/>
+                        </group>
+                        <group string="Latest Result">
+                            <field name="last_sync_result" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Sync Logs">
+                            <field name="sync_log_ids" readonly="1">
+                                <tree decoration-danger="state == 'failed'">
+                                    <field name="requested_at"/>
+                                    <field name="reference_guid"/>
+                                    <field name="fetched_count"/>
+                                    <field name="created_count"/>
+                                    <field name="updated_count"/>
+                                    <field name="state"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_collection_point_sync_config" model="ir.actions.act_window">
+        <field name="name">Pickup Point Sync</field>
+        <field name="res_model">cdu.collection.point.sync.config</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="view_cdu_collection_point_sync_log_tree" model="ir.ui.view">
+        <field name="name">cdu.collection.point.sync.log.tree</field>
+        <field name="model">cdu.collection.point.sync.log</field>
+        <field name="arch" type="xml">
+            <tree decoration-danger="state == 'failed'">
+                <field name="name"/>
+                <field name="requested_at"/>
+                <field name="reference_guid"/>
+                <field name="fetched_count"/>
+                <field name="created_count"/>
+                <field name="updated_count"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_collection_point_sync_log_form" model="ir.ui.view">
+        <field name="name">cdu.collection.point.sync.log.form</field>
+        <field name="model">cdu.collection.point.sync.log</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="requested,completed,failed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Request Tracking">
+                            <field name="config_id" readonly="1"/>
+                            <field name="reference_guid" readonly="1"/>
+                            <field name="requested_at" readonly="1"/>
+                            <field name="request_acknowledged_at" readonly="1"/>
+                            <field name="responded_at" readonly="1"/>
+                        </group>
+                        <group string="Summary">
+                            <field name="fetched_count" readonly="1"/>
+                            <field name="created_count" readonly="1"/>
+                            <field name="updated_count" readonly="1"/>
+                            <field name="result_summary" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Request Payload">
+                            <field name="request_payload" readonly="1"/>
+                        </page>
+                        <page string="POST Ack">
+                            <field name="post_response_payload" readonly="1"/>
+                        </page>
+                        <page string="Raw Response">
+                            <field name="raw_response_payload" readonly="1"/>
+                        </page>
+                        <page string="Normalized Locations">
+                            <field name="normalized_payload" readonly="1"/>
+                        </page>
+                        <page string="Errors">
+                            <field name="error_message" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_collection_point_sync_log" model="ir.actions.act_window">
+        <field name="name">Pickup Point Sync Logs</field>
+        <field name="res_model">cdu.collection.point.sync.log</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>

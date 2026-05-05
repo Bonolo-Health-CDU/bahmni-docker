@@ -6,6 +6,7 @@
         <field name="arch" type="xml">
             <tree decoration-danger="state == 'failed'" decoration-warning="state in ('completed_with_errors', 'duplicate')">
                 <field name="name"/>
+                <field name="ingestion_channel"/>
                 <field name="source_file_name"/>
                 <field name="source_facility_id"/>
                 <field name="report_generated_at"/>
@@ -37,8 +38,15 @@
                     <group>
                         <group string="Source">
                             <field name="source_facility_id"/>
+                            <field name="ingestion_channel"/>
                             <field name="source_file" filename="source_file_name"/>
                             <field name="source_file_name" invisible="1"/>
+                            <field name="remote_file_id"/>
+                            <field name="remote_file_etag"/>
+                            <field name="remote_folder_name"/>
+                            <field name="remote_folder_path"/>
+                            <field name="poll_log_id" groups="base.group_system"/>
+                            <field name="poll_triggered_at"/>
                             <field name="file_hash"/>
                         </group>
                         <group string="Report Metadata">

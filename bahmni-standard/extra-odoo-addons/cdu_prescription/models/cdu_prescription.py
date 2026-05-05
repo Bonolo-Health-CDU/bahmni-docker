@@ -106,6 +106,10 @@ class CduPrescription(models.Model):
         return super().create(vals)
 
     def write(self, vals):
+        if vals.get("facility_id"):
+            facility = self.env["cdu.facility"].browse(vals["facility_id"])
+            vals.setdefault("facility_name", facility.name)
+            vals.setdefault("facility_code", facility.code)
         if vals.get("patient_id"):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
         return super().write(vals)

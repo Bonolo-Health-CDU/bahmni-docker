@@ -64,7 +64,8 @@
         id="menu_cdu_configuration"
         name="Configuration"
         parent="menu_cdu_root"
-        sequence="90"/>
+        sequence="90"
+        groups="base.group_system"/>
 
     <menuitem
         id="menu_cdu_collection_points"
@@ -74,9 +75,37 @@
         sequence="10"/>
 
     <menuitem
+        id="menu_cdu_collection_point_sync"
+        name="Pickup Point Sync"
+        parent="menu_cdu_configuration"
+        action="action_cdu_collection_point_sync_config"
+        sequence="15"/>
+
+    <menuitem
+        id="menu_cdu_collection_point_sync_logs"
+        name="Pickup Point Sync Logs"
+        parent="menu_cdu_configuration"
+        action="action_cdu_collection_point_sync_log"
+        sequence="16"/>
+
+    <menuitem
         id="menu_cdu_facilities"
         name="Facilities"
         parent="menu_cdu_configuration"
         action="action_cdu_facility"
         sequence="20"/>
+
+    <menuitem
+        id="menu_cdu_onedrive_sources"
+        name="OneDrive Sources"
+        parent="menu_cdu_configuration"
+        action="action_cdu_onedrive_source"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_cdu_onedrive_poll_logs"
+        name="OneDrive Poll Logs"
+        parent="menu_cdu_configuration"
+        action="action_cdu_onedrive_poll_log"
+        sequence="40"/>
 </odoo>

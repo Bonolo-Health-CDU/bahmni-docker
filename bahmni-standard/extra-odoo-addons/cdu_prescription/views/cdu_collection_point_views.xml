@@ -6,9 +6,13 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="name"/>
+                <field name="remote_location_id"/>
+                <field name="remote_location_type"/>
                 <field name="code"/>
-                <field name="point_type"/>
-                <field name="external_reference"/>
+                <field name="region_name"/>
+                <field name="city"/>
+                <field name="telephone_number"/>
+                <field name="last_synced_at"/>
                 <field name="active"/>
             </tree>
         </field>
@@ -21,17 +25,66 @@
             <form>
                 <sheet>
                     <group>
-                        <group>
+                        <group string="Core">
                             <field name="name"/>
                             <field name="code"/>
                             <field name="point_type"/>
-                        </group>
-                        <group>
                             <field name="partner_id"/>
-                            <field name="external_reference"/>
                             <field name="active"/>
                         </group>
+                        <group string="Sync">
+                            <field name="remote_sync_key" readonly="1"/>
+                            <field name="remote_location_id" readonly="1"/>
+                            <field name="remote_location_type" readonly="1"/>
+                            <field name="external_reference"/>
+                            <field name="last_synced_at" readonly="1"/>
+                            <field name="sync_source" readonly="1"/>
+                            <field name="remote_timestamp" readonly="1"/>
+                        </group>
                     </group>
+                    <notebook>
+                        <page string="Address">
+                            <group>
+                                <group>
+                                    <field name="address_id" readonly="1"/>
+                                    <field name="address_line_1" readonly="1"/>
+                                    <field name="address_line_2" readonly="1"/>
+                                    <field name="address_line_3" readonly="1"/>
+                                    <field name="city" readonly="1"/>
+                                    <field name="postal_code" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="country_code_id" readonly="1"/>
+                                    <field name="country_name" readonly="1"/>
+                                    <field name="region_id" readonly="1"/>
+                                    <field name="region_name" readonly="1"/>
+                                    <field name="gps_coordinates" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Contact">
+                            <group>
+                                <group>
+                                    <field name="telephone_id" readonly="1"/>
+                                    <field name="telephone_number" readonly="1"/>
+                                    <field name="telephone_type" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="shop_name" readonly="1"/>
+                                    <field name="shop_number" readonly="1"/>
+                                    <field name="owner_id" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Dates">
+                            <group>
+                                <group>
+                                    <field name="effective_date" readonly="1"/>
+                                    <field name="expiry_date" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
