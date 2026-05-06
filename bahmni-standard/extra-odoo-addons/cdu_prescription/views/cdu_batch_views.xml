@@ -6,10 +6,10 @@
         <field name="arch" type="xml">
             <tree decoration-info="state == 'draft'" decoration-success="state == 'done'">
                 <field name="name"/>
-                <field name="filter_facility_id"/>
+                <field name="filter_next_drug_pickup_date_from"/>
+                <field name="filter_next_drug_pickup_date_to"/>
+                <field name="filter_e_locker_district"/>
                 <field name="filter_collection_point_id"/>
-                <field name="filter_next_drug_pickup_date"/>
-                <field name="filter_hiv_program_id"/>
                 <field name="prescription_count"/>
                 <field name="state"/>
             </tree>
@@ -33,10 +33,12 @@
                     </div>
                     <group>
                         <group string="Batch Filters">
-                            <field name="filter_facility_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <separator string="Next Drug Pickup Date"/>
+                            <field name="filter_next_drug_pickup_date_from" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="filter_next_drug_pickup_date_to" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <separator string="Destination"/>
+                            <field name="filter_e_locker_district" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                             <field name="filter_collection_point_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-                            <field name="filter_next_drug_pickup_date" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-                            <field name="filter_hiv_program_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                         </group>
                         <group string="Summary">
                             <field name="prescription_count" readonly="1"/>
@@ -50,8 +52,9 @@
                                     <field name="patient_identifier"/>
                                     <field name="patient_first_name"/>
                                     <field name="facility_name"/>
-                                    <field name="collection_point_id"/>
                                     <field name="next_drug_pickup_date"/>
+                                    <field name="e_locker_district"/>
+                                    <field name="collection_point_id"/>
                                     <field name="hiv_program_id"/>
                                     <field name="state"/>
                                 </tree>

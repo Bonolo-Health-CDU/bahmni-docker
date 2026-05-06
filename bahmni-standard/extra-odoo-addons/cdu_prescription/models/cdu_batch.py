@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class CduBatch(models.Model):
@@ -24,13 +25,13 @@ class CduBatch(models.Model):
         default="draft",
         tracking=True,
     )
-    filter_next_drug_pickup_date = fields.Date(string="Next Drug Pickup Date")
+    filter_next_drug_pickup_date_from = fields.Date(string="Pickup Date From")
+    filter_next_drug_pickup_date_to = fields.Date(string="Pickup Date To")
+    filter_e_locker_district = fields.Char(string="E-locker District")
     filter_collection_point_id = fields.Many2one(
         "cdu.collection.point",
-        string="Collection Point",
+        string="Collection Location",
     )
-    filter_facility_id = fields.Many2one("cdu.facility", string="Source Facility")
-    filter_hiv_program_id = fields.Char(string="HIV Program ID")
     prescription_ids = fields.One2many(
         "cdu.prescription",
         "batch_id",
@@ -53,37 +54,53 @@ class CduBatch(models.Model):
         return super().create(vals)
 
     @api.onchange(
-        "filter_next_drug_pickup_date",
+        "filter_next_drug_pickup_date_from",
+        "filter_next_drug_pickup_date_to",
+        "filter_e_locker_district",
         "filter_collection_point_id",
-        "filter_facility_id",
-        "filter_hiv_program_id",
     )
     def _onchange_filters_fetch_prescriptions(self):
         for batch in self:
             if batch.state != "draft":
                 continue
-            domain = [
-                ("state", "=", "awaiting_batching"),
-                ("batch_id", "=", False),
-            ]
-            if batch.filter_next_drug_pickup_date:
-                domain.append(
-                    ("next_drug_pickup_date", "=", batch.filter_next_drug_pickup_date)
-                )
+            domain = batch._get_prescription_domain()
             if batch.filter_collection_point_id:
                 domain.append(
                     ("collection_point_id", "=", batch.filter_collection_point_id.id)
                 )
-            if batch.filter_facility_id:
-                domain.append(("facility_id", "=", batch.filter_facility_id.id))
-            if batch.filter_hiv_program_id:
+            if batch.filter_e_locker_district:
                 domain.append(
-                    ("hiv_program_id", "=ilike", batch.filter_hiv_program_id.strip())
+                    ("e_locker_district", "=ilike", batch.filter_e_locker_district.strip())
                 )
             prescriptions = self.env["cdu.prescription"].search(
                 domain, order="facility_name, collection_point_id, prescription_date, id"
             )
             batch.prescription_ids = [(6, 0, prescriptions.ids)]
+
+    @api.constrains(
+        "filter_next_drug_pickup_date_from",
+        "filter_next_drug_pickup_date_to",
+    )
+    def _check_pickup_date_filters(self):
+        for batch in self:
+            if (
+                batch.filter_next_drug_pickup_date_from
+                and batch.filter_next_drug_pickup_date_to
+                and batch.filter_next_drug_pickup_date_from > batch.filter_next_drug_pickup_date_to
+            ):
+                raise ValidationError(_("Pickup Date From cannot be after Pickup Date To."))
+
+    def _get_prescription_domain(self):
+        self.ensure_one()
+        domain = [
+            ("state", "=", "awaiting_batching"),
+            ("batch_id", "=", False),
+        ]
+        if self.filter_next_drug_pickup_date_from:
+            domain.append(("next_drug_pickup_date", ">=", self.filter_next_drug_pickup_date_from))
+        if self.filter_next_drug_pickup_date_to:
+            domain.append(("next_drug_pickup_date", "<=", self.filter_next_drug_pickup_date_to))
+        return domain
 
     def action_confirm_batch(self):
         self.write({"state": "confirmed"})
