@@ -103,6 +103,10 @@ class CduBatch(models.Model):
         return domain
 
     def action_confirm_batch(self):
+        for batch in self:
+            if not batch.prescription_ids:
+                raise ValidationError(_("Add at least one prescription before confirming the batch."))
+            batch.prescription_ids.write({"state": "awaiting_picking"})
         self.write({"state": "confirmed"})
 
     def action_mark_printed(self):

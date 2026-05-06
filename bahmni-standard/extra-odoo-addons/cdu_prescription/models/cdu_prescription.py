@@ -78,6 +78,7 @@ class CduPrescription(models.Model):
             ("rejected_to_call_center", "Rejected to call center"),
             ("rejected_to_facility", "Rejected to facility"),
             ("awaiting_batching", "Awaiting batching"),
+            ("awaiting_picking", "Awaiting picking"),
             ("cancelled", "Cancelled"),
         ],
         default="awaiting_verification",

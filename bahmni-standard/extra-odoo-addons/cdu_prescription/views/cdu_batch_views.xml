@@ -45,7 +45,10 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Prescriptions in Batch">
+                        <page string="Selected Prescriptions">
+                            <div class="alert alert-info" role="alert" attrs="{'invisible': [('state', '!=', 'draft')]}">
+                                All prescriptions matching the filters are selected by default. Remove any prescription that should not be included before confirming the batch.
+                            </div>
                             <field name="prescription_ids" attrs="{'readonly': [('state', '!=', 'draft')]}">
                                 <tree create="false" delete="true">
                                     <field name="name"/>

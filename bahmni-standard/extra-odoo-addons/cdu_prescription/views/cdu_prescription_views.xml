@@ -32,7 +32,7 @@
                     <button name="action_return_to_validation" string="Back to Awaiting Validation" type="object" class="oe_highlight" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" attrs="{'invisible': [('state', 'not in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center'))]}"/>
                     <button name="action_cancel" string="Cancel" type="object" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching" attrs="{'invisible': [('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching,awaiting_picking" attrs="{'invisible': [('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="rejected_to_call_center" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="rejected_to_facility" attrs="{'invisible': [('state', '!=', 'rejected_to_facility')]}"/>
                 </header>
@@ -136,7 +136,7 @@
                 <filter string="Awaiting Batching" name="awaiting_batching" domain="[('state', '=', 'awaiting_batching')]"/>
                 <filter string="Rejected to Call Center" name="rejected_to_call_center" domain="[('state', '=', 'rejected_to_call_center')]"/>
                 <filter string="Rejected to Facility" name="rejected_to_facility" domain="[('state', '=', 'rejected_to_facility')]"/>
-                <filter string="Batched" name="batched" domain="[('batch_id', '!=', False)]"/>
+                <filter string="Awaiting Picking" name="awaiting_picking" domain="[('state', '=', 'awaiting_picking')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
