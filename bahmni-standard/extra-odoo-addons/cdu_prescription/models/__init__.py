@@ -1,4 +1,5 @@
 from . import cdu_patient
+from . import cdu_user
 from . import cdu_collection_point
 from . import cdu_collection_point_sync
 from . import cdu_facility

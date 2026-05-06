@@ -20,7 +20,7 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_sync_now" string="Sync Pickup Points" type="object" class="btn-primary"/>
+                    <button name="action_sync_now" string="Sync Pickup Points" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_admin"/>
                     <field name="enabled"/>
                 </header>
                 <sheet>

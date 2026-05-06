@@ -1,5 +1,5 @@
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 
 class CduBatch(models.Model):
@@ -102,7 +102,15 @@ class CduBatch(models.Model):
             domain.append(("next_drug_pickup_date", "<=", self.filter_next_drug_pickup_date_to))
         return domain
 
+    def _ensure_batch_workflow_access(self):
+        if not (
+            self.env.user.has_group("cdu_prescription.group_cdu_dispensing_officer")
+            or self.env.user.has_group("cdu_prescription.group_cdu_admin")
+        ):
+            raise AccessError(_("Only CDU dispensing officers can manage workload batches."))
+
     def action_confirm_batch(self):
+        self._ensure_batch_workflow_access()
         for batch in self:
             if not batch.prescription_ids:
                 raise ValidationError(_("Add at least one prescription before confirming the batch."))
@@ -110,7 +118,9 @@ class CduBatch(models.Model):
         self.write({"state": "confirmed"})
 
     def action_mark_printed(self):
+        self._ensure_batch_workflow_access()
         self.write({"state": "printed"})
 
     def action_mark_done(self):
+        self._ensure_batch_workflow_access()
         self.write({"state": "done"})
