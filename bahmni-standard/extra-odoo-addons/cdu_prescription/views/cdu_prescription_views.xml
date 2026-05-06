@@ -98,7 +98,7 @@
                                 <group>
                                     <field name="regimen_prescribed_raw"/>
                                     <field name="prescriber_name"/>
-                                    <field name="next_drug_pickup_date"/>
+                                    <field name="next_drug_pickup_date" required="1"/>
                                 </group>
                                 <group>
                                     <field name="drug_pickup_point_raw"/>

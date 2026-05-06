@@ -184,7 +184,14 @@ class CduReportRun(models.Model):
             if normalized:
                 column_map[index] = normalized
 
-        required_columns = {"patient_name", "eregister_id", "prescription_date", "regimen_prescribed", "drug_pickup_point"}
+        required_columns = {
+            "patient_name",
+            "eregister_id",
+            "prescription_date",
+            "regimen_prescribed",
+            "next_drug_pickup_date",
+            "drug_pickup_point",
+        }
         missing = sorted(required_columns - set(column_map.values()))
         if missing:
             raise UserError(_("Missing required report columns: %s") % ", ".join(missing))
@@ -309,7 +316,14 @@ class CduReportRow(models.Model):
             return "failed"
 
     def _required_missing(self, values):
-        required = ["patient_name", "eregister_id", "prescription_date", "regimen_prescribed", "drug_pickup_point"]
+        required = [
+            "patient_name",
+            "eregister_id",
+            "prescription_date",
+            "regimen_prescribed",
+            "next_drug_pickup_date",
+            "drug_pickup_point",
+        ]
         return [field_name for field_name in required if not values.get(field_name)]
 
     def _upsert_patient(self, values):

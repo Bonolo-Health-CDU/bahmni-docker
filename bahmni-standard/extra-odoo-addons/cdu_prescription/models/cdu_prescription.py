@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class CduPrescription(models.Model):
@@ -103,7 +104,9 @@ class CduPrescription(models.Model):
             vals.setdefault("facility_code", facility.code)
         if vals.get("patient_id"):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
-        return super().create(vals)
+        prescription = super().create(vals)
+        prescription._check_required_next_drug_pickup_date()
+        return prescription
 
     def write(self, vals):
         if vals.get("facility_id"):
@@ -112,7 +115,15 @@ class CduPrescription(models.Model):
             vals.setdefault("facility_code", facility.code)
         if vals.get("patient_id"):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
-        return super().write(vals)
+        result = super().write(vals)
+        if "next_drug_pickup_date" in vals:
+            self._check_required_next_drug_pickup_date()
+        return result
+
+    def _check_required_next_drug_pickup_date(self):
+        for prescription in self:
+            if not prescription.next_drug_pickup_date:
+                raise ValidationError(_("Next Drug Pickup Date is required."))
 
     def _patient_snapshot_values(self, patient_id, existing_vals=None):
         patient = self.env["res.partner"].browse(patient_id).exists()
@@ -186,4 +197,6 @@ class CduPrescription(models.Model):
             missing.append("drug pickup point")
         if not self.regimen_prescribed_raw:
             missing.append("regimen prescribed")
+        if not self.next_drug_pickup_date:
+            missing.append("next drug pickup date")
         return missing
