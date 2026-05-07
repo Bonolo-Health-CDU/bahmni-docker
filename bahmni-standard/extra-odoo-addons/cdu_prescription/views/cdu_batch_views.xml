@@ -23,6 +23,7 @@
             <form>
                 <header>
                     <button name="action_confirm_batch" string="Confirm Batch" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_generate_picking_list" type="object" string="Generate Picking List" class="btn-primary" states="confirmed"/>
                     <button name="action_mark_printed" string="Mark Picking List Printed" type="object" attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
                     <button name="action_mark_done" string="Mark Done" type="object" attrs="{'invisible': [('state', 'not in', ('confirmed', 'printed'))]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,printed,done"/>
@@ -63,6 +64,54 @@
                                 </tree>
                             </field>
                         </page>
+                        <page string="Picking Summary">
+
+                            <field name="picking_line_ids" readonly="1">
+
+                                <tree create="0" delete="0">
+
+                                    <field name="product_id"/>
+
+                                    <field name="total_tablets"/>
+
+                                    <field name="total_bottles"/>
+
+                                    <field name="prescription_count"/>
+
+                                </tree>
+
+                            </field>
+
+                        </page>
+                        <page string="Patient Picking Lines">
+
+                        <field
+                            name="patient_picking_line_ids"
+                            readonly="1"
+                        >
+
+                            <tree create="0" delete="0">
+
+                                <field name="patient_id"/>
+
+                                <field name="prescription_id"/>
+
+                                <field name="product_id"/>
+
+                                <field name="cdu_days"/>
+
+                                <field name="daily_dose"/>
+
+                                <field name="tablets_required"/>
+
+                                <field name="bottles_required"/>
+
+                            </tree>
+
+                        </field>
+
+                    </page>
+
                     </notebook>
                 </sheet>
                 <div class="oe_chatter">

@@ -13,3 +13,5 @@ access_cdu_collection_point_sync_config_admin,cdu.collection.point.sync.config a
 access_cdu_collection_point_sync_log_admin,cdu.collection.point.sync.log admin,model_cdu_collection_point_sync_log,base.group_system,1,1,1,1
 access_cdu_regimen_user,access.cdu.regimen.user,model_cdu_regimen,base.group_user,1,1,1,1
 access_cdu_regimen_line_user,access.cdu.regimen.line.user,model_cdu_regimen_line,base.group_user,1,1,1,1
+access_cdu_batch_picking_line_user,access.cdu.batch.picking.line.user,model_cdu_batch_picking_line,base.group_user,1,1,1,1
+access_cdu_batch_patient_line_user,access.cdu.batch.patient.line.user,model_cdu_batch_patient_line,base.group_user,1,1,1,1
