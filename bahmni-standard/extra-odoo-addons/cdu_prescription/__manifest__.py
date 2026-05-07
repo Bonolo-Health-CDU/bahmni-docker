@@ -28,6 +28,8 @@
         "views/cdu_patient_views.xml",
         "views/cdu_report_import_views.xml",
         "views/cdu_prescription_views.xml",
+        "views/cdu_product_template_views.xml",
+        "views/cdu_regimen_views.xml",
         "views/cdu_menus.xml",
     ],
     "assets": {
