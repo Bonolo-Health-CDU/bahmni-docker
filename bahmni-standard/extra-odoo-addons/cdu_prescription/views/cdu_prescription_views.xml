@@ -4,12 +4,13 @@
         <field name="name">cdu.prescription.tree</field>
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
-            <tree decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')" decoration-muted="state == 'cancelled'">
+            <tree default_order="next_drug_pickup_date asc, patient_first_name asc" decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')" decoration-muted="state == 'cancelled'">
                 <field name="name"/>
                 <field name="facility_name"/>
                 <field name="patient_identifier"/>
                 <field name="patient_first_name"/>
                 <field name="prescription_date"/>
+                <field name="next_drug_pickup_date"/>
                 <field name="regimen_prescribed_raw"/>
                 <field name="drug_pickup_point_raw"/>
                 <field name="collection_point_id"/>
@@ -155,6 +156,7 @@
         <field name="res_model">cdu.prescription</field>
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="context">{'search_default_group_state': 1}</field>
     </record>
 
     <record id="action_cdu_prescription_awaiting_verification" model="ir.actions.act_window">
