@@ -1,5 +1,6 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
+import math
 
 
 class CduBatch(models.Model):
@@ -19,6 +20,7 @@ class CduBatch(models.Model):
         [
             ("draft", "Draft"),
             ("confirmed", "Confirmed"),
+            ("picking_generated", "Picking Generated"),
             ("printed", "Picking List Printed"),
             ("done", "Done"),
         ],
@@ -40,6 +42,18 @@ class CduBatch(models.Model):
     prescription_count = fields.Integer(
         compute="_compute_prescription_count",
         string="Prescription Count",
+    )
+
+    picking_line_ids = fields.One2many(
+    "cdu.batch.picking.line",
+    "batch_id",
+    string="Picking Summary",
+    )
+
+    patient_picking_line_ids = fields.One2many(
+        "cdu.batch.patient.line",
+        "batch_id",
+        string="Patient Picking Lines",
     )
 
     @api.depends("prescription_ids")
@@ -114,3 +128,91 @@ class CduBatch(models.Model):
 
     def action_mark_done(self):
         self.write({"state": "done"})
+
+    def _generate_picking_lines(self):
+
+        self.ensure_one()
+
+        self.picking_line_ids.unlink()
+        self.patient_picking_line_ids.unlink()
+
+        summary = {}
+
+        for prescription in self.prescription_ids:
+
+            regimen = prescription.regimen_id
+
+            if not regimen:
+                continue
+
+            cdu_days = prescription.cdu_days_supply
+
+            for line in regimen.line_ids:
+
+                product = line.product_id
+
+                daily_dose = line.daily_dose
+
+                pack_size = (
+                    product.product_tmpl_id.cdu_pack_size
+                    or 30
+                )
+
+                tablets_required = (
+                    daily_dose * cdu_days
+                )
+
+                bottles_required = math.ceil(
+                    tablets_required / pack_size
+                )
+
+                self.env[
+                    "cdu.batch.patient.line"
+                ].create({
+                    "batch_id": self.id,
+                    "prescription_id": prescription.id,
+                    "patient_id": prescription.patient_id.id,
+                    "product_id": product.id,
+                    "cdu_days": cdu_days,
+                    "daily_dose": daily_dose,
+                    "tablets_required": tablets_required,
+                    "bottles_required": bottles_required,
+                })
+
+                key = product.id
+
+                if key not in summary:
+
+                    summary[key] = {
+                        "product_id": product.id,
+                        "total_tablets": 0,
+                        "total_bottles": 0,
+                        "prescription_count": 0,
+                    }
+
+                summary[key]["total_tablets"] += tablets_required
+
+                summary[key]["total_bottles"] += bottles_required
+
+                summary[key]["prescription_count"] += 1
+
+        for vals in summary.values():
+
+            vals["batch_id"] = self.id
+
+            self.env[
+                "cdu.batch.picking.line"
+            ].create(vals)
+
+    def action_generate_picking_list(self):
+
+        for batch in self:
+
+            if not batch.prescription_ids:
+                continue
+
+            batch._generate_picking_lines()
+
+        self.write({
+            "state": "picking_generated"
+        })

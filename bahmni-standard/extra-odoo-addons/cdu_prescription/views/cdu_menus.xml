@@ -108,4 +108,11 @@
         parent="menu_cdu_configuration"
         action="action_cdu_onedrive_poll_log"
         sequence="40"/>
+
+    <menuitem
+        id="menu_cdu_regimen"
+        name="Regimens"
+        parent="menu_cdu_root"
+        action="action_cdu_regimen"
+        sequence="40"/>
 </odoo>

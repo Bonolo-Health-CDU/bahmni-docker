@@ -1,3 +1,4 @@
+import re
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -57,6 +58,11 @@ class CduPrescription(models.Model):
     latest_vl_collection_date = fields.Date(string="Latest VL Collection Date")
     latest_vl_result = fields.Char(string="Latest VL Result")
     regimen_prescribed_raw = fields.Char(string="Regimen Prescribed")
+    regimen_id = fields.Many2one(
+        "cdu.regimen",
+        string="Mapped Regimen",
+        tracking=True,
+    )
     new_or_revisit = fields.Selection(
         [("new", "New"), ("revisit", "Revisit"), ("restarted", "Restarted")],
         string="New or Revisit",
@@ -64,13 +70,14 @@ class CduPrescription(models.Model):
     next_drug_pickup_date = fields.Date(string="Next Drug Pickup Date")
     drug_pickup_point_raw = fields.Char(string="Drug Pickup Point")
     e_locker_district = fields.Char(string="E-locker District")
-    collection_point_id = fields.Many2one(
-        "cdu.collection.point",
+    collection_point_id = fields.Many2one("cdu.collection.point",
         tracking=True,
     )
     secondary_contact = fields.Char(string="Secondary Contact")
     prescriber_name = fields.Char(string="Prescriber Name")
     next_clinical_visit_date = fields.Date(string="Next Clinical Appointment Date")
+    cdu_days_supply = fields.Integer(compute="_compute_cdu_days_supply", store=True,
+    )
     state = fields.Selection(
         [
             ("awaiting_verification", "Awaiting verification"),
@@ -97,16 +104,26 @@ class CduPrescription(models.Model):
 
     @api.model
     def create(self, vals):
+
         if vals.get("name", "/") == "/":
-            vals["name"] = self.env["ir.sequence"].next_by_code("cdu.prescription") or "/"
+            vals["name"] = (self.env["ir.sequence"].next_by_code("cdu.prescription") or "/")
+
         if vals.get("facility_id"):
             facility = self.env["cdu.facility"].browse(vals["facility_id"])
-            vals.setdefault("facility_name", facility.name)
-            vals.setdefault("facility_code", facility.code)
+            vals.setdefault("facility_name",facility.name)
+            vals.setdefault("facility_code",facility.code)
+
         if vals.get("patient_id"):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
+
+        if vals.get("regimen_prescribed_raw"):
+            regimen = self._find_matching_regimen(vals.get("regimen_prescribed_raw"))
+            if regimen:
+                vals["regimen_id"] = regimen.id
+
         prescription = super().create(vals)
         prescription._check_required_next_drug_pickup_date()
+
         return prescription
 
     def write(self, vals):
@@ -114,18 +131,67 @@ class CduPrescription(models.Model):
             facility = self.env["cdu.facility"].browse(vals["facility_id"])
             vals.setdefault("facility_name", facility.name)
             vals.setdefault("facility_code", facility.code)
+        
         if vals.get("patient_id"):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
+
+        if "regimen_prescribed_raw" in vals:
+            regimen = self._find_matching_regimen(vals.get("regimen_prescribed_raw"))
+            vals["regimen_id"] = (regimen.id if regimen else False )
         result = super().write(vals)
+
         if "next_drug_pickup_date" in vals:
             self._check_required_next_drug_pickup_date()
         return result
-
+    
     def _check_required_next_drug_pickup_date(self):
         for prescription in self:
             if not prescription.next_drug_pickup_date:
                 raise ValidationError(_("Next Drug Pickup Date is required."))
+    
+    def _find_matching_regimen(self, raw_value):
+           
+        code = self._extract_regimen_code(raw_value)
 
+        if not code:
+            return False
+
+        return self.env["cdu.regimen"].search(
+            [("code", "=ilike", code)],
+            limit=1,
+        )
+
+    def _extract_regimen_code(self, raw_value):
+        if not raw_value:
+            return False
+        prefix = str(raw_value).split('=')[0].strip().lower()
+        match = re.match(r"([a-z0-9]+)", prefix)
+        return match.group(1) if match else False
+    
+    def action_remap_regimens(self):
+        mapping_data = {}
+        for record in self:
+            # code = self._extract_code(record.regimen_prescribed_raw)
+            code = self._extract_regimen_code(record.regimen_prescribed_raw)
+            if code:
+                mapping_data[record.id] = code.lower()
+
+        if not mapping_data:
+            self.write({'regimen_id': False})
+            return
+
+        unique_codes = list(set(mapping_data.values()))
+        regimens = self.env["cdu.regimen"].search([
+            ("code", "in", unique_codes)
+        ])
+        
+        regimen_lookup = {r.code.lower(): r.id for r in regimens}
+
+        for record in self:
+            code = mapping_data.get(record.id)
+            regimen_id = regimen_lookup.get(code) if code else False
+            record.regimen_id = regimen_id
+          
     def _patient_snapshot_values(self, patient_id, existing_vals=None):
         patient = self.env["res.partner"].browse(patient_id).exists()
         if not patient:
@@ -201,3 +267,26 @@ class CduPrescription(models.Model):
         if not self.next_drug_pickup_date:
             missing.append("next drug pickup date")
         return missing
+
+    @api.depends(
+    "next_drug_pickup_date",
+    "next_clinical_visit_date",
+    )
+    def _compute_cdu_days_supply(self):
+
+        for prescription in self:
+
+            if (
+                prescription.next_drug_pickup_date
+                and prescription.next_clinical_visit_date
+            ):
+
+                delta = (
+                    prescription.next_clinical_visit_date
+                    - prescription.next_drug_pickup_date
+                )
+
+                prescription.cdu_days_supply = delta.days
+
+            else:
+                prescription.cdu_days_supply = 0

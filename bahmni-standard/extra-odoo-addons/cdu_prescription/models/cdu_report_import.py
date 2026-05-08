@@ -84,6 +84,14 @@ class CduReportRun(models.Model):
     error_message = fields.Text(readonly=True)
     row_ids = fields.One2many("cdu.report.row", "run_id", string="Rows")
 
+    DATE_PATTERNS = [
+    (re.compile(r'^\d{4}-\d{2}-\d{2}$'), "%Y-%m-%d"),          
+    (re.compile(r'^\d{2}/\d{2}/\d{4}$'), "%d/%m/%Y"),          
+    (re.compile(r'^\d{2}-\d{2}-\d{2}$'), "%m-%d-%y"),          
+    (re.compile(r'^\d{2}-[a-zA-Z]{3}-\d{4}$'), "%d-%b-%Y"),
+    (re.compile(r'^\d{2}-[a-zA-Z]+-\d{4}$'), "%d-%B-%Y"),  
+    ]
+
     @api.model
     def create(self, vals):
         if vals.get("name", "/") == "/":
@@ -240,16 +248,30 @@ class CduReportRun(models.Model):
             return False
         return fields.Datetime.to_string(datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S"))
 
+
+    # def _parse_date(self, value):
+    #     if not value:
+    #         return False
+    #     for date_format in ("%d-%b-%Y", "%Y-%m-%d", "%d/%m/%Y"):
+    #         try:
+    #             return fields.Date.to_string(datetime.strptime(value, date_format).date())
+    #         except ValueError:
+    #             continue
+    #     return False
+
     def _parse_date(self, value):
         if not value:
             return False
-        for date_format in ("%d-%b-%Y", "%Y-%m-%d", "%d/%m/%Y"):
-            try:
-                return fields.Date.to_string(datetime.strptime(value, date_format).date())
-            except ValueError:
-                continue
-        return False
+        val_str = str(value).strip()
+        for pattern, date_format in self.DATE_PATTERNS:
+            if pattern.match(val_str):
+                try:
+                    dt_obj = datetime.strptime(val_str, date_format)
+                    return fields.Date.to_string(dt_obj.date())
+                except ValueError:
+                    continue
 
+        return False
 
 class CduReportRow(models.Model):
     _name = "cdu.report.row"
