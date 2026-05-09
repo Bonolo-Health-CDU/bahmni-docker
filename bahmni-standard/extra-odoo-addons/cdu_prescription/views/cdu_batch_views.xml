@@ -22,11 +22,11 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_confirm_batch" string="Confirm Batch" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'draft')]}"/>
-                    <button name="action_generate_picking_list" type="object" string="Generate Picking List" class="btn-primary" states="confirmed"/>
-                    <button name="action_mark_printed" string="Mark Picking List Printed" type="object" attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
-                    <button name="action_mark_done" string="Mark Done" type="object" attrs="{'invisible': [('state', 'not in', ('confirmed', 'printed'))]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,printed,done"/>
+                    <button name="action_confirm_batch" string="Confirm Batch" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_generate_picking_list" string="Generate Picking List" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
+                    <button name="action_mark_printed" string="Mark Picking List Printed" type="object" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'picking_generated')]}"/>
+                    <button name="action_mark_done" string="Mark Done" type="object" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,picking_generated,printed,done"/>
                 </header>
                 <sheet>
                     <div class="oe_title">

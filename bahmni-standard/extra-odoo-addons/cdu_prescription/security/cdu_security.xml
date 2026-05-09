@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="module_category_cdu" model="ir.module.category">
+        <field name="name">Central Dispensing Unit</field>
+        <field name="sequence">30</field>
+        <field name="visible" eval="True"/>
+        <field name="exclusive" eval="True"/>
+    </record>
+
+    <record id="group_cdu_data_clerk" model="res.groups">
+        <field name="name">CDU Data Clerk</field>
+        <field name="category_id" ref="module_category_cdu"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_cdu_call_agent" model="res.groups">
+        <field name="name">CDU Call Agent</field>
+        <field name="category_id" ref="module_category_cdu"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_cdu_dispensing_officer" model="res.groups">
+        <field name="name">CDU Dispensing Officer</field>
+        <field name="category_id" ref="module_category_cdu"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_cdu_admin" model="res.groups">
+        <field name="name">CDU Admin</field>
+        <field name="category_id" ref="module_category_cdu"/>
+        <field name="implied_ids" eval="[
+            (4, ref('base.group_user')),
+            (4, ref('base.group_system')),
+            (4, ref('group_cdu_data_clerk')),
+            (4, ref('group_cdu_call_agent')),
+            (4, ref('group_cdu_dispensing_officer'))
+        ]"/>
+    </record>
+
+    <record id="rule_cdu_prescription_data_clerk" model="ir.rule">
+        <field name="name">CDU prescriptions: data clerk queue</field>
+        <field name="model_id" ref="model_cdu_prescription"/>
+        <field name="domain_force">[('state', 'in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center', 'rejected_to_facility'))]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_data_clerk'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_cdu_prescription_call_agent" model="ir.rule">
+        <field name="name">CDU prescriptions: call agent queue</field>
+        <field name="model_id" ref="model_cdu_prescription"/>
+        <field name="domain_force">[('state', 'in', ('rejected_to_call_center', 'awaiting_verification', 'awaiting_validation'))]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_call_agent'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_cdu_prescription_dispensing_officer" model="ir.rule">
+        <field name="name">CDU prescriptions: dispensing officer queues</field>
+        <field name="model_id" ref="model_cdu_prescription"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_dispensing_officer'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_cdu_prescription_admin" model="ir.rule">
+        <field name="name">CDU prescriptions: admin all</field>
+        <field name="model_id" ref="model_cdu_prescription"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_admin'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+    </record>
+
+    <record id="base.user_admin" model="res.users">
+        <field name="groups_id" eval="[(4, ref('group_cdu_admin'))]"/>
+    </record>
+</odoo>

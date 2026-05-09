@@ -4,12 +4,13 @@
         <field name="name">cdu.prescription.tree</field>
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
-            <tree decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')" decoration-muted="state == 'cancelled'">
+            <tree default_order="next_drug_pickup_date asc, patient_first_name asc" decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')" decoration-muted="state == 'cancelled'">
                 <field name="name"/>
                 <field name="facility_name"/>
                 <field name="patient_identifier"/>
                 <field name="patient_first_name"/>
                 <field name="prescription_date"/>
+                <field name="next_drug_pickup_date"/>
                 <field name="regimen_prescribed_raw"/>
                 <field name="drug_pickup_point_raw"/>
                 <field name="collection_point_id"/>
@@ -25,14 +26,16 @@
         <field name="arch" type="xml">
             <form class="o_cdu_prescription_form">
                 <header>
-                    <button name="action_mark_patient_verified" string="Verify" type="object" class="oe_highlight" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
-                    <button name="action_mark_medicine_validated" string="Validate" type="object" class="oe_highlight" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
-                    <button name="action_reject_to_call_center" string="Reject to Call Center" type="object" class="btn-danger" attrs="{'invisible': [('state', 'not in', ('awaiting_verification', 'awaiting_validation'))]}"/>
-                    <button name="action_return_to_verification" string="Back to Awaiting Verification" type="object" class="oe_highlight" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
-                    <button name="action_return_to_validation" string="Back to Awaiting Validation" type="object" class="oe_highlight" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
-                    <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" attrs="{'invisible': [('state', 'not in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center'))]}"/>
-                    <button name="action_remap_regimens" type="object" string="Remap Regimen" class="btn-primary"/>
-                    <button name="action_cancel" string="Cancel" type="object" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
+                    <button name="action_mark_patient_verified" string="Verify" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
+                    <button name="action_mark_medicine_validated" string="Validate" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
+                    <button name="action_reject_to_call_center" string="Reject to Call Center" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_data_clerk" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
+                    <button name="action_reject_to_call_center" string="Reject to Call Center" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
+                    <button name="action_return_to_verification" string="Back to Awaiting Verification" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
+                    <button name="action_return_to_validation" string="Back to Awaiting Validation" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
+                    <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_data_clerk" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
+                    <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
+                    <button name="action_remap_regimens" string="Remap Regimen" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+                    <button name="action_cancel" string="Cancel" type="object" groups="cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching,awaiting_picking" attrs="{'invisible': [('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="rejected_to_call_center" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="rejected_to_facility" attrs="{'invisible': [('state', '!=', 'rejected_to_facility')]}"/>
@@ -155,6 +158,7 @@
         <field name="res_model">cdu.prescription</field>
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="context">{'search_default_group_state': 1}</field>
     </record>
 
     <record id="action_cdu_prescription_awaiting_verification" model="ir.actions.act_window">
@@ -179,5 +183,13 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_batching')]</field>
+    </record>
+
+    <record id="action_cdu_prescription_rejected_to_call_center" model="ir.actions.act_window">
+        <field name="name">Rejected to Call Center</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'rejected_to_call_center')]</field>
     </record>
 </odoo>

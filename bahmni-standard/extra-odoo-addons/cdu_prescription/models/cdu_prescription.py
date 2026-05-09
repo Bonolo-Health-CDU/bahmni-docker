@@ -1,6 +1,6 @@
 import re
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 
 class CduPrescription(models.Model):
@@ -226,7 +226,21 @@ class CduPrescription(models.Model):
         if self.patient_id:
             self.update(self._patient_snapshot_values(self.patient_id.id))
 
+    def _ensure_cdu_groups(self, *xml_ids):
+        if self.env.user.has_group("cdu_prescription.group_cdu_admin"):
+            return
+        if any(self.env.user.has_group(xml_id) for xml_id in xml_ids):
+            return
+        raise AccessError(_("You do not have permission to perform this CDU action."))
+
+    def _ensure_states(self, allowed_states):
+        invalid = self.filtered(lambda prescription: prescription.state not in allowed_states)
+        if invalid:
+            raise ValidationError(_("This action is not allowed for the current prescription status."))
+
     def action_mark_patient_verified(self):
+        self._ensure_cdu_groups("cdu_prescription.group_cdu_data_clerk")
+        self._ensure_states(("awaiting_verification",))
         self.write({
             "state": "awaiting_validation",
             "verified_by": self.env.user.id,
@@ -234,6 +248,8 @@ class CduPrescription(models.Model):
         })
 
     def action_mark_medicine_validated(self):
+        self._ensure_cdu_groups("cdu_prescription.group_cdu_dispensing_officer")
+        self._ensure_states(("awaiting_validation",))
         self.write({
             "state": "awaiting_batching",
             "validated_by": self.env.user.id,
@@ -241,18 +257,33 @@ class CduPrescription(models.Model):
         })
 
     def action_reject_to_call_center(self):
+        self._ensure_cdu_groups(
+            "cdu_prescription.group_cdu_data_clerk",
+            "cdu_prescription.group_cdu_dispensing_officer",
+        )
+        self._ensure_states(("awaiting_verification", "awaiting_validation"))
         self.write({"state": "rejected_to_call_center"})
 
     def action_reject_to_facility(self):
+        self._ensure_cdu_groups(
+            "cdu_prescription.group_cdu_data_clerk",
+            "cdu_prescription.group_cdu_dispensing_officer",
+        )
+        self._ensure_states(("awaiting_verification", "awaiting_validation"))
         self.write({"state": "rejected_to_facility"})
 
     def action_return_to_verification(self):
+        self._ensure_cdu_groups("cdu_prescription.group_cdu_call_agent")
+        self._ensure_states(("rejected_to_call_center",))
         self.write({"state": "awaiting_verification"})
 
     def action_return_to_validation(self):
+        self._ensure_cdu_groups("cdu_prescription.group_cdu_call_agent")
+        self._ensure_states(("rejected_to_call_center",))
         self.write({"state": "awaiting_validation"})
 
     def action_cancel(self):
+        self._ensure_cdu_groups("cdu_prescription.group_cdu_admin")
         self.write({"state": "cancelled"})
 
     def _get_validation_errors(self):

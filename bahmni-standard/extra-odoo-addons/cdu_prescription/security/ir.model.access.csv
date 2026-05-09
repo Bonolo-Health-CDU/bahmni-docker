@@ -1,17 +1,45 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_cdu_collection_point_user,cdu.collection.point user,model_cdu_collection_point,base.group_user,1,1,1,0
-access_cdu_batch_user,cdu.batch user,model_cdu_batch,base.group_user,1,1,1,0
-access_cdu_facility_user,cdu.facility user,model_cdu_facility,base.group_user,1,1,1,0
-access_cdu_prescription_user,cdu.prescription user,model_cdu_prescription,base.group_user,1,1,1,0
-access_cdu_prescription_admin,cdu.prescription admin,model_cdu_prescription,base.group_system,1,1,1,1
-access_cdu_report_run_user,cdu.report.run user,model_cdu_report_run,base.group_user,1,1,1,0
-access_cdu_report_run_admin,cdu.report.run admin,model_cdu_report_run,base.group_system,1,1,1,1
-access_cdu_report_row_user,cdu.report.row user,model_cdu_report_row,base.group_user,1,1,1,0
-access_cdu_onedrive_source_admin,cdu.onedrive.source admin,model_cdu_onedrive_source,base.group_system,1,1,1,1
-access_cdu_onedrive_poll_log_admin,cdu.onedrive.poll.log admin,model_cdu_onedrive_poll_log,base.group_system,1,1,1,1
-access_cdu_collection_point_sync_config_admin,cdu.collection.point.sync.config admin,model_cdu_collection_point_sync_config,base.group_system,1,1,1,1
-access_cdu_collection_point_sync_log_admin,cdu.collection.point.sync.log admin,model_cdu_collection_point_sync_log,base.group_system,1,1,1,1
-access_cdu_regimen_user,access.cdu.regimen.user,model_cdu_regimen,base.group_user,1,1,1,1
-access_cdu_regimen_line_user,access.cdu.regimen.line.user,model_cdu_regimen_line,base.group_user,1,1,1,1
-access_cdu_batch_picking_line_user,access.cdu.batch.picking.line.user,model_cdu_batch_picking_line,base.group_user,1,1,1,1
-access_cdu_batch_patient_line_user,access.cdu.batch.patient.line.user,model_cdu_batch_patient_line,base.group_user,1,1,1,1
+access_cdu_prescription_data_clerk,cdu.prescription data clerk,model_cdu_prescription,cdu_prescription.group_cdu_data_clerk,1,1,0,0
+access_cdu_prescription_call_agent,cdu.prescription call agent,model_cdu_prescription,cdu_prescription.group_cdu_call_agent,1,1,0,0
+access_cdu_prescription_dispensing_officer,cdu.prescription dispensing officer,model_cdu_prescription,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0
+access_cdu_prescription_admin,cdu.prescription admin,model_cdu_prescription,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_batch_dispensing_officer,cdu.batch dispensing officer,model_cdu_batch,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0
+access_cdu_batch_admin,cdu.batch admin,model_cdu_batch,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_facility_data_clerk,cdu.facility data clerk,model_cdu_facility,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_facility_call_agent,cdu.facility call agent,model_cdu_facility,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_facility_dispensing_officer,cdu.facility dispensing officer,model_cdu_facility,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_facility_admin,cdu.facility admin,model_cdu_facility,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_collection_point_data_clerk,cdu.collection.point data clerk,model_cdu_collection_point,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_collection_point_call_agent,cdu.collection.point call agent,model_cdu_collection_point,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_collection_point_dispensing_officer,cdu.collection.point dispensing officer,model_cdu_collection_point,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_collection_point_admin,cdu.collection.point admin,model_cdu_collection_point,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_regimen_data_clerk,cdu.regimen data clerk,model_cdu_regimen,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_regimen_call_agent,cdu.regimen call agent,model_cdu_regimen,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_regimen_dispensing_officer,cdu.regimen dispensing officer,model_cdu_regimen,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_regimen_admin,cdu.regimen admin,model_cdu_regimen,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_regimen_line_data_clerk,cdu.regimen.line data clerk,model_cdu_regimen_line,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_regimen_line_call_agent,cdu.regimen.line call agent,model_cdu_regimen_line,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_regimen_line_dispensing_officer,cdu.regimen.line dispensing officer,model_cdu_regimen_line,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_regimen_line_admin,cdu.regimen.line admin,model_cdu_regimen_line,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_batch_picking_line_dispensing_officer,cdu.batch.picking.line dispensing officer,model_cdu_batch_picking_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
+access_cdu_batch_picking_line_admin,cdu.batch.picking.line admin,model_cdu_batch_picking_line,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_batch_patient_line_dispensing_officer,cdu.batch.patient.line dispensing officer,model_cdu_batch_patient_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
+access_cdu_batch_patient_line_admin,cdu.batch.patient.line admin,model_cdu_batch_patient_line,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_report_run_user,cdu.report.run CDU user,model_cdu_report_run,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_report_run_call_agent,cdu.report.run call agent,model_cdu_report_run,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_report_run_dispensing_officer,cdu.report.run dispensing officer,model_cdu_report_run,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_report_run_admin,cdu.report.run admin,model_cdu_report_run,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_report_row_user,cdu.report.row CDU user,model_cdu_report_row,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_report_row_call_agent,cdu.report.row call agent,model_cdu_report_row,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_report_row_dispensing_officer,cdu.report.row dispensing officer,model_cdu_report_row,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_report_row_admin,cdu.report.row admin,model_cdu_report_row,cdu_prescription.group_cdu_admin,1,1,1,1
+access_res_partner_data_clerk,res.partner data clerk,base.model_res_partner,cdu_prescription.group_cdu_data_clerk,1,1,1,0
+access_res_partner_call_agent,res.partner call agent,base.model_res_partner,cdu_prescription.group_cdu_call_agent,1,1,1,0
+access_res_partner_dispensing_officer,res.partner dispensing officer,base.model_res_partner,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0
+access_res_partner_cdu_admin,res.partner CDU admin,base.model_res_partner,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_onedrive_source_admin,cdu.onedrive.source admin,model_cdu_onedrive_source,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_onedrive_poll_log_admin,cdu.onedrive.poll.log admin,model_cdu_onedrive_poll_log,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_collection_point_sync_config_dispensing_officer,cdu.collection.point.sync.config dispensing officer,model_cdu_collection_point_sync_config,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_collection_point_sync_config_admin,cdu.collection.point.sync.config admin,model_cdu_collection_point_sync_config,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_collection_point_sync_log_dispensing_officer,cdu.collection.point.sync.log dispensing officer,model_cdu_collection_point_sync_log,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_collection_point_sync_log_admin,cdu.collection.point.sync.log admin,model_cdu_collection_point_sync_log,cdu_prescription.group_cdu_admin,1,1,1,1
