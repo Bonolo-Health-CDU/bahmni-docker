@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <record id="view_picking_form_cdu_bagging" model="ir.ui.view">
+            <field name="name">stock.picking.form.cdu.bagging</field>
+            <field name="model">stock.picking</field>
+            <field name="inherit_id" ref="stock.view_picking_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='origin']" position="after">
+                    <field name="cdu_is_dispensing_operation" invisible="1"/>
+                    <field name="cdu_bag_count"/>
+                    <field name="cdu_bagging_status" widget="badge"/>
+                </xpath>
+                <xpath expr="//notebook" position="inside">
+                    <page string="Bagging" name="cdu_bagging" attrs="{'invisible': [('cdu_is_dispensing_operation', '=', False)]}">
+                        <group>
+                            <group string="Scan">
+                                <field name="cdu_bag_barcode_scan" placeholder="Scan or enter bag barcode"/>
+                                <button name="action_scan_bag_barcode" type="object" string="Scan Bag" class="oe_highlight"/>
+                                <button name="action_open_bag_scan_wizard" type="object" string="Open Scan Wizard"/>
+                            </group>
+                            <group string="Summary">
+                                <field name="cdu_bag_count"/>
+                                <field name="cdu_bagging_status" widget="badge"/>
+                            </group>
+                        </group>
+                        <field name="cdu_bag_ids" context="{'default_picking_id': active_id}">
+                            <tree editable="bottom">
+                                <field name="name"/>
+                                <field name="box_id"/>
+                                <field name="destination_location_id"/>
+                                <field name="status"/>
+                                <field name="scan_date"/>
+                                <field name="boxed_date"/>
+                                <field name="scan_user_id"/>
+                            </tree>
+                        </field>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_picking_tree_cdu_bagging" model="ir.ui.view">
+            <field name="name">stock.picking.tree.cdu.bagging</field>
+            <field name="model">stock.picking</field>
+            <field name="inherit_id" ref="stock.vpicktree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='state']" position="before">
+                    <field name="cdu_bag_count" optional="show"/>
+                    <field name="cdu_bagging_status" widget="badge" optional="show"/>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cdu_bag_stock_user,cdu.bag stock user,model_cdu_bag,stock.group_stock_user,1,1,1,1
+access_cdu_box_stock_user,cdu.box stock user,model_cdu_box,stock.group_stock_user,1,1,1,1
+access_cdu_bag_scan_wizard_stock_user,cdu.bag.scan.wizard stock user,model_cdu_bag_scan_wizard,stock.group_stock_user,1,1,1,1

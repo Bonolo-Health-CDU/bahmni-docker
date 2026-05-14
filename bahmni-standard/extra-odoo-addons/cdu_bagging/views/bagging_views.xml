@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <record id="view_cdu_box_tree" model="ir.ui.view">
+            <field name="name">cdu.box.tree</field>
+            <field name="model">cdu.box</field>
+            <field name="arch" type="xml">
+                <tree string="Boxes" decoration-info="status == 'open'" decoration-success="status == 'synced'" decoration-muted="status == 'cancelled'">
+                    <field name="name"/>
+                    <field name="location_id"/>
+                    <field name="bag_count"/>
+                    <field name="status" widget="badge"/>
+                    <field name="closed_date"/>
+                    <field name="closed_user_id"/>
+                    <field name="synced_date"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="view_cdu_box_form" model="ir.ui.view">
+            <field name="name">cdu.box.form</field>
+            <field name="model">cdu.box</field>
+            <field name="arch" type="xml">
+                <form string="Box">
+                    <header>
+                        <button name="action_close_box" type="object" string="Close Box" class="oe_highlight" attrs="{'invisible': [('status', '!=', 'open')]}"/>
+                        <button name="action_sync_box" type="object" string="Sync Box" attrs="{'invisible': [('status', '!=', 'closed')]}"/>
+                        <button name="action_reopen" type="object" string="Reopen" attrs="{'invisible': [('status', '!=', 'closed')]}"/>
+                        <button name="action_cancel" type="object" string="Cancel" attrs="{'invisible': [('status', 'not in', ['open', 'closed'])]}"/>
+                        <field name="status" widget="statusbar" statusbar_visible="open,closed,synced"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="location_id"/>
+                                <field name="bag_count"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </group>
+                            <group>
+                                <field name="closed_date"/>
+                                <field name="closed_user_id"/>
+                                <field name="synced_date"/>
+                                <field name="synced_user_id"/>
+                            </group>
+                        </group>
+                        <group string="Scan Bags">
+                            <field name="bag_barcode_scan" placeholder="Scan bag barcode"/>
+                            <button name="action_scan_bag_barcode" type="object" string="Add Bag to Box" class="oe_highlight"/>
+                        </group>
+                        <field name="bag_ids">
+                            <tree editable="bottom">
+                                <field name="name"/>
+                                <field name="picking_id" domain="[('picking_type_id.name', 'ilike', 'dispensing')]"/>
+                                <field name="partner_id"/>
+                                <field name="destination_location_id"/>
+                                <field name="status"/>
+                                <field name="boxed_date"/>
+                                <field name="boxed_user_id"/>
+                            </tree>
+                        </field>
+                        <group string="Notes">
+                            <field name="note" nolabel="1"/>
+                        </group>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids"/>
+                        <field name="activity_ids"/>
+                        <field name="message_ids"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_cdu_box_search" model="ir.ui.view">
+            <field name="name">cdu.box.search</field>
+            <field name="model">cdu.box</field>
+            <field name="arch" type="xml">
+                <search string="Search Boxes">
+                    <field name="name"/>
+                    <field name="location_id"/>
+                    <filter name="open" string="Open" domain="[('status', '=', 'open')]"/>
+                    <filter name="closed" string="Closed" domain="[('status', '=', 'closed')]"/>
+                    <filter name="synced" string="Synced" domain="[('status', '=', 'synced')]"/>
+                    <group expand="0" string="Group By">
+                        <filter name="group_by_status" string="Status" context="{'group_by': 'status'}"/>
+                        <filter name="group_by_location" string="Destination Location" context="{'group_by': 'location_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_cdu_box" model="ir.actions.act_window">
+            <field name="name">Boxing</field>
+            <field name="res_model">cdu.box</field>
+            <field name="view_mode">tree,form</field>
+            <field name="search_view_id" ref="view_cdu_box_search"/>
+            <field name="context">{"search_default_open": 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">Create a box to start bagging</p>
+            </field>
+        </record>
+
+        <record id="view_cdu_bag_tree" model="ir.ui.view">
+            <field name="name">cdu.bag.tree</field>
+            <field name="model">cdu.bag</field>
+            <field name="arch" type="xml">
+                <tree string="Bags" decoration-success="status == 'delivered'" decoration-info="status == 'scanned'" decoration-warning="status == 'packed'" decoration-muted="status == 'cancelled'">
+                    <field name="name"/>
+                    <field name="box_id"/>
+                    <field name="picking_id"/>
+                    <field name="partner_id"/>
+                    <field name="destination_location_id"/>
+                    <field name="status" widget="badge"/>
+                    <field name="scan_date"/>
+                    <field name="boxed_date"/>
+                    <field name="scan_user_id"/>
+                </tree>
+            </field>
+        </record>
+
+        <record id="view_cdu_bag_form" model="ir.ui.view">
+            <field name="name">cdu.bag.form</field>
+            <field name="model">cdu.bag</field>
+            <field name="arch" type="xml">
+                <form string="Bag">
+                    <header>
+                        <button name="action_reset_to_scanned" type="object" string="Mark Scanned" attrs="{'invisible': [('status', 'not in', ['packed', 'dispatched', 'delivered', 'cancelled'])]}"/>
+                        <button name="action_mark_packed" type="object" string="Mark Packed" class="oe_highlight" attrs="{'invisible': [('status', 'not in', ['draft', 'scanned'])]}"/>
+                        <button name="action_mark_dispatched" type="object" string="Mark Dispatched" attrs="{'invisible': [('status', '!=', 'packed')]}"/>
+                        <button name="action_mark_delivered" type="object" string="Mark Delivered" attrs="{'invisible': [('status', '!=', 'dispatched')]}"/>
+                        <button name="action_cancel" type="object" string="Cancel" attrs="{'invisible': [('status', 'not in', ['draft', 'scanned', 'packed'])]}"/>
+                        <field name="status" widget="statusbar" statusbar_visible="draft,scanned,packed,dispatched,delivered"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="box_id"/>
+                                <field name="picking_id"/>
+                                <field name="partner_id"/>
+                                <field name="destination_location_id"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </group>
+                            <group>
+                                <field name="scan_date"/>
+                                <field name="scan_user_id"/>
+                                <field name="boxed_date"/>
+                                <field name="boxed_user_id"/>
+                            </group>
+                        </group>
+                        <group string="Notes">
+                            <field name="note" nolabel="1"/>
+                        </group>
+                    </sheet>
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids"/>
+                        <field name="activity_ids"/>
+                        <field name="message_ids"/>
+                    </div>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_cdu_bag_search" model="ir.ui.view">
+            <field name="name">cdu.bag.search</field>
+            <field name="model">cdu.bag</field>
+            <field name="arch" type="xml">
+                <search string="Search Bags">
+                    <field name="name"/>
+                    <field name="box_id"/>
+                    <field name="picking_id"/>
+                    <field name="partner_id"/>
+                    <field name="destination_location_id"/>
+                    <field name="scan_user_id"/>
+                    <filter name="scanned" string="Scanned" domain="[('status', '=', 'scanned')]"/>
+                    <filter name="packed" string="Packed" domain="[('status', '=', 'packed')]"/>
+                    <filter name="dispatched" string="Dispatched" domain="[('status', '=', 'dispatched')]"/>
+                    <filter name="delivered" string="Delivered" domain="[('status', '=', 'delivered')]"/>
+                    <group expand="0" string="Group By">
+                        <filter name="group_by_status" string="Status" context="{'group_by': 'status'}"/>
+                        <filter name="group_by_box" string="Box" context="{'group_by': 'box_id'}"/>
+                        <filter name="group_by_picking" string="Picking" context="{'group_by': 'picking_id'}"/>
+                        <filter name="group_by_patient" string="Patient/Contact" context="{'group_by': 'partner_id'}"/>
+                        <filter name="group_by_location" string="Destination Location" context="{'group_by': 'destination_location_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_cdu_bag" model="ir.actions.act_window">
+            <field name="name">Bags</field>
+            <field name="res_model">cdu.bag</field>
+            <field name="view_mode">tree,form</field>
+            <field name="search_view_id" ref="view_cdu_bag_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">Scan or create the first bag</p>
+            </field>
+        </record>
+
+        <record id="view_cdu_bag_scan_wizard_form" model="ir.ui.view">
+            <field name="name">cdu.bag.scan.wizard.form</field>
+            <field name="model">cdu.bag.scan.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Scan Bag">
+                    <group>
+                        <field name="picking_id" domain="[('picking_type_id.name', 'ilike', 'dispensing')]"/>
+                        <field name="barcode" placeholder="Scan or enter bag barcode"/>
+                    </group>
+                    <footer>
+                        <button name="action_scan" type="object" string="Scan" class="btn-primary"/>
+                        <button string="Cancel" special="cancel" class="btn-secondary"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <menuitem id="menu_cdu_bagging_root" name="Bagging" parent="stock.menu_stock_root" sequence="95"/>
+        <menuitem id="menu_cdu_bagging_boxing" name="Boxing" parent="menu_cdu_bagging_root" action="action_cdu_box" sequence="10"/>
+        <menuitem id="menu_cdu_bagging_bags" name="Bags" parent="menu_cdu_bagging_root" action="action_cdu_bag" sequence="20"/>
+    </data>
+</odoo>
