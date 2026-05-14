@@ -1,7 +1,7 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 import math
-
+from datetime import timedelta
 
 class CduBatch(models.Model):
     _name = "cdu.batch"
@@ -21,6 +21,7 @@ class CduBatch(models.Model):
             ("draft", "Draft"),
             ("confirmed", "Confirmed"),
             ("picking_generated", "Picking Generated"),
+            ("stock_allocated", "Stock Allocated"),
             ("printed", "Picking List Printed"),
             ("done", "Done"),
         ],
@@ -177,6 +178,7 @@ class CduBatch(models.Model):
                     "daily_dose": daily_dose,
                     "tablets_required": tablets_required,
                     "bottles_required": bottles_required,
+                    "required_days_supply": cdu_days,
                 })
 
                 key = product.id
@@ -215,4 +217,253 @@ class CduBatch(models.Model):
 
         self.write({
             "state": "picking_generated"
+        })
+
+    # def action_allocate_stock(self):
+
+    #     for batch in self:
+    #         available_stock = {}
+
+    #         patient_lines = (
+    #             batch.patient_picking_line_ids
+    #         )
+
+    #         for line in patient_lines:
+
+    #             product = line.product_id
+
+    #             # available_bottles = int(
+    #             #     product.qty_available
+    #             # )
+
+    #             if product.id not in available_stock:
+
+    #                 available_stock[product.id] = int(
+    #                     product.qty_available
+    #                 )
+
+    #             available_bottles = available_stock[
+    #                 product.id
+    #             ]
+
+    #             required_bottles = (line.bottles_required)
+
+    #             if available_bottles <= 0:
+
+    #                 line.allocated_bottles = 0
+
+    #                 line.allocated_days_supply = 0
+
+    #                 line.allocation_status = "none"
+
+    #                 continue
+
+    #             allocated_bottles = min(
+    #                 available_bottles,
+    #                 required_bottles,
+    #             )
+
+    #             # allocated_days = int(
+    #             #     (
+    #             #         allocated_bottles
+    #             #         * (
+    #             #             product.product_tmpl_id.cdu_pack_size
+    #             #             or 30
+    #             #         )
+    #             #     )
+    #             #     / (
+    #             #         line.daily_dose or 1
+    #             #     )
+    #             # )
+
+    #             calculated_allocated_days = int(
+    #                 (
+    #                     allocated_bottles
+    #                     * (
+    #                         product.product_tmpl_id.cdu_pack_size
+    #                         or 30
+    #                     )
+    #                 )
+    #                 / (
+    #                     line.daily_dose or 1
+    #                 )
+    #             )
+
+    #             allocated_days = min(
+    #                 line.required_days_supply,
+    #                 calculated_allocated_days,
+    #             )
+
+    #             line.allocated_bottles = (
+    #                 allocated_bottles
+    #             )
+
+    #             available_stock[product.id] -= (allocated_bottles)
+
+    #             line.allocated_days_supply = (
+    #                 allocated_days
+    #             )
+
+    #             if (
+    #                 allocated_bottles
+    #                 >= required_bottles
+    #             ):
+
+    #                 line.allocation_status = "full"
+
+    #             else:
+
+    #                 line.allocation_status = (
+    #                     "partial"
+    #                 )
+
+    #             if (
+    #                 line.prescription_id
+    #                 .next_drug_pickup_date
+    #             ):
+
+    #                 line.allocated_next_pickup_date = (
+    #                     line.prescription_id
+    #                     .next_drug_pickup_date
+    #                     + timedelta(
+    #                         days=allocated_days
+    #                     )
+    #                 )
+
+    #             # product.qty_available -= (
+    #             #     allocated_bottles
+    #             # )
+
+    #     self.write({
+    #         "state": "stock_allocated"
+    #     })
+
+    def action_allocate_stock(self):
+
+        for batch in self:
+
+            patient_lines = (
+                batch.patient_picking_line_ids
+            )
+
+            products = patient_lines.mapped(
+                "product_id"
+            )
+
+            for product in products:
+
+                product_lines = patient_lines.filtered(
+                    lambda l: l.product_id == product
+                )
+
+                available_bottles = int(
+                    product.qty_available
+                )
+
+                total_required = sum(
+                    product_lines.mapped(
+                        "bottles_required"
+                    )
+                )
+
+                if total_required <= 0:
+                    continue
+
+                # FAIR SHARE RATIO
+
+                allocation_ratio = min(
+                    1,
+                    available_bottles
+                    / total_required,
+                )
+
+                for line in product_lines:
+
+                    required_bottles = (
+                        line.bottles_required
+                    )
+
+                    allocated_bottles = int(
+                        required_bottles
+                        * allocation_ratio
+                    )
+
+                    # Ensure at least 1 bottle
+                    # if stock exists
+
+                    if (
+                        allocated_bottles <= 0
+                        and available_bottles > 0
+                    ):
+
+                        allocated_bottles = 1
+
+                    allocated_bottles = min(
+                        allocated_bottles,
+                        required_bottles,
+                    )
+
+                    calculated_allocated_days = int(
+                        (
+                            allocated_bottles
+                            * (
+                                product.product_tmpl_id
+                                .cdu_pack_size
+                                or 30
+                            )
+                        )
+                        / (
+                            line.daily_dose or 1
+                        )
+                    )
+
+                    allocated_days = min(
+                        line.required_days_supply,
+                        calculated_allocated_days,
+                    )
+
+                    line.allocated_bottles = (
+                        allocated_bottles
+                    )
+
+                    line.allocated_days_supply = (
+                        allocated_days
+                    )
+
+                    if allocated_bottles <= 0:
+
+                        line.allocation_status = (
+                            "none"
+                        )
+
+                    elif (
+                        allocated_bottles
+                        >= required_bottles
+                    ):
+
+                        line.allocation_status = (
+                            "full"
+                        )
+
+                    else:
+
+                        line.allocation_status = (
+                            "partial"
+                        )
+
+                    if (
+                        line.prescription_id
+                        .next_drug_pickup_date
+                    ):
+
+                        line.allocated_next_pickup_date = (
+                            line.prescription_id
+                            .next_drug_pickup_date
+                            + timedelta(
+                                days=allocated_days
+                            )
+                        )
+
+        self.write({
+            "state": "stock_allocated"
         })

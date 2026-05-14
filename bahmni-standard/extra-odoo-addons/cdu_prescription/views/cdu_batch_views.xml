@@ -27,6 +27,7 @@
                     <button name="action_mark_printed" string="Mark Picking List Printed" type="object" attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
                     <button name="action_mark_done" string="Mark Done" type="object" attrs="{'invisible': [('state', 'not in', ('confirmed', 'printed'))]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,printed,done"/>
+                    <button name="action_allocate_stock" type="object" string="Allocate Stock" class="btn-primary" states="picking_generated"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -105,6 +106,15 @@
                                 <field name="tablets_required"/>
 
                                 <field name="bottles_required"/>
+                                <field name="allocated_bottles"/>
+
+                                <field name="shortfall_bottles"/>
+
+                                <field name="allocated_days_supply"/>
+
+                                <field name="allocated_next_pickup_date"/>
+
+                                <field name="allocation_status"/>
 
                             </tree>
 
