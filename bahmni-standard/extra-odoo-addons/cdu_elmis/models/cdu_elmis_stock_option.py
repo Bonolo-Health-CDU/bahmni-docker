@@ -4,7 +4,7 @@ from odoo import api, fields, models
 class CduElmisStockOption(models.Model):
     _name = "cdu.elmis.stock.option"
     _description = "CDU eLMIS Stock Option"
-    _order = "expiration_date, orderable_code, lot"
+    _order = "orderable_name, expiration_date, lot"
     _rec_name = "name"
 
     batch_id = fields.Many2one(

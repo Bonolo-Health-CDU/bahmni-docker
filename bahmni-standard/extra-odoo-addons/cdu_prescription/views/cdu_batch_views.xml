@@ -53,18 +53,19 @@
                             <field name="prescription_ids" attrs="{'readonly': [('state', '!=', 'draft')]}">
                                 <tree create="false" delete="true">
                                     <field name="name"/>
-                                    <field name="patient_identifier"/>
+                                    <field name="patient_identifier" optional="hide"/>
                                     <field name="patient_first_name"/>
                                     <field name="facility_name"/>
                                     <field name="next_drug_pickup_date"/>
+                                    <field name="regimen_prescribed_raw"/>
                                     <field name="e_locker_district"/>
                                     <field name="collection_point_id"/>
-                                    <field name="hiv_program_id"/>
+                                    <field name="hiv_program_id" optional="hide"/>
                                     <field name="state"/>
                                 </tree>
                             </field>
                         </page>
-                        <page string="Picking Summary">
+                        <page string="Picking Summary" groups="cdu_prescription.group_cdu_admin">
 
                             <field name="picking_line_ids" readonly="1">
 
@@ -83,7 +84,7 @@
                             </field>
 
                         </page>
-                        <page string="Patient Picking Lines">
+                        <page string="Patient Picking Lines" groups="cdu_prescription.group_cdu_admin">
 
                         <field
                             name="patient_picking_line_ids"

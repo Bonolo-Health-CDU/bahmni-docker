@@ -15,18 +15,23 @@ class CduPickingLine(models.Model):
     )
     prescription_id = fields.Many2one(
         "cdu.prescription",
-        required=True,
-        ondelete="cascade",
+        ondelete="set null",
         index=True,
     )
     prescription_item_id = fields.Many2one(
         "cdu.batch.patient.line",
         string="Prescription Item",
-        required=True,
+        ondelete="set null",
+        index=True,
+    )
+    summary_line_id = fields.Many2one(
+        "cdu.batch.picking.line",
+        string="Picking Summary Line",
         ondelete="cascade",
         index=True,
     )
-    openmrs_drug_name = fields.Char(required=True)
+    prescription_count = fields.Integer(readonly=True)
+    openmrs_drug_name = fields.Char(string="eRegister Drug / Regimen", required=True)
     openmrs_drug_uuid = fields.Char(
         help="Retained for Phase 2 product mapping from OpenMRS drugs to OpenLMIS orderables.",
     )
@@ -50,6 +55,11 @@ class CduPickingLine(models.Model):
             "unique_prescription_item",
             "unique(prescription_item_id)",
             "Only one eLMIS picking line is allowed per prescription item.",
+        ),
+        (
+            "unique_summary_line",
+            "unique(summary_line_id)",
+            "Only one eLMIS picking line is allowed per picking summary line.",
         )
     ]
 

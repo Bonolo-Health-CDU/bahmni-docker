@@ -45,28 +45,98 @@ class CduBatch(models.Model):
         string="Available eLMIS Stock",
     )
 
-    def action_generate_picking_list(self):
-        result = super().action_generate_picking_list()
+    def action_confirm_batch(self):
+        result = super().action_confirm_batch()
         for batch in self:
             batch._generate_elmis_picking_lines()
         return result
 
+    def action_generate_picking_list(self):
+        result = super().action_generate_picking_list()
+        for batch in self:
+            batch._generate_elmis_picking_lines()
+            batch._refresh_store_stock_options()
+        if result:
+            return result
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Picking list generated"),
+                "message": _(
+                    "eRegister drug lines and available CDU Store stock were prepared."
+                ),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    def action_print_elmis_picking_list(self):
+        self._ensure_batch_workflow_access()
+        for batch in self:
+            if not batch.elmis_picking_line_ids:
+                batch._generate_elmis_picking_lines()
+            if not batch.elmis_stock_option_ids:
+                batch._refresh_store_stock_options()
+        return self.env.ref(
+            "cdu_elmis.action_report_cdu_elmis_picking_list"
+        ).report_action(self)
+
     def _generate_elmis_picking_lines(self):
         for batch in self:
             batch.elmis_picking_line_ids.unlink()
-            for item in batch.patient_picking_line_ids:
+            if not batch.picking_line_ids:
+                batch._generate_picking_lines()
+            mapped_prescription_ids = set()
+            for item in batch.picking_line_ids:
                 product = item.product_id
                 template = product.product_tmpl_id
+                mapped_prescription_ids.update(
+                    batch.patient_picking_line_ids.filtered(
+                        lambda line, product=product: line.product_id == product
+                    ).mapped("prescription_id").ids
+                )
                 self.env["cdu.picking.line"].create(
                     {
                         "batch_id": batch.id,
-                        "prescription_id": item.prescription_id.id,
-                        "prescription_item_id": item.id,
+                        "summary_line_id": item.id,
                         "openmrs_drug_name": product.display_name,
                         "openmrs_drug_uuid": template.cdu_openmrs_drug_uuid,
-                        "quantity_to_pick": item.bottles_required or 1,
+                        "quantity_to_pick": item.total_bottles or 1,
+                        "prescription_count": item.prescription_count,
                     }
                 )
+            batch._generate_unmapped_elmis_picking_lines(mapped_prescription_ids)
+
+    def _generate_unmapped_elmis_picking_lines(self, mapped_prescription_ids):
+        self.ensure_one()
+        fallback_summary = {}
+        for prescription in self.prescription_ids.filtered(
+            lambda record: record.id not in mapped_prescription_ids
+        ):
+            raw_drug = (prescription.regimen_prescribed_raw or "").strip()
+            if not raw_drug:
+                continue
+            key = raw_drug.lower()
+            if key not in fallback_summary:
+                fallback_summary[key] = {
+                    "display_name": raw_drug,
+                    "prescription_count": 0,
+                    "quantity_to_pick": 0,
+                }
+            fallback_summary[key]["prescription_count"] += 1
+            fallback_summary[key]["quantity_to_pick"] += 1
+
+        for values in fallback_summary.values():
+            self.env["cdu.picking.line"].create(
+                {
+                    "batch_id": self.id,
+                    "openmrs_drug_name": values["display_name"],
+                    "quantity_to_pick": values["quantity_to_pick"],
+                    "prescription_count": values["prescription_count"],
+                }
+            )
 
     @api.depends(
         "elmis_picking_line_ids.selected_stock_option_id",
@@ -238,29 +308,8 @@ class CduBatch(models.Model):
         return errors
 
     def action_refresh_store_stock(self):
-        service = self.env["cdu.elmis.stock.service"]
-        params = self.env["ir.config_parameter"].sudo()
-        store_facility_code = params.get_param("cdu.elmis.cdu_store_facility_code")
-        program_code = params.get_param("cdu.elmis.default_program_code")
-        if not store_facility_code:
-            raise UserError(_("CDU Store Facility Code is not configured."))
-        if not program_code:
-            raise UserError(_("Default Program Code is not configured."))
-
         for batch in self:
-            service.invalidate_stock_cache(store_facility_code, program_code)
-            payload = service.get_stock_card_summaries(
-                facility_code=store_facility_code,
-                program_code=program_code,
-                use_cache=False,
-                batch=batch,
-            )
-            batch._replace_store_stock_options(
-                payload,
-                facility_code=store_facility_code,
-                program_code=program_code,
-            )
-            batch.store_stock_refreshed_at = fields.Datetime.now()
+            batch._refresh_store_stock_options()
 
         return {
             "type": "ir.actions.client",
@@ -270,8 +319,36 @@ class CduBatch(models.Model):
                 "message": _("Available CDU Store stock was refreshed from eLMIS."),
                 "type": "success",
                 "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
+
+    def _refresh_store_stock_options(self):
+        self.ensure_one()
+        service = self.env["cdu.elmis.stock.service"]
+        params = self.env["ir.config_parameter"].sudo()
+        store_facility_code = params.get_param("cdu.elmis.cdu_store_facility_code")
+        program_code = params.get_param("cdu.elmis.default_program_code")
+        if not store_facility_code:
+            raise UserError(_("CDU Store Facility Code is not configured."))
+        if not program_code:
+            raise UserError(_("Default Program Code is not configured."))
+        if not self.elmis_picking_line_ids:
+            self._generate_elmis_picking_lines()
+
+        service.invalidate_stock_cache(store_facility_code, program_code)
+        payload = service.get_stock_card_summaries(
+            facility_code=store_facility_code,
+            program_code=program_code,
+            use_cache=False,
+            batch=self,
+        )
+        self._replace_store_stock_options(
+            payload,
+            facility_code=store_facility_code,
+            program_code=program_code,
+        )
+        self.store_stock_refreshed_at = fields.Datetime.now()
 
     def _replace_store_stock_options(self, payload, facility_code, program_code):
         self.ensure_one()

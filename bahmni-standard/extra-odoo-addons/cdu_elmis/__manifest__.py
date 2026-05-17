@@ -14,6 +14,7 @@
         "views/cdu_elmis_settings_views.xml",
         "views/cdu_elmis_api_log_views.xml",
         "views/cdu_elmis_stock_cache_views.xml",
+        "reports/cdu_picking_list_report.xml",
         "views/cdu_elmis_batch_views.xml",
         "views/cdu_elmis_menus.xml",
     ],
