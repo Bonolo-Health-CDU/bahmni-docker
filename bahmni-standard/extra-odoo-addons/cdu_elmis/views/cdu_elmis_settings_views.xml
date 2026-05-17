@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_elmis_settings_form" model="ir.ui.view">
+        <field name="name">cdu.elmis.settings.form</field>
+        <field name="model">res.config.settings</field>
+        <field name="arch" type="xml">
+            <form string="eLMIS Settings">
+                <header>
+                    <button name="execute" string="Save" type="object" class="btn-primary"/>
+                    <button name="action_resolve_elmis_reference_ids" string="Resolve eLMIS UUIDs" type="object" class="btn-secondary"/>
+                    <button string="Discard" special="cancel"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>eLMIS Stock Integration</h1>
+                    </div>
+                    <group string="Connection">
+                        <field name="cdu_elmis_base_url" placeholder="https://elmis.gov.ls"/>
+                        <field name="cdu_elmis_api_key" password="True"/>
+                    </group>
+                    <group string="Facilities and Program">
+                        <field name="cdu_elmis_cdu_store_facility_code"/>
+                        <field name="cdu_elmis_cdu_store_facility_id"/>
+                        <field name="cdu_elmis_cdu_production_floor_facility_code"/>
+                        <field name="cdu_elmis_cdu_production_floor_facility_id"/>
+                        <field name="cdu_elmis_default_program_code"/>
+                        <field name="cdu_elmis_default_program_id"/>
+                    </group>
+                    <group string="Reason Names">
+                        <field name="cdu_elmis_picking_debit_reason_name"/>
+                        <field name="cdu_elmis_picking_credit_reason_name"/>
+                        <field name="cdu_elmis_consumption_reason_name"/>
+                        <field name="cdu_elmis_residual_debit_reason_name"/>
+                        <field name="cdu_elmis_residual_credit_reason_name"/>
+                    </group>
+                    <group string="Resolved Reason UUIDs">
+                        <field name="cdu_elmis_picking_debit_reason_id"/>
+                        <field name="cdu_elmis_picking_credit_reason_id"/>
+                        <field name="cdu_elmis_consumption_reason_id"/>
+                        <field name="cdu_elmis_residual_debit_reason_id"/>
+                        <field name="cdu_elmis_residual_credit_reason_id"/>
+                    </group>
+                    <group string="Resolved Transfer Node UUIDs">
+                        <field name="cdu_elmis_store_to_production_destination_node_id"/>
+                        <field name="cdu_elmis_production_from_store_source_node_id"/>
+                        <field name="cdu_elmis_production_to_store_destination_node_id"/>
+                        <field name="cdu_elmis_store_from_production_source_node_id"/>
+                    </group>
+                    <group string="Reliability">
+                        <field name="cdu_elmis_stock_cache_ttl_seconds"/>
+                        <field name="cdu_elmis_max_retry_count"/>
+                        <field name="cdu_elmis_mapping_service_backend"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_elmis_settings" model="ir.actions.act_window">
+        <field name="name">eLMIS Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cdu_elmis_settings_form"/>
+        <field name="target">current</field>
+        <field name="context">{'module': 'cdu_elmis'}</field>
+    </record>
+</odoo>

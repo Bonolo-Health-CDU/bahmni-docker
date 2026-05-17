@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cdu_elmis_api_log_dispensing_officer,cdu.elmis.api.log dispensing officer,model_cdu_elmis_api_log,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_elmis_api_log_admin,cdu.elmis.api.log admin,model_cdu_elmis_api_log,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_elmis_stock_cache_dispensing_officer,cdu.elmis.stock.cache dispensing officer,model_cdu_elmis_stock_cache,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_elmis_stock_cache_admin,cdu.elmis.stock.cache admin,model_cdu_elmis_stock_cache,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_elmis_stock_option_dispensing_officer,cdu.elmis.stock.option dispensing officer,model_cdu_elmis_stock_option,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
+access_cdu_elmis_stock_option_admin,cdu.elmis.stock.option admin,model_cdu_elmis_stock_option,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_picking_line_dispensing_officer,cdu.picking.line dispensing officer,model_cdu_picking_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
+access_cdu_picking_line_admin,cdu.picking.line admin,model_cdu_picking_line,cdu_prescription.group_cdu_admin,1,1,1,1

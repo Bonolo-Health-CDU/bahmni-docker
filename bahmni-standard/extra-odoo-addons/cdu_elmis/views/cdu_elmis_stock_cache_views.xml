@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_elmis_stock_cache_tree" model="ir.ui.view">
+        <field name="name">cdu.elmis.stock.cache.tree</field>
+        <field name="model">cdu.elmis.stock.cache</field>
+        <field name="arch" type="xml">
+            <tree decoration-muted="not is_valid">
+                <field name="facility_code"/>
+                <field name="program_code"/>
+                <field name="orderable_code"/>
+                <field name="fetched_at"/>
+                <field name="expires_at"/>
+                <field name="is_valid"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_elmis_stock_cache_form" model="ir.ui.view">
+        <field name="name">cdu.elmis.stock.cache.form</field>
+        <field name="model">cdu.elmis.stock.cache</field>
+        <field name="arch" type="xml">
+            <form string="eLMIS Stock Cache">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="facility_code" readonly="1"/>
+                            <field name="program_code" readonly="1"/>
+                            <field name="orderable_code" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="fetched_at" readonly="1"/>
+                            <field name="expires_at" readonly="1"/>
+                            <field name="is_valid" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Response JSON">
+                            <field name="response_json" readonly="1" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cdu_elmis_stock_cache_search" model="ir.ui.view">
+        <field name="name">cdu.elmis.stock.cache.search</field>
+        <field name="model">cdu.elmis.stock.cache</field>
+        <field name="arch" type="xml">
+            <search string="eLMIS Stock Cache">
+                <field name="facility_code"/>
+                <field name="program_code"/>
+                <field name="orderable_code"/>
+                <filter string="Valid" name="valid" domain="[('expires_at', '&gt;', context_today())]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Facility" name="group_facility" context="{'group_by': 'facility_code'}"/>
+                    <filter string="Program" name="group_program" context="{'group_by': 'program_code'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cdu_elmis_stock_cache" model="ir.actions.act_window">
+        <field name="name">eLMIS Stock Cache</field>
+        <field name="res_model">cdu.elmis.stock.cache</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_elmis_stock_cache_search"/>
+    </record>
+</odoo>

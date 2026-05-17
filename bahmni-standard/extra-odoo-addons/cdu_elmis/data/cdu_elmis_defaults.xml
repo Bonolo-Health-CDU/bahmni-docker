@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <record id="param_cdu_elmis_picking_debit_reason_name" model="ir.config_parameter">
+        <field name="key">cdu.elmis.picking_debit_reason_name</field>
+        <field name="value">Transfer Out</field>
+    </record>
+
+    <record id="param_cdu_elmis_picking_credit_reason_name" model="ir.config_parameter">
+        <field name="key">cdu.elmis.picking_credit_reason_name</field>
+        <field name="value">Transfer In</field>
+    </record>
+
+    <record id="param_cdu_elmis_consumption_reason_name" model="ir.config_parameter">
+        <field name="key">cdu.elmis.consumption_reason_name</field>
+        <field name="value">Consumed</field>
+    </record>
+
+    <record id="param_cdu_elmis_residual_debit_reason_name" model="ir.config_parameter">
+        <field name="key">cdu.elmis.residual_debit_reason_name</field>
+        <field name="value">Transfer Out</field>
+    </record>
+
+    <record id="param_cdu_elmis_residual_credit_reason_name" model="ir.config_parameter">
+        <field name="key">cdu.elmis.residual_credit_reason_name</field>
+        <field name="value">Facility Return</field>
+    </record>
+
+    <record id="param_cdu_elmis_stock_cache_ttl_seconds" model="ir.config_parameter">
+        <field name="key">cdu.elmis.stock_cache_ttl_seconds</field>
+        <field name="value">300</field>
+    </record>
+
+    <record id="param_cdu_elmis_max_retry_count" model="ir.config_parameter">
+        <field name="key">cdu.elmis.max_retry_count</field>
+        <field name="value">3</field>
+    </record>
+
+    <record id="param_cdu_elmis_mapping_service_backend" model="ir.config_parameter">
+        <field name="key">cdu.elmis.mapping_service_backend</field>
+        <field name="value">local</field>
+    </record>
+</odoo>

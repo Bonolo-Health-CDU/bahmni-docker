@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_elmis_api_log_tree" model="ir.ui.view">
+        <field name="name">cdu.elmis.api.log.tree</field>
+        <field name="model">cdu.elmis.api.log</field>
+        <field name="arch" type="xml">
+            <tree decoration-danger="not success" decoration-success="success">
+                <field name="timestamp"/>
+                <field name="call_type"/>
+                <field name="http_method"/>
+                <field name="http_status_code"/>
+                <field name="success"/>
+                <field name="batch_id"/>
+                <field name="user_id"/>
+                <field name="retry_count"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_elmis_api_log_form" model="ir.ui.view">
+        <field name="name">cdu.elmis.api.log.form</field>
+        <field name="model">cdu.elmis.api.log</field>
+        <field name="arch" type="xml">
+            <form string="eLMIS API Log">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="call_type" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Request">
+                            <field name="timestamp" readonly="1"/>
+                            <field name="endpoint" readonly="1"/>
+                            <field name="http_method" readonly="1"/>
+                            <field name="batch_id" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                        </group>
+                        <group string="Response">
+                            <field name="http_status_code" readonly="1"/>
+                            <field name="success" readonly="1"/>
+                            <field name="error_message" readonly="1"/>
+                            <field name="retry_count" readonly="1"/>
+                            <field name="retry_of" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Request Payload">
+                            <field name="request_payload" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Response Body">
+                            <field name="response_body" readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Retries">
+                            <field name="retry_ids" readonly="1">
+                                <tree>
+                                    <field name="timestamp"/>
+                                    <field name="call_type"/>
+                                    <field name="http_status_code"/>
+                                    <field name="success"/>
+                                    <field name="retry_count"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cdu_elmis_api_log_search" model="ir.ui.view">
+        <field name="name">cdu.elmis.api.log.search</field>
+        <field name="model">cdu.elmis.api.log</field>
+        <field name="arch" type="xml">
+            <search string="eLMIS API Logs">
+                <field name="batch_id"/>
+                <field name="call_type"/>
+                <field name="user_id"/>
+                <filter string="Failed" name="failed" domain="[('success', '=', False)]"/>
+                <filter string="Successful" name="successful" domain="[('success', '=', True)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>
+                    <filter string="Call Type" name="group_call_type" context="{'group_by': 'call_type'}"/>
+                    <filter string="Success" name="group_success" context="{'group_by': 'success'}"/>
+                    <filter string="Date" name="group_date" context="{'group_by': 'timestamp:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cdu_elmis_api_log" model="ir.actions.act_window">
+        <field name="name">eLMIS API Logs</field>
+        <field name="res_model">cdu.elmis.api.log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_elmis_api_log_search"/>
+    </record>
+</odoo>

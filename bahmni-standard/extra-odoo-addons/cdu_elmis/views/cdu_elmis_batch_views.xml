@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_batch_form_elmis" model="ir.ui.view">
+        <field name="name">cdu.batch.form.elmis</field>
+        <field name="model">cdu.batch</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_batch_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_mark_printed']" position="before">
+                <button name="action_refresh_store_stock"
+                        string="Refresh Store Stock"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
+                <button name="action_check_picking_readiness"
+                        string="Check Picking Readiness"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
+                <button name="action_confirm_elmis_picking"
+                        string="Confirm eLMIS Picking"
+                        type="object"
+                        class="btn-primary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        confirm="This will submit stock movement events to eLMIS: debit CDU Store, then credit CDU Production Floor. Continue?"
+                        attrs="{'invisible': ['|', ('state', 'not in', ('picking_generated', 'printed')), ('picking_confirmed_at', '!=', False)]}"/>
+            </xpath>
+            <xpath expr="//sheet/group" position="after">
+                <group string="eLMIS Stock Status">
+                    <field name="stock_event_status" readonly="1"/>
+                    <field name="store_stock_refreshed_at" readonly="1"/>
+                    <field name="picking_ready" readonly="1"/>
+                    <field name="picking_confirmed_at" readonly="1"/>
+                    <field name="boxing_completed_at" readonly="1"/>
+                    <field name="residual_returned_at" readonly="1"/>
+                </group>
+                <group string="Picking Readiness">
+                    <field name="picking_readiness_message" readonly="1" nolabel="1"/>
+                </group>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="eLMIS Picking Selections">
+                    <field name="elmis_picking_line_ids">
+                        <tree editable="bottom">
+                            <field name="batch_id" invisible="1"/>
+                            <field name="prescription_id" readonly="1"/>
+                            <field name="openmrs_drug_name" readonly="1"/>
+                            <field name="openmrs_drug_uuid" readonly="1" optional="hide"/>
+                            <field name="quantity_to_pick"/>
+                            <field name="selected_stock_option_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="selected_orderable_code"/>
+                            <field name="selected_orderable_name"/>
+                            <field name="selected_lot"/>
+                            <field name="selected_lot_expiry"/>
+                            <field name="selected_stock_on_hand"/>
+                            <field name="quantity_picked"/>
+                        </tree>
+                    </field>
+                </page>
+                <page string="Available eLMIS Stock">
+                    <field name="elmis_stock_option_ids" readonly="1">
+                        <tree create="0" delete="0">
+                            <field name="orderable_code"/>
+                            <field name="orderable_name"/>
+                            <field name="lot"/>
+                            <field name="stock_on_hand"/>
+                            <field name="expiration_date"/>
+                            <field name="occurred_date"/>
+                            <field name="facility_code" optional="hide"/>
+                            <field name="program_code" optional="hide"/>
+                        </tree>
+                    </field>
+                </page>
+                <page string="eLMIS API Logs">
+                    <field name="stock_event_log_ids" readonly="1">
+                        <tree decoration-danger="not success" decoration-success="success">
+                            <field name="timestamp"/>
+                            <field name="call_type"/>
+                            <field name="http_method"/>
+                            <field name="http_status_code"/>
+                            <field name="success"/>
+                            <field name="retry_count"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
