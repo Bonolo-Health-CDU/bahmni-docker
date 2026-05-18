@@ -12,6 +12,7 @@
     "assets": {
         "web.assets_backend": [
             "cdu_base/static/src/css/custom_backend.css",
+            "cdu_base/static/src/js/chatter_toggle.js",
         ],
         "web.assets_frontend": [
             "cdu_base/static/src/css/custom_frontend.css",

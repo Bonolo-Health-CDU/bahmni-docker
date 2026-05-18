@@ -40,3 +40,143 @@
 .o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) select {
     border-left: 4px solid #005baa;
 }
+
+.o_cdu_batch_form .oe_title {
+    margin-bottom: 8px;
+}
+
+.o_cdu_batch_form .oe_title h1 {
+    margin-bottom: 4px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_dashboard {
+    align-items: stretch;
+    border-bottom: 1px solid #e6ebf1;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    margin: 8px 0 10px;
+    padding-bottom: 14px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card {
+    background: #fbfcfe;
+    border: 1px solid #e1e8f0;
+    border-radius: 8px;
+    min-height: 108px;
+    padding: 12px 14px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card h3 {
+    border-bottom: 1px solid #dfe7ef;
+    color: #3d4652;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin: 0 0 10px;
+    padding-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_fields {
+    align-items: start;
+    display: grid;
+    gap: 8px 12px;
+    grid-template-columns: minmax(128px, 0.85fr) minmax(120px, 1.15fr);
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_fields > label {
+    color: #5f6b78;
+    font-weight: 600;
+    margin-bottom: 0;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card .o_field_widget {
+    min-width: 0;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_readiness .o_field_text {
+    color: #4f5b66;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.o_cdu_batch_form .o_cdu_batch_table_context {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin: -2px 0 8px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_count_badge {
+    align-items: center;
+    background: #eef7ff;
+    border: 1px solid #c9e4fb;
+    border-radius: 999px;
+    color: #245278;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 600;
+    gap: 6px;
+    padding: 5px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_count_badge .o_field_widget {
+    align-items: center;
+    color: #005baa;
+    display: inline-flex;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.o_cdu_batch_form .o_cdu_batch_count_badge span {
+    line-height: 1;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_badge {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 520px;
+    min-height: 28px;
+    padding: 5px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_ready {
+    background: #edf9f1;
+    border: 1px solid #bfe8cc;
+    color: #27663a;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_needs_attention {
+    background: #fff7e8;
+    border: 1px solid #f3d59c;
+    color: #7a4d00;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_message {
+    background: #fff8ec;
+    border: 1px solid #f3d59c;
+    border-radius: 8px;
+    color: #6d4a09;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+    margin: -2px 0 10px;
+    padding: 9px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_message .o_field_text {
+    white-space: pre-wrap;
+}
+
+.o_cdu_batch_form .o_notebook {
+    margin-top: 6px;
+}
+
+.o_cdu_batch_form .o_notebook .tab-content {
+    padding-top: 0;
+}

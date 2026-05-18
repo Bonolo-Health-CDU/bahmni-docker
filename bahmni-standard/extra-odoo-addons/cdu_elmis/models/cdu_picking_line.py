@@ -5,7 +5,7 @@ from odoo.exceptions import ValidationError
 class CduPickingLine(models.Model):
     _name = "cdu.picking.line"
     _description = "CDU eLMIS Picking Line"
-    _order = "batch_id, prescription_id, id"
+    _order = "batch_id, openmrs_drug_name, id"
 
     batch_id = fields.Many2one(
         "cdu.batch",
@@ -37,18 +37,18 @@ class CduPickingLine(models.Model):
     )
     selected_orderable_code = fields.Char(string="eLMIS Orderable Code")
     selected_orderable_id = fields.Char(string="eLMIS Orderable UUID")
-    selected_orderable_name = fields.Char(string="eLMIS Orderable")
-    selected_lot = fields.Char(string="Lot")
+    selected_orderable_name = fields.Char(string="Fulfil With eLMIS Product")
+    selected_lot = fields.Char(string="Batch Number")
     selected_lot_id = fields.Char(string="eLMIS Lot UUID")
-    selected_lot_expiry = fields.Date(string="Lot Expiry")
+    selected_lot_expiry = fields.Date(string="Expiry")
     selected_stock_option_id = fields.Many2one(
         "cdu.elmis.stock.option",
         string="Fulfil With",
-        domain="[('batch_id', '=', batch_id)]",
+        domain="[('batch_id', '=', batch_id), ('stock_on_hand', '>', 0)]",
     )
     selected_stock_on_hand = fields.Integer(string="Available SOH", readonly=True)
-    quantity_to_pick = fields.Float(required=True)
-    quantity_picked = fields.Float()
+    quantity_to_pick = fields.Float(string="Required Qty", required=True)
+    quantity_picked = fields.Float(string="Picked Qty")
 
     _sql_constraints = [
         (

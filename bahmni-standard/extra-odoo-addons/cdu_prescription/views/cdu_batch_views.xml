@@ -20,7 +20,7 @@
         <field name="name">cdu.batch.form</field>
         <field name="model">cdu.batch</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_cdu_batch_form">
                 <header>
                     <button name="action_confirm_batch" string="Confirm Batch" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_generate_picking_list" string="Generate Picking List" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
@@ -32,19 +32,32 @@
                     <div class="oe_title">
                         <h1><field name="name"/></h1>
                     </div>
-                    <group>
-                        <group string="Batch Filters">
-                            <separator string="Next Drug Pickup Date"/>
-                            <field name="filter_next_drug_pickup_date_from" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-                            <field name="filter_next_drug_pickup_date_to" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-                            <separator string="Destination"/>
-                            <field name="filter_e_locker_district" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-                            <field name="filter_collection_point_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
-                        </group>
-                        <group string="Summary">
-                            <field name="prescription_count" readonly="1"/>
-                        </group>
-                    </group>
+                    <div class="o_cdu_batch_dashboard">
+                        <div class="o_cdu_batch_card">
+                            <h3>Pickup Dates</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="filter_next_drug_pickup_date_from"/>
+                                <field name="filter_next_drug_pickup_date_from" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                                <label for="filter_next_drug_pickup_date_to"/>
+                                <field name="filter_next_drug_pickup_date_to" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Destination</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="filter_e_locker_district"/>
+                                <field name="filter_e_locker_district" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                                <label for="filter_collection_point_id"/>
+                                <field name="filter_collection_point_id" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="o_cdu_batch_table_context">
+                        <span class="o_cdu_batch_count_badge">
+                            <field name="prescription_count" readonly="1" nolabel="1"/>
+                            <span>prescriptions selected</span>
+                        </span>
+                    </div>
                     <notebook>
                         <page string="Selected Prescriptions">
                             <div class="alert alert-info" role="alert" attrs="{'invisible': [('state', '!=', 'draft')]}">
