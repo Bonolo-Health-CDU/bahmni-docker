@@ -1,10 +1,11 @@
 import json
+import base64
 from datetime import timedelta
 from urllib.parse import urljoin
 
 import requests
 
-from odoo import fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
@@ -44,10 +45,11 @@ class CduElmisStockService(models.AbstractModel):
             params["orderableCode"] = orderable_code
 
         try:
+            auth = self._auth_context(use_user_token=True)
             response = requests.get(
                 endpoint,
                 params=params,
-                headers=self._auth_headers(),
+                headers=auth["headers"],
                 timeout=30,
             )
             response_text = response.text
@@ -61,6 +63,8 @@ class CduElmisStockService(models.AbstractModel):
                 success=success,
                 error_message=None if success else response_text[:250],
                 batch=batch,
+                auth_mode=auth["auth_mode"],
+                elmis_username=auth["elmis_username"],
             )
             if not success:
                 raise UserError("eLMIS stock query failed: %s" % response_text[:250])
@@ -77,6 +81,8 @@ class CduElmisStockService(models.AbstractModel):
                 success=False,
                 error_message=str(error)[:250],
                 batch=batch,
+                auth_mode="user_token",
+                elmis_username=self.env.user.cdu_elmis_username,
             )
             raise UserError("Could not reach eLMIS for stock query: %s" % error) from error
 
@@ -93,10 +99,11 @@ class CduElmisStockService(models.AbstractModel):
         }
 
         try:
+            auth = self._auth_context(use_user_token=True)
             response = requests.post(
                 endpoint,
                 data=json.dumps(payload),
-                headers=self._auth_headers(),
+                headers=auth["headers"],
                 timeout=30,
             )
             response_text = response.text
@@ -111,6 +118,8 @@ class CduElmisStockService(models.AbstractModel):
                 success=success,
                 error_message=None if success else response_text[:250],
                 batch=batch,
+                auth_mode=auth["auth_mode"],
+                elmis_username=auth["elmis_username"],
             )
             if not success:
                 raise UserError("eLMIS stock event failed: %s" % response_text[:250])
@@ -125,6 +134,8 @@ class CduElmisStockService(models.AbstractModel):
                 success=False,
                 error_message=str(error)[:250],
                 batch=batch,
+                auth_mode="user_token",
+                elmis_username=self.env.user.cdu_elmis_username,
             )
             raise UserError("Could not reach eLMIS for stock event: %s" % error) from error
 
@@ -135,6 +146,7 @@ class CduElmisStockService(models.AbstractModel):
         items,
         call_type,
         batch=None,
+        box=None,
         source_facility_code=None,
         destination_facility_code=None,
     ):
@@ -177,10 +189,11 @@ class CduElmisStockService(models.AbstractModel):
         }
 
         try:
+            auth = self._auth_context(use_user_token=True)
             response = requests.post(
                 endpoint,
                 data=json.dumps(payload),
-                headers=self._auth_headers(),
+                headers=auth["headers"],
                 timeout=30,
             )
             response_text = response.text
@@ -195,6 +208,9 @@ class CduElmisStockService(models.AbstractModel):
                 success=success,
                 error_message=None if success else response_text[:250],
                 batch=batch,
+                box=box,
+                auth_mode=auth["auth_mode"],
+                elmis_username=auth["elmis_username"],
             )
             if not success:
                 raise UserError("eLMIS stock event failed: %s" % response_text[:250])
@@ -209,6 +225,9 @@ class CduElmisStockService(models.AbstractModel):
                 success=False,
                 error_message=str(error)[:250],
                 batch=batch,
+                box=box,
+                auth_mode="user_token",
+                elmis_username=self.env.user.cdu_elmis_username,
             )
             raise UserError("Could not reach eLMIS for stock event: %s" % error) from error
 
@@ -275,6 +294,9 @@ class CduElmisStockService(models.AbstractModel):
         success=False,
         error_message=None,
         batch=None,
+        box=None,
+        auth_mode=None,
+        elmis_username=None,
     ):
         return self.env["cdu.elmis.api.log"].sudo().create(
             {
@@ -286,17 +308,118 @@ class CduElmisStockService(models.AbstractModel):
                 "http_status_code": http_status_code,
                 "success": success,
                 "error_message": error_message,
+                "auth_mode": auth_mode,
+                "elmis_username": elmis_username,
                 "batch_id": batch.id if batch else False,
+                "box_id": box.id if box else False,
                 "user_id": self.env.user.id,
             }
         )
 
-    def _auth_headers(self):
+    def _auth_context(self, use_user_token=False):
+        if use_user_token:
+            token = self._get_current_user_elmis_token()
+            return {
+                "headers": self._headers_for_token(token),
+                "auth_mode": "user_token",
+                "elmis_username": self.env.user.cdu_elmis_username,
+            }
         api_key = self._get_required_param("cdu.elmis.api_key", "eLMIS API Key")
         return {
-            "Authorization": "Bearer %s" % api_key,
+            "headers": self._headers_for_token(api_key),
+            "auth_mode": "system_api_key",
+            "elmis_username": False,
+        }
+
+    def _headers_for_token(self, token):
+        return {
+            "Authorization": "Bearer %s" % token,
             "Content-Type": "application/json",
             "Accept": "application/json",
+        }
+
+    def _auth_headers(self):
+        return self._auth_context()["headers"]
+
+    def _get_current_user_elmis_token(self):
+        user = self.env.user
+        if not user.cdu_elmis_access_token or not user.cdu_elmis_token_expires_at:
+            raise UserError(
+                _(
+                    "Please authenticate with eLMIS before performing this stock action."
+                )
+            )
+        expires_at = fields.Datetime.to_datetime(user.cdu_elmis_token_expires_at)
+        if expires_at <= fields.Datetime.now() + timedelta(seconds=30):
+            raise UserError(
+                _(
+                    "Your eLMIS session has expired. Please authenticate with eLMIS again."
+                )
+            )
+        return user.cdu_elmis_access_token
+
+    def has_valid_current_user_elmis_token(self):
+        try:
+            self._get_current_user_elmis_token()
+            return True
+        except UserError:
+            return False
+
+    def action_open_elmis_auth_wizard(self, batch=None):
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Authenticate with eLMIS"),
+            "res_model": "cdu.elmis.auth.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_username": self.env.user.cdu_elmis_username
+                or self.env.user.login,
+                "default_batch_id": batch.id if batch else False,
+            },
+        }
+
+    def authenticate_elmis_user(self, username, password):
+        base_url = self._get_required_param("cdu.elmis.base_url", "eLMIS Base URL")
+        endpoint = urljoin(base_url.rstrip("/") + "/", "api/oauth/token")
+        client_id = self._get_required_param(
+            "cdu.elmis.user_client_id",
+            "eLMIS User OAuth Client ID",
+        )
+        client_secret = self._get_required_param(
+            "cdu.elmis.user_client_secret",
+            "eLMIS User OAuth Client Secret",
+        )
+        client_credentials = "%s:%s" % (client_id, client_secret)
+        basic_token = base64.b64encode(client_credentials.encode("utf-8")).decode(
+            "ascii"
+        )
+        try:
+            response = requests.post(
+                endpoint,
+                params={"grant_type": "password"},
+                data={"username": username, "password": password},
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": "Basic %s" % basic_token,
+                },
+                timeout=30,
+            )
+        except requests.RequestException as error:
+            raise UserError(_("Could not reach eLMIS authentication service: %s") % error) from error
+
+        if response.status_code != 200:
+            raise UserError(_("eLMIS authentication failed: %s") % response.text[:250])
+
+        payload = response.json()
+        access_token = payload.get("access_token")
+        if not access_token:
+            raise UserError(_("eLMIS did not return an access token."))
+        expires_in = int(payload.get("expires_in") or 3600)
+        return {
+            "access_token": access_token,
+            "expires_at": fields.Datetime.now() + timedelta(seconds=expires_in),
         }
 
     def _get_required_param(self, key, label):

@@ -6,6 +6,7 @@ class CduPickingLine(models.Model):
     _name = "cdu.picking.line"
     _description = "CDU eLMIS Picking Line"
     _order = "batch_id, openmrs_drug_name, id"
+    _rec_name = "openmrs_drug_name"
 
     batch_id = fields.Many2one(
         "cdu.batch",
@@ -49,6 +50,15 @@ class CduPickingLine(models.Model):
     selected_stock_on_hand = fields.Integer(string="Available SOH", readonly=True)
     quantity_to_pick = fields.Float(string="Required Qty", required=True)
     quantity_picked = fields.Float(string="Picked Qty")
+    fulfilment_line_ids = fields.One2many(
+        "cdu.picking.fulfilment.line",
+        "picking_line_id",
+        string="eLMIS Fulfilment Lines",
+    )
+    total_quantity_picked = fields.Float(
+        string="Total Picked Qty",
+        compute="_compute_total_quantity_picked",
+    )
 
     _sql_constraints = [
         (
@@ -70,6 +80,24 @@ class CduPickingLine(models.Model):
                 raise ValidationError(_("Quantity to pick must be greater than zero."))
             if line.quantity_picked < 0:
                 raise ValidationError(_("Quantity picked cannot be negative."))
+
+    @api.depends("fulfilment_line_ids.quantity_picked")
+    def _compute_total_quantity_picked(self):
+        for line in self:
+            line.total_quantity_picked = sum(line.fulfilment_line_ids.mapped("quantity_picked"))
+
+    def _ensure_default_fulfilment_line(self):
+        for line in self:
+            if line.fulfilment_line_ids:
+                continue
+            values = {
+                "batch_id": line.batch_id.id,
+                "picking_line_id": line.id,
+                "quantity_picked": line.quantity_picked or line.quantity_to_pick or 1,
+            }
+            if line.selected_stock_option_id:
+                values["selected_stock_option_id"] = line.selected_stock_option_id.id
+            self.env["cdu.picking.fulfilment.line"].create(values)
 
     @api.onchange("selected_stock_option_id")
     def _onchange_selected_stock_option_id(self):

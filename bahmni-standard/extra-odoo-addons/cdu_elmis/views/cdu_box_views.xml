@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_box_tree" model="ir.ui.view">
+        <field name="name">cdu.box.tree</field>
+        <field name="model">cdu.box</field>
+        <field name="arch" type="xml">
+            <tree default_order="create_date desc"
+                  decoration-success="state == 'confirmed'">
+                <field name="name"/>
+                <field name="collection_point_id"/>
+                <field name="next_drug_pickup_date"/>
+                <field name="parcel_count"/>
+                <field name="max_parcels"/>
+                <field name="dispatch_status"/>
+                <field name="confirmed_by"/>
+                <field name="confirmed_at"/>
+                <field name="dispatched_at"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_box_form" model="ir.ui.view">
+        <field name="name">cdu.box.form</field>
+        <field name="model">cdu.box</field>
+        <field name="arch" type="xml">
+            <form class="o_cdu_prescription_form o_cdu_batch_form">
+                <header>
+                    <button name="action_confirm_box"
+                            string="Confirm Box"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            confirm="This will consume the boxed medicines from the eLMIS Production Floor and move the prescriptions to Awaiting Dispatch. Continue?"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_load_eligible_parcels"
+                            string="Load Eligible Parcels"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_confirm_dispatch_handover"
+                            string="Confirm Dispatch Handover"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            confirm="This will mark the boxed prescriptions as Dispatched in CDU. Continue?"
+                            attrs="{'invisible': ['|', ('state', '!=', 'confirmed'), ('dispatch_status', '=', 'dispatched')]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+
+                    <div class="o_cdu_batch_dashboard">
+                        <div class="o_cdu_batch_card">
+                            <h3>Box Rules</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="collection_point_id"/>
+                                <field name="collection_point_id" nolabel="1" readonly="1"/>
+                                <label for="next_drug_pickup_date"/>
+                                <field name="next_drug_pickup_date" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Capacity</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="parcel_count"/>
+                                <field name="parcel_count" nolabel="1" readonly="1"/>
+                                <label for="max_parcels"/>
+                                <field name="max_parcels" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Confirmation</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="confirmed_by"/>
+                                <field name="confirmed_by" nolabel="1" readonly="1"/>
+                                <label for="confirmed_at"/>
+                                <field name="confirmed_at" nolabel="1" readonly="1"/>
+                                <label for="consumption_posted_at"/>
+                                <field name="consumption_posted_at" nolabel="1" readonly="1"/>
+                                <label for="consumption_log_id"/>
+                                <field name="consumption_log_id" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Dispatch</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="dispatch_status"/>
+                                <field name="dispatch_status" nolabel="1" readonly="1"/>
+                                <label for="dispatch_ready_at"/>
+                                <field name="dispatch_ready_at" nolabel="1" readonly="1"/>
+                                <label for="dispatched_by"/>
+                                <field name="dispatched_by" nolabel="1" readonly="1"/>
+                                <label for="dispatched_at"/>
+                                <field name="dispatched_at" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
+                        Add one parcel, then click <strong>Load Eligible Parcels</strong> to auto-add
+                        matching parcels with the same collection point and next drug pickup date, up to
+                        the box capacity. Remove any parcels that should not be included before confirming.
+                    </div>
+
+                    <notebook>
+                        <page string="Parcels">
+                            <field name="line_ids" attrs="{'readonly': [('state', '=', 'confirmed')]}">
+                                <tree editable="bottom" default_order="parcel_reference asc">
+                                    <field name="bagging_qa_id" options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="parcel_reference" readonly="1"/>
+                                    <field name="patient_name" readonly="1"/>
+                                    <field name="collection_point_id" readonly="1"/>
+                                    <field name="next_drug_pickup_date" readonly="1"/>
+                                    <field name="prescription_id" optional="hide" readonly="1"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Dispatch Notes">
+                            <field name="dispatch_notes"
+                                   placeholder="Capture handover notes, courier reference, or any dispatch exception here."
+                                   attrs="{'readonly': [('dispatch_status', '=', 'dispatched')]}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cdu_box_search" model="ir.ui.view">
+        <field name="name">cdu.box.search</field>
+        <field name="model">cdu.box</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="collection_point_id"/>
+                <field name="next_drug_pickup_date"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <filter string="Pending Dispatch" name="pending_dispatch" domain="[('state', '=', 'confirmed'), ('dispatch_status', '=', 'pending')]"/>
+                <filter string="Dispatched" name="dispatched" domain="[('dispatch_status', '=', 'dispatched')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Dispatch Status" name="group_dispatch_status" context="{'group_by': 'dispatch_status'}"/>
+                    <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
+                    <filter string="Pickup Date" name="group_pickup_date" context="{'group_by': 'next_drug_pickup_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cdu_box" model="ir.actions.act_window">
+        <field name="name">Boxes</field>
+        <field name="res_model">cdu.box</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_box_search"/>
+    </record>
+
+    <record id="action_cdu_dispatch_work_queue" model="ir.actions.act_window">
+        <field name="name">Dispatch Work Queue</field>
+        <field name="res_model">cdu.box</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_box_search"/>
+        <field name="domain">[('state', '=', 'confirmed'), ('dispatch_status', '=', 'pending')]</field>
+    </record>
+
+    <record id="action_cdu_boxing_work_queue" model="ir.actions.act_window">
+        <field name="name">Boxing Work Queue</field>
+        <field name="res_model">cdu.bagging.qa</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_bagging_qa_search"/>
+        <field name="domain">[('state', '=', 'confirmed'), ('prescription_id.state', '=', 'awaiting_boxing')]</field>
+    </record>
+
+    <record id="action_cdu_awaiting_dispatch" model="ir.actions.act_window">
+        <field name="name">Awaiting Dispatch</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_dispatch')]</field>
+    </record>
+</odoo>

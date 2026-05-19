@@ -63,11 +63,11 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr t-foreach="batch.elmis_picking_line_ids" t-as="line">
+                                <tr t-foreach="batch.elmis_picking_fulfilment_line_ids" t-as="line">
                                     <td><span t-esc="line_index + 1"/></td>
                                     <td><span t-field="line.openmrs_drug_name"/></td>
-                                    <td class="text-end"><span t-field="line.prescription_count"/></td>
-                                    <td class="text-end"><span t-field="line.quantity_to_pick"/></td>
+                                    <td class="text-end"><span t-field="line.picking_line_id.prescription_count"/></td>
+                                    <td class="text-end"><span t-field="line.required_quantity"/></td>
                                     <td>
                                         <span t-if="line.selected_orderable_name" t-field="line.selected_orderable_name"/>
                                         <span t-if="not line.selected_orderable_name" class="text-muted">Not selected</span>
@@ -77,9 +77,9 @@
                                     <td class="text-end"><span t-field="line.selected_stock_on_hand"/></td>
                                     <td class="text-end"><span t-field="line.quantity_picked"/></td>
                                 </tr>
-                                <tr t-if="not batch.elmis_picking_line_ids">
+                                <tr t-if="not batch.elmis_picking_fulfilment_line_ids">
                                     <td colspan="9" class="text-center text-muted">
-                                        No eLMIS picking lines have been generated for this batch.
+                                        No eLMIS fulfilment lines have been generated for this batch.
                                     </td>
                                 </tr>
                             </tbody>

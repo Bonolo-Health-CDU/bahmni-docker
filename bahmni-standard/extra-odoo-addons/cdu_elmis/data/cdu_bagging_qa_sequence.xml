@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="seq_cdu_bagging_qa" model="ir.sequence">
+        <field name="name">CDU Bagging / QA</field>
+        <field name="code">cdu.bagging.qa</field>
+        <field name="prefix">CDU/QA/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_cdu_parcel" model="ir.sequence">
+        <field name="name">CDU Parcel</field>
+        <field name="code">cdu.parcel</field>
+        <field name="prefix">CDU/PARCEL/%(year)s/</field>
+        <field name="padding">6</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

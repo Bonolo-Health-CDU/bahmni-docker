@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_prescription_form_dispensing_button" model="ir.ui.view">
+        <field name="name">cdu.prescription.form.dispensing.button</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_remap_regimens']" position="before">
+                <button name="action_open_dispensing"
+                        string="Start Dispensing"
+                        type="object"
+                        class="oe_highlight"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', '!=', 'awaiting_dispensing')]}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_cdu_dispense_tree" model="ir.ui.view">
+        <field name="name">cdu.dispense.tree</field>
+        <field name="model">cdu.dispense</field>
+        <field name="arch" type="xml">
+            <tree default_order="next_drug_pickup_date asc, patient_name asc"
+                  decoration-success="state == 'confirmed'">
+                <field name="name"/>
+                <field name="patient_name"/>
+                <field name="patient_identifier"/>
+                <field name="regimen_prescribed_raw"/>
+                <field name="next_drug_pickup_date"/>
+                <field name="batch_id"/>
+                <field name="production_stock_refreshed_at"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_dispense_form" model="ir.ui.view">
+        <field name="name">cdu.dispense.form</field>
+        <field name="model">cdu.dispense</field>
+        <field name="arch" type="xml">
+            <form class="o_cdu_prescription_form o_cdu_batch_form">
+                <header>
+                    <button name="action_refresh_production_stock"
+                            string="Refresh Production Floor Stock"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_confirm_dispensing"
+                            string="Confirm Dispensing"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            confirm="This will confirm dispensing in Odoo and move the prescription to Awaiting Bagging / QA. No eLMIS consumption event will be posted yet. Continue?"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_print_labels"
+                            string="Print Labels"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
+                    <button name="action_mark_labels_printed"
+                            string="Mark Labels Printed"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': ['|', ('state', '!=', 'confirmed'), ('labels_printed', '=', True)]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+
+                    <div class="o_cdu_batch_dashboard">
+                        <div class="o_cdu_batch_card">
+                            <h3>Patient</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="patient_name"/>
+                                <field name="patient_name" nolabel="1" readonly="1"/>
+                                <label for="patient_phone"/>
+                                <field name="patient_phone" nolabel="1" readonly="1"/>
+                                <label for="collection_point_id"/>
+                                <field name="collection_point_id" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Prescription</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="prescription_id"/>
+                                <field name="prescription_id" nolabel="1" readonly="1"/>
+                                <label for="regimen_prescribed_raw"/>
+                                <field name="regimen_prescribed_raw" nolabel="1" readonly="1"/>
+                                <label for="next_drug_pickup_date"/>
+                                <field name="next_drug_pickup_date" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Dispensing</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="batch_id"/>
+                                <field name="batch_id" nolabel="1" readonly="1"/>
+                                <label for="production_stock_refreshed_at"/>
+                                <field name="production_stock_refreshed_at" nolabel="1" readonly="1"/>
+                                <label for="dispensing_ready"/>
+                                <field name="dispensing_ready" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Labels</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="labels_printed"/>
+                                <field name="labels_printed" nolabel="1" readonly="1"/>
+                                <label for="labels_printed_by"/>
+                                <field name="labels_printed_by" nolabel="1" readonly="1"/>
+                                <label for="labels_printed_at"/>
+                                <field name="labels_printed_at" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_cdu_batch_readiness_message" attrs="{'invisible': [('dispensing_ready', '=', True)]}">
+                        <field name="dispensing_readiness_message" readonly="1" nolabel="1"/>
+                    </div>
+
+                    <notebook>
+                        <page string="Dispense Selections">
+                            <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
+                                Selections are prefilled from the batch picking lines. Refresh Production Floor stock,
+                                then confirm or adjust the exact product, batch, quantity, and dosing instructions.
+                            </div>
+                            <field name="stock_selection_ids">
+                                <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
+                                    <field name="dispense_id" invisible="1"/>
+                                    <field name="openmrs_drug_name"/>
+                                    <field name="stock_option_id" string="Dispense From" options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="selected_orderable_name" readonly="1"/>
+                                    <field name="selected_lot" readonly="1"/>
+                                    <field name="selected_lot_expiry" readonly="1"/>
+                                    <field name="selected_stock_on_hand" readonly="1"/>
+                                    <field name="quantity_dispensed"/>
+                                    <field name="dosage_instructions"/>
+                                    <field name="selected_orderable_code" optional="hide"/>
+                                    <field name="selected_orderable_id" optional="hide"/>
+                                    <field name="selected_lot_id" optional="hide"/>
+                                    <field name="picking_fulfilment_line_id" optional="hide"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Available Production Floor Stock">
+                            <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
+                                 role="alert"
+                                 attrs="{'invisible': [('stock_option_ids', '!=', [])]}">
+                                No Production Floor stock has been loaded for this prescription yet.
+                                Click <strong>Refresh Production Floor Stock</strong>.
+                            </div>
+                            <field name="stock_option_ids" readonly="1">
+                                <tree create="0" delete="0" default_order="orderable_name asc, expiration_date asc, lot asc">
+                                    <field name="orderable_name" string="Product"/>
+                                    <field name="lot" string="Batch Number"/>
+                                    <field name="stock_on_hand"/>
+                                    <field name="expiration_date"/>
+                                    <field name="occurred_date"/>
+                                    <field name="orderable_code" optional="hide"/>
+                                    <field name="orderable_id" optional="hide"/>
+                                    <field name="lot_id" optional="hide"/>
+                                    <field name="facility_code" optional="hide"/>
+                                    <field name="program_code" optional="hide"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cdu_dispense_search" model="ir.ui.view">
+        <field name="name">cdu.dispense.search</field>
+        <field name="model">cdu.dispense</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="patient_name"/>
+                <field name="patient_identifier"/>
+                <field name="regimen_prescribed_raw"/>
+                <field name="batch_id"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>
+                    <filter string="Pickup Date" name="group_pickup_date" context="{'group_by': 'next_drug_pickup_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cdu_dispense" model="ir.actions.act_window">
+        <field name="name">Dispensing Records</field>
+        <field name="res_model">cdu.dispense</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_dispense_search"/>
+    </record>
+
+    <record id="action_cdu_dispensing_work_queue" model="ir.actions.act_window">
+        <field name="name">Dispensing Work Queue</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_dispensing')]</field>
+    </record>
+
+    <record id="action_cdu_awaiting_bagging_qa" model="ir.actions.act_window">
+        <field name="name">Awaiting Bagging / QA</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_bagging_qa')]</field>
+    </record>
+</odoo>

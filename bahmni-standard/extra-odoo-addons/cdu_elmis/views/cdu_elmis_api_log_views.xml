@@ -10,7 +10,10 @@
                 <field name="http_method"/>
                 <field name="http_status_code"/>
                 <field name="success"/>
+                <field name="auth_mode"/>
+                <field name="elmis_username"/>
                 <field name="batch_id"/>
+                <field name="box_id"/>
                 <field name="user_id"/>
                 <field name="retry_count"/>
             </tree>
@@ -34,7 +37,10 @@
                             <field name="endpoint" readonly="1"/>
                             <field name="http_method" readonly="1"/>
                             <field name="batch_id" readonly="1"/>
+                            <field name="box_id" readonly="1"/>
                             <field name="user_id" readonly="1"/>
+                            <field name="auth_mode" readonly="1"/>
+                            <field name="elmis_username" readonly="1"/>
                         </group>
                         <group string="Response">
                             <field name="http_status_code" readonly="1"/>
@@ -74,13 +80,17 @@
         <field name="arch" type="xml">
             <search string="eLMIS API Logs">
                 <field name="batch_id"/>
+                <field name="box_id"/>
                 <field name="call_type"/>
                 <field name="user_id"/>
+                <field name="elmis_username"/>
                 <filter string="Failed" name="failed" domain="[('success', '=', False)]"/>
                 <filter string="Successful" name="successful" domain="[('success', '=', True)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>
+                    <filter string="Box" name="group_box" context="{'group_by': 'box_id'}"/>
                     <filter string="Call Type" name="group_call_type" context="{'group_by': 'call_type'}"/>
+                    <filter string="eLMIS User" name="group_elmis_username" context="{'group_by': 'elmis_username'}"/>
                     <filter string="Success" name="group_success" context="{'group_by': 'success'}"/>
                     <filter string="Date" name="group_date" context="{'group_by': 'timestamp:day'}"/>
                 </group>

@@ -78,6 +78,14 @@
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_awaiting_dispensing"
+        name="Awaiting Dispensing"
+        parent="menu_cdu_prescription_operations"
+        action="action_cdu_prescription_awaiting_dispensing"
+        sequence="55"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_configuration"
         name="Configuration"
         parent="menu_cdu_root"

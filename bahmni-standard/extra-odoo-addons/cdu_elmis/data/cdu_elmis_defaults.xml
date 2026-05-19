@@ -39,4 +39,14 @@
         <field name="key">cdu.elmis.mapping_service_backend</field>
         <field name="value">local</field>
     </record>
+
+    <record id="param_cdu_elmis_user_client_id" model="ir.config_parameter">
+        <field name="key">cdu.elmis.user_client_id</field>
+        <field name="value">user-client</field>
+    </record>
+
+    <record id="param_cdu_elmis_user_client_secret" model="ir.config_parameter">
+        <field name="key">cdu.elmis.user_client_secret</field>
+        <field name="value">changeme</field>
+    </record>
 </odoo>

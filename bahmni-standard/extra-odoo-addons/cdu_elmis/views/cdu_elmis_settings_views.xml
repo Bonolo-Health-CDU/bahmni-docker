@@ -17,6 +17,8 @@
                     <group string="Connection">
                         <field name="cdu_elmis_base_url" placeholder="https://elmis.gov.ls"/>
                         <field name="cdu_elmis_api_key" password="True"/>
+                        <field name="cdu_elmis_user_client_id"/>
+                        <field name="cdu_elmis_user_client_secret" password="True"/>
                     </group>
                     <group string="Facilities and Program">
                         <field name="cdu_elmis_cdu_store_facility_code"/>

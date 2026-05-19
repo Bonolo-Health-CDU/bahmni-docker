@@ -13,6 +13,18 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="cdu.elmis.api_key",
         groups="cdu_prescription.group_cdu_admin",
     )
+    cdu_elmis_user_client_id = fields.Char(
+        string="eLMIS User OAuth Client ID",
+        config_parameter="cdu.elmis.user_client_id",
+        default="user-client",
+        groups="cdu_prescription.group_cdu_admin",
+    )
+    cdu_elmis_user_client_secret = fields.Char(
+        string="eLMIS User OAuth Client Secret",
+        config_parameter="cdu.elmis.user_client_secret",
+        default="changeme",
+        groups="cdu_prescription.group_cdu_admin",
+    )
     cdu_elmis_cdu_store_facility_code = fields.Char(
         string="CDU Store Facility Code",
         config_parameter="cdu.elmis.cdu_store_facility_code",

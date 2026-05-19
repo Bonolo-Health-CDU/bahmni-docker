@@ -25,9 +25,24 @@ class CduElmisApiLog(models.Model):
     http_status_code = fields.Integer(string="HTTP Status Code")
     success = fields.Boolean(default=False, index=True)
     error_message = fields.Char()
+    auth_mode = fields.Selection(
+        [
+            ("system_api_key", "System API Key"),
+            ("user_token", "User eLMIS Token"),
+        ],
+        string="Authentication Mode",
+        index=True,
+    )
+    elmis_username = fields.Char(string="eLMIS Username", index=True)
     batch_id = fields.Many2one(
         "cdu.batch",
         string="Workload Batch",
+        ondelete="set null",
+        index=True,
+    )
+    box_id = fields.Many2one(
+        "cdu.box",
+        string="Box",
         ondelete="set null",
         index=True,
     )

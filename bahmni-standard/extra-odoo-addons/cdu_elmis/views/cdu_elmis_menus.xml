@@ -1,11 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <record id="cdu_prescription.menu_cdu_awaiting_dispensing" model="ir.ui.menu">
+        <field name="name">Dispensing Work Queue</field>
+        <field name="action" ref="action_cdu_dispensing_work_queue"/>
+    </record>
+
+    <menuitem
+        id="menu_cdu_dispensing_records"
+        name="Dispensing Records"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_dispense"
+        sequence="56"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_awaiting_bagging_qa"
+        name="Bagging / QA Work Queue"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_bagging_qa_work_queue"
+        sequence="57"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_bagging_qa_records"
+        name="Bagging / QA Records"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_bagging_qa"
+        sequence="58"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_boxing_work_queue"
+        name="Boxing Work Queue"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_boxing_work_queue"
+        sequence="59"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_boxes"
+        name="Boxes"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_box"
+        sequence="60"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_awaiting_dispatch"
+        name="Awaiting Dispatch"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_awaiting_dispatch"
+        sequence="61"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_dispatch_work_queue"
+        name="Dispatch Work Queue"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_dispatch_work_queue"
+        sequence="62"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
     <menuitem
         id="menu_cdu_elmis_settings"
         name="eLMIS Settings"
         parent="cdu_prescription.menu_cdu_configuration"
         action="action_cdu_elmis_settings"
-        sequence="60"
+        sequence="70"
         groups="cdu_prescription.group_cdu_admin"/>
 
     <menuitem
@@ -13,7 +74,7 @@
         name="eLMIS API Logs"
         parent="cdu_prescription.menu_cdu_configuration"
         action="action_cdu_elmis_api_log"
-        sequence="70"
+        sequence="80"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
@@ -21,6 +82,6 @@
         name="eLMIS Stock Cache"
         parent="cdu_prescription.menu_cdu_configuration"
         action="action_cdu_elmis_stock_cache"
-        sequence="80"
+        sequence="90"
         groups="cdu_prescription.group_cdu_admin"/>
 </odoo>
