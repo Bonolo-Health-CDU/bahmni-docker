@@ -3,6 +3,7 @@
     <record id="view_cdu_elmis_settings_form" model="ir.ui.view">
         <field name="name">cdu.elmis.settings.form</field>
         <field name="model">res.config.settings</field>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
             <form string="eLMIS Settings">
                 <header>
