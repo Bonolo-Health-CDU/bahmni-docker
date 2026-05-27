@@ -6,3 +6,66 @@
     background-color: #005baa !important;
     border-color: #005baa !important;
 }
+
+.cdu-chatter-toggle {
+    align-items: center;
+    background: #005baa;
+    border: 1px solid #005baa;
+    border-radius: 18px;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 6px;
+    height: 30px;
+    justify-content: center;
+    min-width: 92px;
+    padding: 0 10px;
+    position: absolute;
+    right: 12px;
+    top: 10px;
+    z-index: 5;
+}
+
+.cdu-chatter-toggle:hover,
+.cdu-chatter-toggle:focus {
+    background: #004b8c;
+    border-color: #004b8c;
+    color: #fff;
+}
+
+.o_FormRenderer_chatterContainer,
+.oe_chatter {
+    position: relative;
+}
+
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer {
+    flex: 0 0 46px !important;
+    max-width: 46px !important;
+    min-width: 46px !important;
+    overflow: hidden !important;
+    width: 46px !important;
+}
+
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer > :not(.cdu-chatter-toggle) {
+    display: none !important;
+}
+
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle {
+    border-radius: 50%;
+    height: 34px;
+    min-width: 34px;
+    padding: 0;
+    right: 6px;
+    top: 10px;
+    width: 34px;
+}
+
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle-label {
+    display: none;
+}
+
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle-icon {
+    transform: rotate(180deg);
+}

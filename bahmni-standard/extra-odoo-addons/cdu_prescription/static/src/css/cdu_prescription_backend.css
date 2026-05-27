@@ -40,3 +40,291 @@
 .o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) select {
     border-left: 4px solid #005baa;
 }
+
+.o_cdu_batch_form .oe_title {
+    margin-bottom: 8px;
+}
+
+.o_cdu_batch_form .oe_title h1 {
+    margin-bottom: 4px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_dashboard {
+    align-items: stretch;
+    border-bottom: 1px solid #e6ebf1;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    margin: 8px 0 10px;
+    padding-bottom: 14px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card {
+    background: #fbfcfe;
+    border: 1px solid #e1e8f0;
+    border-radius: 8px;
+    min-height: 108px;
+    padding: 12px 14px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card h3 {
+    border-bottom: 1px solid #dfe7ef;
+    color: #3d4652;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin: 0 0 10px;
+    padding-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_fields {
+    align-items: start;
+    display: grid;
+    gap: 8px 12px;
+    grid-template-columns: minmax(128px, 0.85fr) minmax(120px, 1.15fr);
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_fields > label,
+.o_cdu_batch_form .o_cdu_batch_card_fields > .o_cdu_card_label {
+    color: #5f6b78;
+    font-weight: 600;
+    margin-bottom: 0;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card .o_field_widget {
+    min-width: 0;
+}
+
+.o_cdu_batch_form .o_cdu_boolean_badge {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 700;
+    justify-content: center;
+    line-height: 1;
+    min-height: 24px;
+    padding: 5px 10px;
+    width: fit-content;
+}
+
+.o_cdu_batch_form .o_cdu_boolean_yes {
+    background: #edf9f1;
+    border: 1px solid #bfe8cc;
+    color: #27663a;
+}
+
+.o_cdu_batch_form .o_cdu_boolean_no {
+    background: #fff7e8;
+    border: 1px solid #f3d59c;
+    color: #7a4d00;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_readiness .o_field_text {
+    color: #4f5b66;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.o_cdu_batch_form .o_cdu_batch_table_context {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin: -2px 0 8px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_count_badge {
+    align-items: center;
+    background: #eef7ff;
+    border: 1px solid #c9e4fb;
+    border-radius: 999px;
+    color: #245278;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 600;
+    gap: 6px;
+    padding: 5px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_count_badge .o_field_widget {
+    align-items: center;
+    color: #005baa;
+    display: inline-flex;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.o_cdu_batch_form .o_cdu_batch_count_badge span {
+    line-height: 1;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_badge {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 520px;
+    min-height: 28px;
+    padding: 5px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_ready {
+    background: #edf9f1;
+    border: 1px solid #bfe8cc;
+    color: #27663a;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_needs_attention {
+    background: #fff7e8;
+    border: 1px solid #f3d59c;
+    color: #7a4d00;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_message {
+    background: #fff8ec;
+    border: 1px solid #f3d59c;
+    border-radius: 8px;
+    color: #6d4a09;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.45;
+    margin: -2px 0 10px;
+    padding: 9px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_readiness_message .o_field_text {
+    white-space: pre-wrap;
+}
+
+.o_cdu_batch_form .o_cdu_batch_status_strip {
+    align-items: center;
+    border-bottom: 1px solid #e6ebf1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    margin: -2px 0 10px;
+    padding: 0 0 10px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_status_pill {
+    align-items: center;
+    background: #edf9f1;
+    border: 1px solid #bfe8cc;
+    border-radius: 999px;
+    color: #27663a;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    min-height: 28px;
+    padding: 5px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_status_warning {
+    background: #fff7e8;
+    border-color: #f3d59c;
+    color: #7a4d00;
+}
+
+.o_cdu_batch_form .o_cdu_batch_status_ready {
+    background: #edf9f1;
+    border-color: #bfe8cc;
+    color: #27663a;
+}
+
+.o_cdu_batch_form .o_cdu_qa_checklist {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    margin: 0 0 12px;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item {
+    align-items: center;
+    background: #fbfcfe;
+    border: 1px solid #e1e8f0;
+    border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    min-height: 42px;
+    padding: 9px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item .o_field_boolean {
+    align-items: center;
+    display: inline-flex;
+    margin: 0;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item input[type="checkbox"] {
+    appearance: none;
+    background: #ffffff;
+    border: 2px solid #b7c7d9;
+    border-radius: 5px;
+    box-shadow: none;
+    cursor: pointer;
+    height: 24px;
+    margin: 0;
+    min-height: 24px;
+    padding: 0;
+    position: relative;
+    width: 24px;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item input[type="checkbox"]:checked {
+    background: #005baa;
+    border-color: #005baa;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item input[type="checkbox"]:checked::after {
+    border: solid #ffffff;
+    border-width: 0 3px 3px 0;
+    content: "";
+    display: block;
+    height: 12px;
+    left: 7px;
+    position: absolute;
+    top: 3px;
+    transform: rotate(45deg);
+    width: 7px;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item:has(input[type="checkbox"]:checked) {
+    background: #eef7ff;
+    border-color: #9ed0f5;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item:has(input[type="checkbox"]:checked) span {
+    color: #245278;
+}
+
+.o_cdu_batch_form .o_cdu_qa_check_item span {
+    color: #3d4652;
+    font-weight: 650;
+    line-height: 1.25;
+}
+
+.o_cdu_batch_form .o_notebook {
+    margin-top: 6px;
+}
+
+.o_cdu_batch_form .o_notebook .tab-content {
+    padding-top: 0;
+}
+
+.o_cdu_batch_form .o_cdu_elmis_fulfilment_hint {
+    margin: 10px 0;
+}
+
+.o_cdu_batch_form .o_cdu_elmis_section_title {
+    color: #3d4652;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin: 14px 0 6px;
+    text-transform: uppercase;
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_users_form_cdu_elmis" model="ir.ui.view">
+        <field name="name">res.users.form.cdu.elmis</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="cdu_prescription.view_users_form_cdu_role"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='cdu_role']" position="after">
+                <field name="cdu_elmis_username"/>
+                <field name="cdu_elmis_token_expires_at" readonly="1" groups="cdu_prescription.group_cdu_admin"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

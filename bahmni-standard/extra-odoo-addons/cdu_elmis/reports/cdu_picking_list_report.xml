@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_report_cdu_elmis_picking_list" model="ir.actions.report">
+        <field name="name">CDU Picking List</field>
+        <field name="model">cdu.batch</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">cdu_elmis.report_cdu_elmis_picking_list</field>
+        <field name="report_file">cdu_elmis.report_cdu_elmis_picking_list</field>
+        <field name="print_report_name">'CDU Picking List - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="cdu_prescription.model_cdu_batch"/>
+        <field name="binding_type">report</field>
+        <field name="groups_id" eval="[(4, ref('cdu_prescription.group_cdu_dispensing_officer')), (4, ref('cdu_prescription.group_cdu_admin'))]"/>
+    </record>
+
+    <template id="report_cdu_elmis_picking_list">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="batch">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>CDU Picking List</h2>
+                        <table class="table table-sm o_main_table" style="width: 100%; margin-bottom: 16px;">
+                            <tbody>
+                                <tr>
+                                    <th style="width: 18%;">Batch</th>
+                                    <td style="width: 32%;"><span t-field="batch.name"/></td>
+                                    <th style="width: 18%;">Status</th>
+                                    <td style="width: 32%;"><span t-field="batch.state"/></td>
+                                </tr>
+                                <tr>
+                                    <th>Pickup Date From</th>
+                                    <td><span t-field="batch.filter_next_drug_pickup_date_from"/></td>
+                                    <th>Pickup Date To</th>
+                                    <td><span t-field="batch.filter_next_drug_pickup_date_to"/></td>
+                                </tr>
+                                <tr>
+                                    <th>Collection Location</th>
+                                    <td><span t-field="batch.filter_collection_point_id"/></td>
+                                    <th>E-locker District</th>
+                                    <td><span t-field="batch.filter_e_locker_district"/></td>
+                                </tr>
+                                <tr>
+                                    <th>Prescriptions</th>
+                                    <td><span t-field="batch.prescription_count"/></td>
+                                    <th>Store Stock Refreshed</th>
+                                    <td><span t-field="batch.store_stock_refreshed_at"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>Items to Pick</h3>
+                        <table class="table table-sm o_main_table" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>eRegister Drug / Regimen</th>
+                                    <th class="text-end">Rx Count</th>
+                                    <th class="text-end">Required Qty</th>
+                                    <th>Fulfil With eLMIS Product</th>
+                                    <th>Lot</th>
+                                    <th>Expiry</th>
+                                    <th class="text-end">Available SOH</th>
+                                    <th class="text-end">Picked Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="batch.elmis_picking_fulfilment_line_ids" t-as="line">
+                                    <td><span t-esc="line_index + 1"/></td>
+                                    <td><span t-field="line.openmrs_drug_name"/></td>
+                                    <td class="text-end"><span t-field="line.picking_line_id.prescription_count"/></td>
+                                    <td class="text-end"><span t-field="line.required_quantity"/></td>
+                                    <td>
+                                        <span t-if="line.selected_orderable_name" t-field="line.selected_orderable_name"/>
+                                        <span t-if="not line.selected_orderable_name" class="text-muted">Not selected</span>
+                                    </td>
+                                    <td><span t-field="line.selected_lot"/></td>
+                                    <td><span t-field="line.selected_lot_expiry"/></td>
+                                    <td class="text-end"><span t-field="line.selected_stock_on_hand"/></td>
+                                    <td class="text-end"><span t-field="line.quantity_picked"/></td>
+                                </tr>
+                                <tr t-if="not batch.elmis_picking_fulfilment_line_ids">
+                                    <td colspan="9" class="text-center text-muted">
+                                        No eLMIS fulfilment lines have been generated for this batch.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="margin-top: 36px;">
+                            <table class="table table-sm" style="width: 100%;">
+                                <tbody>
+                                    <tr>
+                                        <td style="width: 33%; padding-top: 28px;">Picked By: ____________________</td>
+                                        <td style="width: 33%; padding-top: 28px;">Checked By: ____________________</td>
+                                        <td style="width: 33%; padding-top: 28px;">Date: ____________________</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

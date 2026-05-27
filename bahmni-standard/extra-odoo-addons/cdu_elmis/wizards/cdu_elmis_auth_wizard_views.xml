@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_elmis_auth_wizard_form" model="ir.ui.view">
+        <field name="name">cdu.elmis.auth.wizard.form</field>
+        <field name="model">cdu.elmis.auth.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Authenticate with eLMIS">
+                <sheet>
+                    <p class="text-muted">
+                        Enter your eLMIS credentials. The password is only used to request a token and is not stored in CDU.
+                    </p>
+                    <group>
+                        <field name="username"/>
+                        <field name="password" password="True"/>
+                        <field name="batch_id" invisible="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_authenticate" string="Authenticate" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_elmis_auth_wizard" model="ir.actions.act_window">
+        <field name="name">Authenticate with eLMIS</field>
+        <field name="res_model">cdu.elmis.auth.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cdu_elmis_auth_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

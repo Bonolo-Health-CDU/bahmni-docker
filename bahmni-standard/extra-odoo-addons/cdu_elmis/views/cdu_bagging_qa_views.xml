@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_prescription_form_bagging_qa_button" model="ir.ui.view">
+        <field name="name">cdu.prescription.form.bagging.qa.button</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_open_dispensing']" position="after">
+                <button name="action_open_bagging_qa"
+                        string="Start Bagging / QA"
+                        type="object"
+                        class="oe_highlight"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', '!=', 'awaiting_bagging_qa')]}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_cdu_bagging_qa_tree" model="ir.ui.view">
+        <field name="name">cdu.bagging.qa.tree</field>
+        <field name="model">cdu.bagging.qa</field>
+        <field name="arch" type="xml">
+            <tree default_order="next_drug_pickup_date asc, patient_name asc"
+                  decoration-success="state == 'confirmed'">
+                <field name="name"/>
+                <field name="patient_name"/>
+                <field name="patient_phone"/>
+                <field name="parcel_reference"/>
+                <field name="regimen_prescribed_raw"/>
+                <field name="next_drug_pickup_date"/>
+                <field name="batch_id"/>
+                <field name="labels_printed"/>
+                <field name="qa_ready"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_bagging_qa_form" model="ir.ui.view">
+        <field name="name">cdu.bagging.qa.form</field>
+        <field name="model">cdu.bagging.qa</field>
+        <field name="arch" type="xml">
+            <form class="o_cdu_prescription_form o_cdu_batch_form">
+                <header>
+                    <button name="action_confirm_bagging_qa"
+                            string="Confirm Bagging / QA"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            confirm="This will confirm Bagging / QA and move the prescription to Awaiting Boxing. Continue?"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <field name="labels_printed" invisible="1"/>
+                    <field name="qa_ready" invisible="1"/>
+
+                    <div class="o_cdu_batch_dashboard">
+                        <div class="o_cdu_batch_card">
+                            <h3>Patient</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="patient_name"/>
+                                <field name="patient_name" nolabel="1" readonly="1"/>
+                                <label for="patient_phone"/>
+                                <field name="patient_phone" nolabel="1" readonly="1"/>
+                                <label for="collection_point_id"/>
+                                <field name="collection_point_id" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Prescription</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="prescription_id"/>
+                                <field name="prescription_id" nolabel="1" readonly="1"/>
+                                <label for="regimen_prescribed_raw"/>
+                                <field name="regimen_prescribed_raw" nolabel="1" readonly="1"/>
+                                <label for="next_drug_pickup_date"/>
+                                <field name="next_drug_pickup_date" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Dispensing</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="dispense_id"/>
+                                <field name="dispense_id" nolabel="1" readonly="1"/>
+                                <label for="batch_id"/>
+                                <field name="batch_id" nolabel="1" readonly="1"/>
+                                <span class="o_cdu_card_label">Labels Printed</span>
+                                <span class="o_cdu_boolean_badge o_cdu_boolean_yes"
+                                      attrs="{'invisible': [('labels_printed', '=', False)]}">
+                                    Yes
+                                </span>
+                                <span class="o_cdu_boolean_badge o_cdu_boolean_no"
+                                      attrs="{'invisible': [('labels_printed', '=', True)]}">
+                                    No
+                                </span>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>Parcel</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <label for="parcel_reference"/>
+                                <field name="parcel_reference" nolabel="1" readonly="1" placeholder="Generated on QA confirmation"/>
+                                <label for="bagged_by"/>
+                                <field name="bagged_by" nolabel="1" readonly="1"/>
+                                <label for="bagged_at"/>
+                                <field name="bagged_at" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                        <div class="o_cdu_batch_card">
+                            <h3>QA</h3>
+                            <div class="o_cdu_batch_card_fields">
+                                <span class="o_cdu_card_label">QA Ready</span>
+                                <span class="o_cdu_boolean_badge o_cdu_boolean_yes"
+                                      attrs="{'invisible': [('qa_ready', '=', False)]}">
+                                    Yes
+                                </span>
+                                <span class="o_cdu_boolean_badge o_cdu_boolean_no"
+                                      attrs="{'invisible': [('qa_ready', '=', True)]}">
+                                    No
+                                </span>
+                                <label for="qa_checked_by"/>
+                                <field name="qa_checked_by" nolabel="1" readonly="1"/>
+                                <label for="qa_checked_at"/>
+                                <field name="qa_checked_at" nolabel="1" readonly="1"/>
+                                <label for="confirmed_by"/>
+                                <field name="confirmed_by" nolabel="1" readonly="1"/>
+                                <label for="confirmed_at"/>
+                                <field name="confirmed_at" nolabel="1" readonly="1"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="o_cdu_batch_status_strip">
+                        <span class="o_cdu_batch_status_pill o_cdu_batch_status_ready"
+                              attrs="{'invisible': [('labels_printed', '=', False)]}">
+                            Labels printed
+                        </span>
+                        <span class="o_cdu_batch_status_pill o_cdu_batch_status_warning"
+                              attrs="{'invisible': [('labels_printed', '=', True)]}">
+                            Labels not printed
+                        </span>
+                        <span class="o_cdu_batch_status_pill"
+                              attrs="{'invisible': [('qa_ready', '=', False)]}">
+                            Ready for boxing
+                        </span>
+                        <span class="o_cdu_batch_status_pill o_cdu_batch_status_warning"
+                              attrs="{'invisible': [('qa_ready', '=', True)]}">
+                            QA needs attention
+                        </span>
+                    </div>
+
+                    <div class="o_cdu_batch_readiness_message" attrs="{'invisible': [('qa_ready', '=', True)]}">
+                        <field name="qa_readiness_message" readonly="1" nolabel="1"/>
+                    </div>
+
+                    <div class="o_cdu_elmis_section_title">QA Checklist</div>
+                    <div class="o_cdu_qa_checklist">
+                        <div class="o_cdu_qa_check_item">
+                            <field name="patient_details_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Patient details checked</span>
+                        </div>
+                        <div class="o_cdu_qa_check_item">
+                            <field name="medicine_product_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Medicine/product checked</span>
+                        </div>
+                        <div class="o_cdu_qa_check_item">
+                            <field name="quantity_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Quantity checked</span>
+                        </div>
+                        <div class="o_cdu_qa_check_item">
+                            <field name="dosing_instructions_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Dosing instructions checked</span>
+                        </div>
+                        <div class="o_cdu_qa_check_item">
+                            <field name="product_labels_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Product labels attached</span>
+                        </div>
+                        <div class="o_cdu_qa_check_item">
+                            <field name="bag_label_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Bag label attached</span>
+                        </div>
+                        <div class="o_cdu_qa_check_item">
+                            <field name="medicines_placed_in_bag" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Medicines placed in bag</span>
+                        </div>
+                        <div class="o_cdu_qa_check_item">
+                            <field name="bag_sealed" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                            <span>Bag sealed</span>
+                        </div>
+                    </div>
+
+                    <notebook>
+                        <page string="Dispensed Products">
+                            <field name="stock_selection_ids" readonly="1">
+                                <tree create="0" edit="0" delete="0"
+                                      default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
+                                    <field name="openmrs_drug_name"/>
+                                    <field name="selected_orderable_name"/>
+                                    <field name="selected_lot"/>
+                                    <field name="selected_lot_expiry"/>
+                                    <field name="quantity_dispensed"/>
+                                    <field name="dosage_instructions"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="QA Notes">
+                            <field name="qa_notes" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cdu_bagging_qa_search" model="ir.ui.view">
+        <field name="name">cdu.bagging.qa.search</field>
+        <field name="model">cdu.bagging.qa</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="patient_name"/>
+                <field name="patient_phone"/>
+                <field name="regimen_prescribed_raw"/>
+                <field name="batch_id"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <filter string="Needs Attention" name="needs_attention" domain="[('qa_ready', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>
+                    <filter string="Pickup Date" name="group_pickup_date" context="{'group_by': 'next_drug_pickup_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cdu_bagging_qa" model="ir.actions.act_window">
+        <field name="name">Bagging / QA Records</field>
+        <field name="res_model">cdu.bagging.qa</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_bagging_qa_search"/>
+    </record>
+
+    <record id="action_cdu_bagging_qa_work_queue" model="ir.actions.act_window">
+        <field name="name">Bagging / QA Work Queue</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_bagging_qa')]</field>
+    </record>
+</odoo>

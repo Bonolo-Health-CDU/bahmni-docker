@@ -36,7 +36,7 @@
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
                     <button name="action_remap_regimens" string="Remap Regimen" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
                     <button name="action_cancel" string="Cancel" type="object" groups="cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching,awaiting_picking" attrs="{'invisible': [('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching,awaiting_picking,awaiting_dispensing,awaiting_bagging_qa,awaiting_boxing,awaiting_dispatch,dispatched" attrs="{'invisible': [('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="rejected_to_call_center" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="rejected_to_facility" attrs="{'invisible': [('state', '!=', 'rejected_to_facility')]}"/>
                 </header>
@@ -142,6 +142,11 @@
                 <filter string="Rejected to Call Center" name="rejected_to_call_center" domain="[('state', '=', 'rejected_to_call_center')]"/>
                 <filter string="Rejected to Facility" name="rejected_to_facility" domain="[('state', '=', 'rejected_to_facility')]"/>
                 <filter string="Awaiting Picking" name="awaiting_picking" domain="[('state', '=', 'awaiting_picking')]"/>
+                <filter string="Awaiting Dispensing" name="awaiting_dispensing" domain="[('state', '=', 'awaiting_dispensing')]"/>
+                <filter string="Awaiting Bagging / QA" name="awaiting_bagging_qa" domain="[('state', '=', 'awaiting_bagging_qa')]"/>
+                <filter string="Awaiting Boxing" name="awaiting_boxing" domain="[('state', '=', 'awaiting_boxing')]"/>
+                <filter string="Awaiting Dispatch" name="awaiting_dispatch" domain="[('state', '=', 'awaiting_dispatch')]"/>
+                <filter string="Dispatched" name="dispatched" domain="[('state', '=', 'dispatched')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
@@ -183,6 +188,14 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_batching')]</field>
+    </record>
+
+    <record id="action_cdu_prescription_awaiting_dispensing" model="ir.actions.act_window">
+        <field name="name">Awaiting Dispensing</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'awaiting_dispensing')]</field>
     </record>
 
     <record id="action_cdu_prescription_rejected_to_call_center" model="ir.actions.act_window">

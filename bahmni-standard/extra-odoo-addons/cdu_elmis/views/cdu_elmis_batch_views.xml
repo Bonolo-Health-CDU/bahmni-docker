@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_batch_form_elmis" model="ir.ui.view">
+        <field name="name">cdu.batch.form.elmis</field>
+        <field name="model">cdu.batch</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_batch_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_mark_printed']" position="before">
+                <button name="action_authenticate_elmis"
+                        string="Authenticate eLMIS"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('confirmed', 'picking_generated', 'printed'))]}"/>
+                <button name="action_refresh_store_stock"
+                        string="Refresh Store Stock"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
+                <button name="action_print_elmis_picking_list"
+                        string="Print Picking List"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
+                <button name="action_confirm_elmis_picking"
+                        string="Confirm eLMIS Picking"
+                        type="object"
+                        class="btn-primary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        confirm="This will submit stock movement events to eLMIS: debit CDU Store, then credit CDU Production Floor. Continue?"
+                        attrs="{'invisible': ['|', ('state', 'not in', ('picking_generated', 'printed')), ('picking_confirmed_at', '!=', False)]}"/>
+                <button name="action_calculate_residual_stock"
+                        string="Calculate Residual Stock"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('picking_confirmed_at', '=', False)]}"/>
+                <button name="action_return_residual_stock"
+                        string="Return Residual Stock"
+                        type="object"
+                        class="btn-primary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        confirm="This will submit residual stock events to eLMIS: debit CDU Production Floor, then credit CDU Store. Continue?"
+                        attrs="{'invisible': ['|', ('picking_confirmed_at', '=', False), ('residual_returned_at', '!=', False)]}"/>
+            </xpath>
+            <xpath expr="//div[contains(@class, 'o_cdu_batch_dashboard')]" position="inside">
+                <div class="o_cdu_batch_card">
+                    <h3>eLMIS Status</h3>
+                    <div class="o_cdu_batch_card_fields">
+                        <label for="stock_event_status"/>
+                        <field name="stock_event_status" nolabel="1" readonly="1"/>
+                        <label for="store_stock_refreshed_at"/>
+                        <field name="store_stock_refreshed_at" nolabel="1" readonly="1"/>
+                        <label for="picking_ready"/>
+                        <field name="picking_ready" nolabel="1" readonly="1"/>
+                    </div>
+                </div>
+                <div class="o_cdu_batch_card">
+                    <h3>Milestones</h3>
+                    <div class="o_cdu_batch_card_fields">
+                        <label for="picking_confirmed_at"/>
+                        <field name="picking_confirmed_at" nolabel="1" readonly="1"/>
+                        <label for="boxing_completed_at"/>
+                        <field name="boxing_completed_at" nolabel="1" readonly="1"/>
+                        <label for="residual_returned_at"/>
+                        <field name="residual_returned_at" nolabel="1" readonly="1"/>
+                    </div>
+                </div>
+            </xpath>
+            <xpath expr="//div[contains(@class, 'o_cdu_batch_table_context')]" position="inside">
+                <span class="o_cdu_batch_readiness_badge o_cdu_batch_readiness_ready" attrs="{'invisible': [('picking_ready', '=', False)]}">
+                    <span>Ready for picking</span>
+                </span>
+                <span class="o_cdu_batch_readiness_badge o_cdu_batch_readiness_needs_attention" attrs="{'invisible': [('picking_ready', '=', True)]}">
+                    <span>Picking needs attention</span>
+                </span>
+            </xpath>
+            <xpath expr="//div[contains(@class, 'o_cdu_batch_table_context')]" position="after">
+                <div class="o_cdu_batch_readiness_message" attrs="{'invisible': [('picking_ready', '=', True)]}">
+                    <field name="picking_readiness_message" readonly="1" nolabel="1"/>
+                </div>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Available eLMIS Stock">
+                    <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
+                         role="alert"
+                         attrs="{'invisible': [('elmis_stock_option_ids', '!=', [])]}">
+                        No eLMIS stock has been loaded for this batch yet. Click
+                        <strong>Refresh Store Stock</strong> or
+                        <strong>Generate Picking List</strong> to fetch current CDU Store stock.
+                    </div>
+                    <field name="elmis_stock_option_ids" readonly="1">
+                        <tree create="0" delete="0" default_order="orderable_name asc, expiration_date asc, lot asc">
+                            <field name="orderable_name" string="Product"/>
+                            <field name="lot" string="Batch Number"/>
+                            <field name="stock_on_hand"/>
+                            <field name="expiration_date"/>
+                            <field name="occurred_date"/>
+                            <field name="orderable_code" optional="hide"/>
+                            <field name="orderable_id" optional="hide"/>
+                            <field name="lot_id" optional="hide"/>
+                            <field name="facility_code" optional="hide"/>
+                            <field name="program_code" optional="hide"/>
+                        </tree>
+                    </field>
+                </page>
+                <page string="eLMIS Picking Selections">
+                    <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
+                        Each eRegister drug/regimen below is generated from the prescriptions in this batch.
+                        Add one or more eLMIS fulfilment rows for each regimen when multiple eLMIS products
+                        or lots are needed.
+                    </div>
+                    <div class="o_cdu_elmis_section_title">eRegister requirements</div>
+                    <field name="elmis_picking_line_ids" readonly="1">
+                        <tree create="0" delete="0" default_order="openmrs_drug_name asc">
+                            <field name="batch_id" invisible="1"/>
+                            <field name="summary_line_id" readonly="1" optional="hide"/>
+                            <field name="openmrs_drug_name" readonly="1"/>
+                            <field name="openmrs_drug_uuid" readonly="1" optional="hide"/>
+                            <field name="prescription_count" readonly="1"/>
+                            <field name="quantity_to_pick" readonly="1"/>
+                            <field name="total_quantity_picked" readonly="1"/>
+                        </tree>
+                    </field>
+                    <div class="o_cdu_elmis_section_title">Fulfil with eLMIS stock</div>
+                    <field name="elmis_picking_fulfilment_line_ids">
+                        <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
+                            <field name="batch_id" invisible="1"/>
+                            <field name="picking_line_id"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   required="1"/>
+                            <field name="openmrs_drug_name" readonly="1" optional="hide"/>
+                            <field name="required_quantity" readonly="1"/>
+                            <field name="selected_stock_option_id" string="Fulfil With" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="selected_orderable_name" readonly="1"/>
+                            <field name="selected_lot" readonly="1"/>
+                            <field name="selected_lot_expiry" readonly="1"/>
+                            <field name="selected_stock_on_hand" readonly="1"/>
+                            <field name="quantity_picked"/>
+                            <field name="selected_orderable_code" optional="hide"/>
+                            <field name="selected_orderable_id" optional="hide"/>
+                            <field name="selected_lot_id" optional="hide"/>
+                        </tree>
+                    </field>
+                </page>
+                <page string="eLMIS API Logs">
+                    <field name="stock_event_log_ids" readonly="1">
+                        <tree decoration-danger="not success" decoration-success="success">
+                            <field name="timestamp"/>
+                            <field name="call_type"/>
+                            <field name="http_method"/>
+                            <field name="http_status_code"/>
+                            <field name="success"/>
+                            <field name="retry_count"/>
+                        </tree>
+                    </field>
+                </page>
+                <page string="Residual Return">
+                    <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
+                        Residual stock is calculated as <strong>picked quantity minus dispensed quantity</strong>
+                        for each eLMIS product and batch number. Return residual stock only after the
+                        batch has finished boxing.
+                    </div>
+                    <field name="residual_return_line_ids" readonly="1">
+                        <tree create="0" delete="0" default_order="orderable_name asc, lot_expiry asc, lot asc"
+                              decoration-success="residual_qty &gt; 0">
+                            <field name="orderable_name"/>
+                            <field name="lot"/>
+                            <field name="lot_expiry"/>
+                            <field name="picked_qty"/>
+                            <field name="dispensed_qty"/>
+                            <field name="residual_qty"/>
+                            <field name="orderable_code" optional="hide"/>
+                            <field name="orderable_id" optional="hide"/>
+                            <field name="lot_id" optional="hide"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
