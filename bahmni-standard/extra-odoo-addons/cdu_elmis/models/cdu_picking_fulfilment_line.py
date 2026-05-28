@@ -76,6 +76,30 @@ class CduPickingFulfilmentLine(models.Model):
             self._sync_selected_stock_option()
         return result
 
+            # def _sync_selected_stock_option(self):
+            #     for line in self:
+            #         option = line.selected_stock_option_id
+            #         if not option:
+            #             line.selected_orderable_code = False
+            #             line.selected_orderable_id = False
+            #             line.selected_orderable_name = False
+            #             line.selected_lot = False
+            #             line.selected_lot_id = False
+            #             line.selected_lot_expiry = False
+            #             line.selected_stock_on_hand = 0
+            #             continue
+            #         line.selected_orderable_code = option.orderable_code
+            #         line.selected_orderable_id = option.orderable_id
+            #         line.selected_orderable_name = option.orderable_name
+            #         line.selected_lot = option.lot
+            #         line.selected_lot_id = option.lot_id
+            #         line.selected_lot_expiry = option.expiration_date
+            #         line.selected_stock_on_hand = option.stock_on_hand
+            #         if not line.quantity_picked:
+            #             line.quantity_picked = line.required_quantity or 1
+    
+    # Locate the _sync_selected_stock_option method in cdu_picking_fulfilment_line.py and verify the default assignment:
+
     def _sync_selected_stock_option(self):
         for line in self:
             option = line.selected_stock_option_id
@@ -88,6 +112,7 @@ class CduPickingFulfilmentLine(models.Model):
                 line.selected_lot_expiry = False
                 line.selected_stock_on_hand = 0
                 continue
+            
             line.selected_orderable_code = option.orderable_code
             line.selected_orderable_id = option.orderable_id
             line.selected_orderable_name = option.orderable_name
@@ -95,5 +120,7 @@ class CduPickingFulfilmentLine(models.Model):
             line.selected_lot_id = option.lot_id
             line.selected_lot_expiry = option.expiration_date
             line.selected_stock_on_hand = option.stock_on_hand
-            if not line.quantity_picked:
-                line.quantity_picked = line.required_quantity or 1
+            
+            # Ensure quantity picked updates cleanly against the new calculation logic
+            if not line.quantity_picked or line.quantity_picked == 1:
+                line.quantity_picked = line.required_quantity

@@ -56,3 +56,14 @@ class CduBatchPatientLine(models.Model):
     tablets_required = fields.Float()
 
     bottles_required = fields.Integer()
+
+    facility_days_supply = fields.Integer()
+
+    total_days_supply = fields.Integer()
+
+    facility_bottles_required = fields.Integer()
+
+    cdu_bottles_required = fields.Integer()
+
+    total_bottles_required = fields.Integer()
+

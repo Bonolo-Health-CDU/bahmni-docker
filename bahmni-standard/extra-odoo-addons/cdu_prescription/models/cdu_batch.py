@@ -140,6 +140,142 @@ class CduBatch(models.Model):
         self._ensure_batch_workflow_access()
         self.write({"state": "done"})
 
+    # def _generate_picking_lines(self):
+
+    #     self.ensure_one()
+
+    #     self.picking_line_ids.unlink()
+    #     self.patient_picking_line_ids.unlink()
+
+    #     summary = {}
+
+    #     for prescription in self.prescription_ids:
+
+    #         regimen = prescription.regimen_id
+
+    #         if not regimen:
+    #             continue
+
+    #         cdu_days = prescription.cdu_days_supply
+
+    #         for line in regimen.line_ids:
+
+    #             product = line.product_id
+
+    #             daily_dose = line.daily_dose
+
+    #             pack_size = (
+    #                 product.product_tmpl_id.cdu_pack_size
+    #                 or 30
+    #             )
+
+    #             tablets_required = (
+    #                 daily_dose * cdu_days
+    #             )
+
+    #             bottles_required = math.ceil(
+    #                 tablets_required / pack_size
+    #             )
+
+    #             self.env[
+    #                 "cdu.batch.patient.line"
+    #             ].create({
+    #                 "batch_id": self.id,
+    #                 "prescription_id": prescription.id,
+    #                 "patient_id": prescription.patient_id.id,
+    #                 "product_id": product.id,
+    #                 "cdu_days": cdu_days,
+    #                 "daily_dose": daily_dose,
+    #                 "tablets_required": tablets_required,
+    #                 "bottles_required": bottles_required,
+    #             })
+
+    #             key = product.id
+
+    #             if key not in summary:
+
+    #                 summary[key] = {
+    #                     "product_id": product.id,
+    #                     "total_tablets": 0,
+    #                     "total_bottles": 0,
+    #                     "prescription_count": 0,
+    #                 }
+
+    #             summary[key]["total_tablets"] += tablets_required
+
+    #             summary[key]["total_bottles"] += bottles_required
+
+    #             summary[key]["prescription_count"] += 1
+
+    #     for vals in summary.values():
+
+    #         vals["batch_id"] = self.id
+
+    #         self.env[
+    #             "cdu.batch.picking.line"
+    #         ].create(vals)
+
+    # Locate the _generate_picking_lines method in cdu_batch.py and update the loop logic:
+
+    # def _generate_picking_lines(self):
+    #     self.ensure_one()
+
+    #     self.picking_line_ids.unlink()
+    #     self.patient_picking_line_ids.unlink()
+
+    #     summary = {}
+
+    #     for prescription in self.prescription_ids:
+    #         regimen = prescription.regimen_id
+    #         if not regimen:
+    #             continue
+
+    #         # Uses the newly computed CDU specific window days
+    #         cdu_days = prescription.cdu_days_supply
+    #         if cdu_days <= 0:
+    #             continue
+
+    #         for line in regimen.line_ids:
+    #             product = line.product_id
+    #             daily_dose = line.daily_dose
+                
+    #             # Safe fallback to 30 if pack size is 0 or False
+    #             pack_size = product.product_tmpl_id.cdu_pack_size or 30
+
+    #             # Formula: Dosage X Quantity (in drug days)
+    #             tablets_required = daily_dose * cdu_days
+
+    #             # Formula: Bottles to be dispensed (Rounded up to full pack size)
+    #             bottles_required = math.ceil(tablets_required / pack_size)
+
+    #             self.env["cdu.batch.patient.line"].create({
+    #                 "batch_id": self.id,
+    #                 "prescription_id": prescription.id,
+    #                 "patient_id": prescription.patient_id.id,
+    #                 "product_id": product.id,
+    #                 "cdu_days": cdu_days,
+    #                 "daily_dose": daily_dose,
+    #                 "tablets_required": tablets_required,
+    #                 "bottles_required": bottles_required,
+    #             })
+
+    #             key = product.id
+    #             if key not in summary:
+    #                 summary[key] = {
+    #                     "product_id": product.id,
+    #                     "total_tablets": 0,
+    #                     "total_bottles": 0,
+    #                     "prescription_count": 0,
+    #                 }
+
+    #             summary[key]["total_tablets"] += tablets_required
+    #             summary[key]["total_bottles"] += bottles_required
+    #             summary[key]["prescription_count"] += 1
+
+    #     for vals in summary.values():
+    #         vals["batch_id"] = self.id
+    #         self.env["cdu.batch.picking.line"].create(vals)
+
     def _generate_picking_lines(self):
 
         self.ensure_one()
@@ -156,39 +292,113 @@ class CduBatch(models.Model):
             if not regimen:
                 continue
 
-            cdu_days = prescription.cdu_days_supply
+            # -------------------------------------------------
+            # DAYS SUPPLY
+            # -------------------------------------------------
+
+            facility_days = (
+                prescription.facility_days_supply or 0
+            )
+
+            cdu_days = (
+                prescription.cdu_days_supply or 0
+            )
+
+            total_days = (
+                prescription.total_days_supply or 0
+            )
+
+            # Skip prescriptions with no CDU allocation
+            if cdu_days <= 0:
+                continue
 
             for line in regimen.line_ids:
 
                 product = line.product_id
 
-                daily_dose = line.daily_dose
+                daily_dose = line.daily_dose or 0
 
+                # Safe fallback to 30 if pack size missing
                 pack_size = (
                     product.product_tmpl_id.cdu_pack_size
                     or 30
                 )
 
-                tablets_required = (
+                # -------------------------------------------------
+                # FACILITY SUPPLY
+                # -------------------------------------------------
+
+                facility_units_required = (
+                    daily_dose * facility_days
+                )
+
+                facility_bottles_required = math.ceil(
+                    facility_units_required / pack_size
+                )
+
+                # -------------------------------------------------
+                # CDU SUPPLY
+                # -------------------------------------------------
+
+                cdu_units_required = (
                     daily_dose * cdu_days
                 )
 
-                bottles_required = math.ceil(
-                    tablets_required / pack_size
+                cdu_bottles_required = math.ceil(
+                    cdu_units_required / pack_size
                 )
 
-                self.env[
-                    "cdu.batch.patient.line"
-                ].create({
+                # -------------------------------------------------
+                # TOTAL SUPPLY
+                # -------------------------------------------------
+
+                total_units_required = (
+                    daily_dose * total_days
+                )
+
+                total_bottles_required = math.ceil(
+                    total_units_required / pack_size
+                )
+
+                # -------------------------------------------------
+                # CREATE PATIENT PICKING LINE
+                # -------------------------------------------------
+
+                self.env["cdu.batch.patient.line"].create({
+
                     "batch_id": self.id,
+
                     "prescription_id": prescription.id,
+
                     "patient_id": prescription.patient_id.id,
+
                     "product_id": product.id,
+
+                    # DAYS
+                    "facility_days_supply": facility_days,
                     "cdu_days": cdu_days,
+                    "total_days_supply": total_days,
+
+                    # DOSING
                     "daily_dose": daily_dose,
-                    "tablets_required": tablets_required,
-                    "bottles_required": bottles_required,
+
+                    # TOTAL TABLETS
+                    "tablets_required": total_units_required,
+
+                    # BOTTLES
+                    "facility_bottles_required": facility_bottles_required,
+                    "cdu_bottles_required": cdu_bottles_required,
+                    "total_bottles_required": total_bottles_required,
+
+                    # IMPORTANT:
+                    # Operational warehouse/eLMIS picking
+                    # uses CDU quantities ONLY
+                    "bottles_required": cdu_bottles_required,
                 })
+
+                # -------------------------------------------------
+                # BATCH SUMMARY
+                # -------------------------------------------------
 
                 key = product.id
 
@@ -201,19 +411,23 @@ class CduBatch(models.Model):
                         "prescription_count": 0,
                     }
 
-                summary[key]["total_tablets"] += tablets_required
+                # Summary reflects CDU operational stock only
+                summary[key]["total_tablets"] += cdu_units_required
 
-                summary[key]["total_bottles"] += bottles_required
+                summary[key]["total_bottles"] += cdu_bottles_required
 
                 summary[key]["prescription_count"] += 1
+
+        # -------------------------------------------------
+        # CREATE SUMMARY LINES
+        # -------------------------------------------------
 
         for vals in summary.values():
 
             vals["batch_id"] = self.id
 
-            self.env[
-                "cdu.batch.picking.line"
-            ].create(vals)
+            self.env["cdu.batch.picking.line"].create(vals)
+
 
     def action_generate_picking_list(self):
         self._ensure_batch_workflow_access()
