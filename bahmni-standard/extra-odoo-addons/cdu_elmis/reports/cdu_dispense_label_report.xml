@@ -1,11 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <record id="paperformat_cdu_dispense_labels" model="report.paperformat">
+        <field name="name">CDU Dispensing Labels 4x6</field>
+        <field name="default" eval="False"/>
+        <field name="format">custom</field>
+        <field name="page_width">102</field>
+        <field name="page_height">152</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">3</field>
+        <field name="margin_bottom">3</field>
+        <field name="margin_left">3</field>
+        <field name="margin_right">3</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">203</field>
+    </record>
+
     <record id="action_report_cdu_dispense_labels" model="ir.actions.report">
         <field name="name">CDU Dispensing and Bagging Labels</field>
         <field name="model">cdu.dispense</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">cdu_elmis.report_cdu_dispense_labels</field>
         <field name="report_file">cdu_elmis.report_cdu_dispense_labels</field>
+        <field name="paperformat_id" ref="cdu_elmis.paperformat_cdu_dispense_labels"/>
         <field name="print_report_name">'CDU Dispensing and Bagging Labels - %s' % (object.name)</field>
         <field name="binding_model_id" ref="model_cdu_dispense"/>
         <field name="binding_type">report</field>
@@ -15,27 +32,98 @@
     <template id="report_cdu_dispense_labels">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="dispense">
-                <t t-call="web.external_layout">
-                    <div class="page">
-                        <h2>CDU Dispensing and Bagging Labels</h2>
+                <t t-call="web.basic_layout">
+                    <t t-set="label_layout" t-value="dispense.env.context.get('cdu_label_layout', 'all')"/>
+                    <style>
+                        .cdu-label-page {
+                            font-family: Arial, sans-serif;
+                            font-size: 11px;
+                            line-height: 1.25;
+                            page-break-after: always;
+                        }
+                        .cdu-label {
+                            border: 1px solid #111;
+                            padding: 7px;
+                            min-height: 136mm;
+                            box-sizing: border-box;
+                            page-break-inside: avoid;
+                        }
+                        .cdu-label--bag {
+                            border-width: 2px;
+                        }
+                        .cdu-label h3 {
+                            font-size: 16px;
+                            margin: 0 0 2px 0;
+                            text-align: center;
+                        }
+                        .cdu-label .cdu-subtitle {
+                            font-size: 10px;
+                            margin: 0 0 7px 0;
+                            text-align: center;
+                        }
+                        .cdu-label table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 6px;
+                        }
+                        .cdu-label th,
+                        .cdu-label td {
+                            border-bottom: 1px solid #ddd;
+                            padding: 3px 2px 4px 2px;
+                            vertical-align: top;
+                        }
+                        .cdu-label th {
+                            width: 34%;
+                            text-align: left;
+                            font-weight: bold;
+                        }
+                        .cdu-label .cdu-instructions {
+                            border-top: 1px solid #111;
+                            margin-top: 6px;
+                            padding-top: 6px;
+                            min-height: 20mm;
+                        }
+                        .cdu-label .cdu-items {
+                            margin-top: 6px;
+                        }
+                        .cdu-label .cdu-items th,
+                        .cdu-label .cdu-items td {
+                            font-size: 10px;
+                        }
+                        .cdu-label .cdu-signature {
+                            margin-top: 10px;
+                        }
+                        .cdu-label .cdu-signature td {
+                            border-bottom: 0;
+                            padding-top: 9px;
+                        }
+                    </style>
 
-                        <h3>Dispensing Labels</h3>
-                        <div t-if="dispense.stock_selection_ids">
-                            <div t-foreach="dispense.stock_selection_ids" t-as="line"
-                                 style="display: inline-block; width: 48%; min-height: 210px; vertical-align: top; border: 1px solid #333; padding: 10px; margin: 0 1% 12px 0; page-break-inside: avoid;">
-                                <h4 style="margin: 0 0 8px 0;">DISPENSING LABEL</h4>
-                                <table class="table table-sm" style="width: 100%; margin-bottom: 6px;">
+                    <t t-if="label_layout in ('all', 'medicine') and dispense.stock_selection_ids">
+                        <div t-foreach="dispense.stock_selection_ids" t-as="line" class="page cdu-label-page">
+                            <div class="cdu-label">
+                                <h3>MEDICINE LABEL</h3>
+                                <div class="cdu-subtitle">Attach to dispensed medicine</div>
+                                <table>
                                     <tbody>
                                         <tr>
-                                            <th style="width: 34%;">Patient</th>
+                                            <th>Patient</th>
                                             <td><span t-field="dispense.patient_name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>eRegister ID</th>
+                                            <td><span t-field="dispense.patient_identifier"/></td>
                                         </tr>
                                         <tr>
                                             <th>Prescription</th>
                                             <td><span t-field="dispense.prescription_id"/></td>
                                         </tr>
                                         <tr>
-                                            <th>Drug / Regimen</th>
+                                            <th>Pickup Date</th>
+                                            <td><span t-field="dispense.next_drug_pickup_date"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Regimen</th>
                                             <td><span t-field="line.openmrs_drug_name"/></td>
                                         </tr>
                                         <tr>
@@ -54,54 +142,107 @@
                                             <th>Quantity</th>
                                             <td><span t-field="line.quantity_dispensed"/></td>
                                         </tr>
+                                        <tr>
+                                            <th>Dispense Ref</th>
+                                            <td><span t-field="dispense.name"/></td>
+                                        </tr>
                                     </tbody>
                                 </table>
-                                <div style="border-top: 1px solid #999; padding-top: 6px;">
-                                    <strong>Instructions:</strong>
+                                <div class="cdu-instructions">
+                                    <strong>Directions:</strong><br/>
                                     <span t-field="line.dosage_instructions"/>
                                 </div>
                             </div>
                         </div>
-                        <p t-if="not dispense.stock_selection_ids" class="text-muted">
+                    </t>
+                    <div t-if="label_layout in ('all', 'medicine') and not dispense.stock_selection_ids" class="page cdu-label-page">
+                        <div class="cdu-label">
+                            <h3>MEDICINE LABEL</h3>
                             No dispense stock selections were captured.
-                        </p>
+                        </div>
+                    </div>
 
-                        <div style="page-break-inside: avoid; border: 2px solid #111; padding: 14px; margin-top: 18px;">
-                            <h3 style="margin-top: 0;">BAGGING LABEL</h3>
-                            <table class="table table-sm" style="width: 100%;">
+                    <div t-if="label_layout in ('all', 'bag')" class="page cdu-label-page">
+                        <div class="cdu-label cdu-label--bag">
+                            <h3>BAG LABEL</h3>
+                            <div class="cdu-subtitle">Attach to patient medicine bag</div>
+                            <table>
                                 <tbody>
                                     <tr>
-                                        <th style="width: 22%;">Patient</th>
+                                        <th>Patient</th>
                                         <td><span t-field="dispense.patient_name"/></td>
-                                        <th style="width: 22%;">Phone</th>
+                                    </tr>
+                                    <tr>
+                                        <th>eRegister ID</th>
+                                        <td><span t-field="dispense.patient_identifier"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Phone</th>
                                         <td><span t-field="dispense.patient_phone"/></td>
                                     </tr>
                                     <tr>
                                         <th>Prescription</th>
                                         <td><span t-field="dispense.prescription_id"/></td>
+                                    </tr>
+                                    <tr>
                                         <th>Batch</th>
                                         <td><span t-field="dispense.batch_id"/></td>
                                     </tr>
                                     <tr>
                                         <th>Collection Point</th>
                                         <td><span t-field="dispense.collection_point_id"/></td>
+                                    </tr>
+                                    <tr>
                                         <th>Next Pickup Date</th>
                                         <td><span t-field="dispense.next_drug_pickup_date"/></td>
                                     </tr>
                                     <tr>
                                         <th>Dispense Ref</th>
                                         <td><span t-field="dispense.name"/></td>
+                                    </tr>
+                                    <tr>
                                         <th>Items</th>
                                         <td><span t-esc="len(dispense.stock_selection_ids)"/></td>
                                     </tr>
                                 </tbody>
                             </table>
-                            <table class="table table-sm" style="width: 100%; margin-top: 8px;">
+                            <table class="cdu-items" t-if="dispense.stock_selection_ids">
+                                <thead>
+                                    <tr>
+                                        <th>Medicine</th>
+                                        <th>Product</th>
+                                        <th>Qty</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="dispense.stock_selection_ids" t-as="line">
+                                        <td><span t-field="line.openmrs_drug_name"/></td>
+                                        <td><span t-field="line.selected_orderable_name"/></td>
+                                        <td><span t-field="line.quantity_dispensed"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <table>
                                 <tbody>
                                     <tr>
-                                        <td style="width: 33%; padding-top: 18px;">Printed By: <span t-field="dispense.labels_printed_by"/></td>
-                                        <td style="width: 33%; padding-top: 18px;">Printed At: <span t-field="dispense.labels_printed_at"/></td>
-                                        <td style="width: 33%; padding-top: 18px;">Bagged By: ____________________</td>
+                                        <th>Printed By</th>
+                                        <td><span t-field="dispense.labels_printed_by"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Printed At</th>
+                                        <td><span t-field="dispense.labels_printed_at"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <table class="cdu-signature">
+                                <tbody>
+                                    <tr>
+                                        <th>Bagged By</th>
+                                        <td>____________________</td>
+                                    </tr>
+                                    <tr>
+                                        <th>QA Checked By</th>
+                                        <td>____________________</td>
                                     </tr>
                                 </tbody>
                             </table>

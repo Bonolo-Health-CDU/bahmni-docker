@@ -15,6 +15,7 @@
         "data/cdu_bagging_qa_sequence.xml",
         "data/cdu_box_sequence.xml",
         "wizards/cdu_elmis_auth_wizard_views.xml",
+        "wizards/cdu_label_print_wizard_views.xml",
         "views/cdu_dispense_views.xml",
         "views/cdu_bagging_qa_views.xml",
         "views/cdu_box_views.xml",

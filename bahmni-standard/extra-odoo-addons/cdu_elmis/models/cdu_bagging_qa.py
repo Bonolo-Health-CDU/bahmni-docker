@@ -219,6 +219,13 @@ class CduBaggingQa(models.Model):
             },
         }
 
+    def action_print_labels(self):
+        self._ensure_bagging_qa_access()
+        dispenses = self.mapped("dispense_id")
+        if not dispenses:
+            raise UserError(_("This Bagging / QA record is not linked to a dispense record."))
+        return dispenses.action_print_labels()
+
     def _action_open(self):
         self.ensure_one()
         return {
