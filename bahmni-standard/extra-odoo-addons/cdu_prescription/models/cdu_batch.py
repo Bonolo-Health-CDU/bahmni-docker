@@ -130,7 +130,10 @@ class CduBatch(models.Model):
             if not batch.prescription_ids:
                 raise ValidationError(_("Add at least one prescription before confirming the batch."))
             batch.prescription_ids.write({"state": "awaiting_picking"})
+            # Ensure picking summary and patient lines are populated upon confirmation
+            batch._generate_picking_lines()
         self.write({"state": "confirmed"})
+        return {"type": "ir.actions.client", "tag": "reload"}
 
     def action_mark_printed(self):
         self._ensure_batch_workflow_access()
@@ -280,17 +283,10 @@ class CduBatch(models.Model):
 
         self.ensure_one()
 
-        self.picking_line_ids.unlink()
-        self.patient_picking_line_ids.unlink()
-
         summary = {}
+        patient_line_vals = []
 
         for prescription in self.prescription_ids:
-
-            regimen = prescription.regimen_id
-
-            if not regimen:
-                continue
 
             # -------------------------------------------------
             # DAYS SUPPLY
@@ -308,21 +304,33 @@ class CduBatch(models.Model):
                 prescription.total_days_supply or 0
             )
 
-            # Skip prescriptions with no CDU allocation
-            if cdu_days <= 0:
+            # Keep operational picking computable even when CDU days are not yet present.
+            # Fallback to total days so picking lines are still generated for the batch.
+            operational_days = cdu_days if cdu_days > 0 else total_days
+            if operational_days <= 0:
                 continue
 
-            for line in regimen.line_ids:
+            # If there is no regimen, we create a virtual line for the raw drug name
+            # to ensure it appears in the picking list.
+            regimen = prescription.regimen_id
+            lines = regimen.line_ids if regimen else [False]
 
-                product = line.product_id
+            for line in lines:
 
-                daily_dose = line.daily_dose or 0
+                if line:
+                    product = line.product_id
+                    daily_dose = line.daily_dose or 0
+                    pack_size = product.product_tmpl_id.cdu_pack_size or 30
+                    drug_name = product.display_name
+                else:
+                    # Fallback for unmapped prescriptions
+                    product = self.env['product.product'] # Empty
+                    daily_dose = 1.0 # Assume 1 unit/day
+                    pack_size = 30
+                    drug_name = (prescription.regimen_prescribed_raw or "Unknown Drug").strip()
 
-                # Safe fallback to 30 if pack size missing
-                pack_size = (
-                    product.product_tmpl_id.cdu_pack_size
-                    or 30
-                )
+                if not drug_name:
+                    continue
 
                 # -------------------------------------------------
                 # FACILITY SUPPLY
@@ -341,7 +349,7 @@ class CduBatch(models.Model):
                 # -------------------------------------------------
 
                 cdu_units_required = (
-                    daily_dose * cdu_days
+                    daily_dose * operational_days
                 )
 
                 cdu_bottles_required = math.ceil(
@@ -364,15 +372,15 @@ class CduBatch(models.Model):
                 # CREATE PATIENT PICKING LINE
                 # -------------------------------------------------
 
-                self.env["cdu.batch.patient.line"].create({
-
+                patient_line_vals.append({
                     "batch_id": self.id,
 
                     "prescription_id": prescription.id,
 
                     "patient_id": prescription.patient_id.id,
 
-                    "product_id": product.id,
+                    "product_id": product.id if product else False,
+                    "drug_name": drug_name,
 
                     # DAYS
                     "facility_days_supply": facility_days,
@@ -400,12 +408,12 @@ class CduBatch(models.Model):
                 # BATCH SUMMARY
                 # -------------------------------------------------
 
-                key = product.id
+                key = product.id if product else drug_name
 
                 if key not in summary:
-
                     summary[key] = {
-                        "product_id": product.id,
+                        "product_id": product.id if product else False,
+                        "unmapped_drug_name": drug_name,
                         "total_tablets": 0,
                         "total_bottles": 0,
                         "prescription_count": 0,
@@ -418,16 +426,16 @@ class CduBatch(models.Model):
 
                 summary[key]["prescription_count"] += 1
 
-        # -------------------------------------------------
-        # CREATE SUMMARY LINES
-        # -------------------------------------------------
+        # -------------------------------------------------------------------------
+        # UPDATE ONE2MANY RELATIONS (Native ORM approach for UI consistency)
+        # -------------------------------------------------------------------------
+        self.write({
+            "patient_picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in patient_line_vals],
+            "picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in summary.values()]
+        })
 
-        for vals in summary.values():
-
-            vals["batch_id"] = self.id
-
-            self.env["cdu.batch.picking.line"].create(vals)
-
+        # Ensure the changes are flushed to the database so eLMIS logic can read them
+        self.flush_recordset(['patient_picking_line_ids', 'picking_line_ids'])
 
     def action_generate_picking_list(self):
         self._ensure_batch_workflow_access()
@@ -442,3 +450,4 @@ class CduBatch(models.Model):
         self.write({
             "state": "picking_generated"
         })
+        return {"type": "ir.actions.client", "tag": "reload"}

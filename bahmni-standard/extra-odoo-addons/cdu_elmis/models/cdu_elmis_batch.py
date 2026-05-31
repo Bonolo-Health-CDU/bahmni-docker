@@ -1,3 +1,5 @@
+import math
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -59,7 +61,7 @@ class CduBatch(models.Model):
         result = super().action_confirm_batch()
         for batch in self:
             batch._generate_elmis_picking_lines()
-        return result
+        return {"type": "ir.actions.client", "tag": "reload"}
 
     def action_generate_picking_list(self):
         service = self.env["cdu.elmis.stock.service"]
@@ -108,29 +110,28 @@ class CduBatch(models.Model):
 
     def _generate_elmis_picking_lines(self):
         for batch in self:
-            batch.elmis_picking_line_ids.unlink()
-            if not batch.picking_line_ids:
-                batch._generate_picking_lines()
-            mapped_prescription_ids = set()
+            # Always force regeneration of core batch lines to ensure fresh clinical data
+            batch._generate_picking_lines()
+            
+            # Ensure the current transaction sees the new records in the O2M cache
+            batch.invalidate_recordset(['picking_line_ids', 'patient_picking_line_ids'])
+
+            elmis_line_vals = []
+            
             for item in batch.picking_line_ids:
-                product = item.product_id
-                template = product.product_tmpl_id
-                mapped_prescription_ids.update(
-                    batch.patient_picking_line_ids.filtered(
-                        lambda line, product=product: line.product_id == product
-                    ).mapped("prescription_id").ids
-                )
-                self.env["cdu.picking.line"].create(
-                    {
-                        "batch_id": batch.id,
-                        "summary_line_id": item.id,
-                        "openmrs_drug_name": product.display_name,
-                        "openmrs_drug_uuid": template.cdu_openmrs_drug_uuid,
-                        "quantity_to_pick": item.total_bottles or 1,
-                        "prescription_count": item.prescription_count,
-                    }
-                )
-            batch._generate_unmapped_elmis_picking_lines(mapped_prescription_ids)
+                elmis_line_vals.append({
+                    "batch_id": batch.id,
+                    "summary_line_id": item.id,
+                    "openmrs_drug_name": item.product_id.display_name if item.product_id else item.unmapped_drug_name,
+                    "openmrs_drug_uuid": item.product_id.product_tmpl_id.cdu_openmrs_drug_uuid if item.product_id else False,
+                    "quantity_to_pick": item.total_bottles or 1.0,
+                    "prescription_count": item.prescription_count,
+                })
+            
+            # Use write with command tuples to ensure elmis_picking_line_ids is refreshed in UI
+            batch.write({
+                "elmis_picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in elmis_line_vals]
+            })
             batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
 
     def _generate_unmapped_elmis_picking_lines(self, mapped_prescription_ids):
@@ -149,8 +150,14 @@ class CduBatch(models.Model):
                     "prescription_count": 0,
                     "quantity_to_pick": 0,
                 }
+            
+            # Estimate requirement for unmapped drugs: 
+            # Assume 1 unit/day and 30 units/pack as a safer fallback than +1
+            cdu_days = prescription.cdu_days_supply or 0
+            estimated_bottles = math.ceil(cdu_days / 30) if cdu_days > 0 else 1
+            
             fallback_summary[key]["prescription_count"] += 1
-            fallback_summary[key]["quantity_to_pick"] += 1
+            fallback_summary[key]["quantity_to_pick"] += estimated_bottles
 
         for values in fallback_summary.values():
             self.env["cdu.picking.line"].create(
@@ -253,6 +260,18 @@ class CduBatch(models.Model):
             except Exception:
                 batch.stock_event_status = "failed"
                 raise
+
+            for line in batch.elmis_picking_line_ids:
+                if line.summary_line_id:
+                    # Update the Picking Summary line to reflect the actual quantity picked in eLMIS
+                    line.summary_line_id.total_bottles = int(line.total_quantity_picked)
+
+                    # Synchronize the actual eLMIS products picked from fulfilment lines (aggregating if multiple)
+                    names = line.fulfilment_line_ids.filtered("selected_orderable_name").mapped("selected_orderable_name")
+                    if names:
+                        line.summary_line_id.elmis_product_name = ", ".join(sorted(set(names)))
+                    else:
+                        line.summary_line_id.elmis_product_name = line.selected_orderable_name
 
             batch.write(
                 {

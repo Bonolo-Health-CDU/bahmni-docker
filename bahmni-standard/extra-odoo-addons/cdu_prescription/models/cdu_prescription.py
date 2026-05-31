@@ -88,6 +88,11 @@ class CduPrescription(models.Model):
         store=True,
         string="CDU Dispensing Days"
     )
+    total_days_supply = fields.Integer(
+        compute="_compute_prescription_durations",
+        store=True,
+        string="Total Dispensing Days"
+    )
     state = fields.Selection(
         [
             ("awaiting_verification", "Awaiting verification"),
@@ -180,7 +185,8 @@ class CduPrescription(models.Model):
         if not raw_value:
             return False
         prefix = str(raw_value).split('=')[0].strip().lower()
-        match = re.match(r"([a-z0-9]+)", prefix)
+        # Match everything before the first space or equal sign, allowing slashes and hyphens
+        match = re.match(r"([^=\s]+)", prefix)
         return match.group(1) if match else False
     
     def action_remap_regimens(self):
@@ -314,43 +320,6 @@ class CduPrescription(models.Model):
             missing.append("next drug pickup date")
         return missing
 
-    # @api.depends(
-    # "next_drug_pickup_date",
-    # "next_clinical_visit_date",
-    # )
-    # def _compute_cdu_days_supply(self):
-
-    #     for prescription in self:
-
-    #         if (
-    #             prescription.next_drug_pickup_date
-    #             and prescription.next_clinical_visit_date
-    #         ):
-
-    #             delta = (
-    #                 prescription.next_clinical_visit_date
-    #                 - prescription.next_drug_pickup_date
-    #             )
-
-    #             prescription.cdu_days_supply = delta.days
-
-    #         else:
-    #             prescription.cdu_days_supply = 0
-    # Locate your fields declaration in cdu_prescription.py and modify/add:
-
-    facility_days_supply = fields.Integer(
-        compute="_compute_prescription_durations", 
-        store=True,
-        string="Facility Dispensing Days"
-    )
-    cdu_days_supply = fields.Integer(
-        compute="_compute_prescription_durations", 
-        store=True,
-        string="CDU Dispensing Days"
-    )
-
-# Replace the old @api.depends( ... ) def _compute_cdu_days_supply method with:
-
     @api.depends(
         "prescription_date",
         "next_drug_pickup_date",
@@ -367,7 +336,12 @@ class CduPrescription(models.Model):
 
             # 2. Calculate CDU Days: Next Clinical Appointment Date - Next Drug Pickup Date
             if prescription.next_drug_pickup_date and prescription.next_clinical_visit_date:
-                cdu_delta = prescription.next_clinical_visit_date - prescription.prescription_date
+                cdu_delta = prescription.next_clinical_visit_date - prescription.next_drug_pickup_date
                 prescription.cdu_days_supply = max(0, cdu_delta.days)
             else:
                 prescription.cdu_days_supply = 0
+
+            # 3. Total Days
+            prescription.total_days_supply = (
+                prescription.facility_days_supply + prescription.cdu_days_supply
+            )

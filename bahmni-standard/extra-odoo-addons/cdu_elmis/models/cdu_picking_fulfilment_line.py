@@ -122,5 +122,5 @@ class CduPickingFulfilmentLine(models.Model):
             line.selected_stock_on_hand = option.stock_on_hand
             
             # Ensure quantity picked updates cleanly against the new calculation logic
-            if not line.quantity_picked or line.quantity_picked == 1:
+            if not line.quantity_picked:
                 line.quantity_picked = line.required_quantity

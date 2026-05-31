@@ -51,8 +51,6 @@ class CduPickingLine(models.Model):
     # quantity_to_pick = fields.Float(string="Required Qty", required=True)
     quantity_to_pick = fields.Float(
         string="Required Qty", 
-        compute="_compute_quantity_to_pick",
-        store=True,
         required=True
     )
     quantity_picked = fields.Float(string="Picked Qty")
@@ -127,18 +125,4 @@ class CduPickingLine(models.Model):
             line.selected_lot = option.lot
             line.selected_lot_id = option.lot_id
             line.selected_lot_expiry = option.expiration_date
-            line.selected_stock_on_hand = option.stock_on_hand
-            if not line.quantity_picked:
-                line.quantity_picked = line.quantity_to_pick
-
-    @api.depends('prescription_item_id', 'prescription_item_id.bottles_required')
-    def _compute_quantity_to_pick(self):
-        for line in self:
-            if line.prescription_item_id:
-                # Map directly to the rounded up bottles required calculated inside the batch
-                line.quantity_to_pick = line.prescription_item_id.bottles_required
-            elif line.summary_line_id:
-                # If this is linked to a batch-level summary line instead of a patient item
-                line.quantity_to_pick = line.summary_line_id.total_bottles
-            else:
-                line.quantity_to_pick = 0.0
+ 

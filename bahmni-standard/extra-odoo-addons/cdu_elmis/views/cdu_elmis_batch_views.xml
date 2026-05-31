@@ -83,6 +83,38 @@
                 </div>
             </xpath>
             <xpath expr="//notebook" position="inside">
+                <page string="Picking Summary">
+                    <field name="picking_line_ids" readonly="1">
+                        <tree>
+                            <field name="product_id" optional="show"/>
+                            <field name="unmapped_drug_name" string="Drug Name"/>
+                            <field name="elmis_product_name" string="eLMIS Product"/>
+                            <field name="total_tablets" string="Total Units (CDU)"/>
+                            <field name="total_bottles" string="Total Bottles (CDU)"/>
+                            <field name="prescription_count"/>
+                        </tree>
+                    </field>
+                </page>
+                <page string="Patient Picking Lines">
+                    <field name="patient_picking_line_ids" readonly="1">
+                        <tree>
+                            <field name="patient_id"/>
+                            <field name="product_id" optional="hide"/>
+                            <field name="drug_name" string="Product/Drug"/>
+                            <field name="daily_dose"/>
+                            <field name="facility_days_supply" optional="show"/>
+                            <field name="cdu_days" string="CDU Days" optional="show"/>
+                            <field name="total_days_supply" optional="show"/>
+                            <field name="tablets_required" string="Total Units"/>
+                            <field name="facility_bottles_required" optional="hide"/>
+                            <field name="cdu_bottles_required" string="CDU Bottles"/>
+                            <field name="total_bottles_required" optional="hide"/>
+                            <field name="bottles_required" string="Dispense Qty" 
+                                   help="Operational quantity used for picking." 
+                                   decoration-bf="1"/>
+                        </tree>
+                    </field>
+                </page>
                 <page string="Available eLMIS Stock">
                     <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
                          role="alert"
@@ -121,7 +153,6 @@
                             <field name="openmrs_drug_uuid" readonly="1" optional="hide"/>
                             <field name="prescription_count" readonly="1"/>
                             <field name="quantity_to_pick" readonly="1"/>
-                            <field name="total_quantity_picked" readonly="1"/>
                         </tree>
                     </field>
                     <div class="o_cdu_elmis_section_title">Fulfil with eLMIS stock</div>
