@@ -59,7 +59,10 @@
                             <h3>Box Rules</h3>
                             <div class="o_cdu_batch_card_fields">
                                 <label for="collection_point_id"/>
-                                <field name="collection_point_id" nolabel="1" readonly="1"/>
+                                <field name="collection_point_id"
+                                       nolabel="1"
+                                       options="{'no_create': True}"
+                                       attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
                                 <label for="next_drug_pickup_date"/>
                                 <field name="next_drug_pickup_date" nolabel="1" readonly="1"/>
                             </div>
@@ -102,16 +105,18 @@
                     </div>
 
                     <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
-                        Add one parcel, then click <strong>Load Eligible Parcels</strong> to auto-add
-                        matching parcels with the same collection point and next drug pickup date, up to
-                        the box capacity. Remove any parcels that should not be included before confirming.
+                        Select a collection point, then add parcels or click <strong>Load Eligible Parcels</strong>
+                        to auto-add matching parcels with the same collection point and next drug pickup date,
+                        up to the box capacity. Remove any parcels that should not be included before confirming.
                     </div>
 
                     <notebook>
                         <page string="Parcels">
                             <field name="line_ids" attrs="{'readonly': [('state', '=', 'confirmed')]}">
                                 <tree editable="bottom" default_order="parcel_reference asc">
-                                    <field name="bagging_qa_id" options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="bagging_qa_id"
+                                           domain="[('state', '=', 'confirmed'), ('prescription_id.state', '=', 'awaiting_boxing'), ('collection_point_id', '=', parent.collection_point_id)]"
+                                           options="{'no_create': True, 'no_open': True}"/>
                                     <field name="parcel_reference" readonly="1"/>
                                     <field name="patient_name" readonly="1"/>
                                     <field name="collection_point_id" readonly="1"/>

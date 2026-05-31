@@ -55,6 +55,31 @@ class CduBox(models.Model):
             vals["name"] = self.env["ir.sequence"].next_by_code("cdu.box") or "/"
         return super().create(vals)
 
+    def write(self, vals):
+        rule_fields = {"collection_point_id", "next_drug_pickup_date"}
+        changing_rule = rule_fields.intersection(vals)
+        if changing_rule and not self.env.context.get("skip_box_rule_change_guard"):
+            for box in self:
+                if box.state == "confirmed":
+                    raise UserError(_("Box rules cannot be changed after confirmation."))
+                changed_values = {}
+                if "collection_point_id" in changing_rule:
+                    new_collection_point_id = vals["collection_point_id"] or False
+                    if new_collection_point_id != (box.collection_point_id.id or False):
+                        changed_values["collection_point_id"] = new_collection_point_id
+                if "next_drug_pickup_date" in changing_rule:
+                    new_date = fields.Date.to_date(vals["next_drug_pickup_date"]) or False
+                    if new_date != (box.next_drug_pickup_date or False):
+                        changed_values["next_drug_pickup_date"] = new_date
+                if changed_values and box.line_ids:
+                    raise UserError(
+                        _(
+                            "Remove existing parcels before changing the box collection point "
+                            "or next drug pickup date."
+                        )
+                    )
+        return super().write(vals)
+
     @api.depends("line_ids")
     def _compute_parcel_count(self):
         for box in self:
@@ -80,6 +105,10 @@ class CduBox(models.Model):
 
         collection_points = self.line_ids.mapped("collection_point_id")
         pickup_dates = set(self.line_ids.mapped("next_drug_pickup_date"))
+        if self.collection_point_id and collection_points != self.collection_point_id:
+            errors.append(_("All parcels must match the selected box collection point."))
+        if self.next_drug_pickup_date and pickup_dates != {self.next_drug_pickup_date}:
+            errors.append(_("All parcels must match the selected box next drug pickup date."))
         if len(collection_points) > 1:
             errors.append(_("All parcels in a box must have the same collection point."))
         if len(pickup_dates) > 1:
@@ -97,7 +126,7 @@ class CduBox(models.Model):
             if not box.next_drug_pickup_date:
                 values["next_drug_pickup_date"] = first_line.next_drug_pickup_date
             if values:
-                box.write(values)
+                box.with_context(skip_box_rule_change_guard=True).write(values)
 
     def action_load_eligible_parcels(self):
         self._ensure_boxing_access()
@@ -369,6 +398,7 @@ class CduBoxLine(models.Model):
             raise UserError(_("Parcels cannot be added to a confirmed box."))
         records = super().create(vals_list)
         records.mapped("box_id")._sync_from_lines()
+        records._validate_box_rule_matches()
         return records
 
     def write(self, vals):
@@ -376,6 +406,7 @@ class CduBoxLine(models.Model):
             raise UserError(_("Parcels cannot be changed on a confirmed box."))
         result = super().write(vals)
         self.mapped("box_id")._sync_from_lines()
+        self._validate_box_rule_matches()
         return result
 
     def unlink(self):
@@ -385,3 +416,22 @@ class CduBoxLine(models.Model):
         result = super().unlink()
         boxes._sync_from_lines()
         return result
+
+    def _validate_box_rule_matches(self):
+        for line in self:
+            box = line.box_id
+            parcel = line.bagging_qa_id
+            if not box or not parcel:
+                continue
+            if parcel.state != "confirmed" or parcel.prescription_id.state != "awaiting_boxing":
+                raise UserError(
+                    _("Only confirmed parcels awaiting boxing can be added to a box.")
+                )
+            if box.collection_point_id and parcel.collection_point_id != box.collection_point_id:
+                raise UserError(
+                    _("Only parcels for the selected collection point can be added to this box.")
+                )
+            if box.next_drug_pickup_date and parcel.next_drug_pickup_date != box.next_drug_pickup_date:
+                raise UserError(
+                    _("Only parcels for the selected next drug pickup date can be added to this box.")
+                )

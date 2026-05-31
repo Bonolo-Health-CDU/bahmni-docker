@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <record id="action_report_cdu_dispense_labels" model="ir.actions.report">
-        <field name="name">CDU Dispense Labels</field>
+        <field name="name">CDU Dispensing and Bagging Labels</field>
         <field name="model">cdu.dispense</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">cdu_elmis.report_cdu_dispense_labels</field>
         <field name="report_file">cdu_elmis.report_cdu_dispense_labels</field>
-        <field name="print_report_name">'CDU Dispense Labels - %s' % (object.name)</field>
+        <field name="print_report_name">'CDU Dispensing and Bagging Labels - %s' % (object.name)</field>
         <field name="binding_model_id" ref="model_cdu_dispense"/>
         <field name="binding_type">report</field>
         <field name="groups_id" eval="[(4, ref('cdu_prescription.group_cdu_dispensing_officer')), (4, ref('cdu_prescription.group_cdu_admin'))]"/>
@@ -17,13 +17,57 @@
             <t t-foreach="docs" t-as="dispense">
                 <t t-call="web.external_layout">
                     <div class="page">
-                        <h2>CDU Dispense Labels</h2>
-                        <p class="text-muted">
-                            Placeholder label set for CDU testing. Final label dimensions and barcode/QR content can be refined in the label-design increment.
+                        <h2>CDU Dispensing and Bagging Labels</h2>
+
+                        <h3>Dispensing Labels</h3>
+                        <div t-if="dispense.stock_selection_ids">
+                            <div t-foreach="dispense.stock_selection_ids" t-as="line"
+                                 style="display: inline-block; width: 48%; min-height: 210px; vertical-align: top; border: 1px solid #333; padding: 10px; margin: 0 1% 12px 0; page-break-inside: avoid;">
+                                <h4 style="margin: 0 0 8px 0;">DISPENSING LABEL</h4>
+                                <table class="table table-sm" style="width: 100%; margin-bottom: 6px;">
+                                    <tbody>
+                                        <tr>
+                                            <th style="width: 34%;">Patient</th>
+                                            <td><span t-field="dispense.patient_name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Prescription</th>
+                                            <td><span t-field="dispense.prescription_id"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Drug / Regimen</th>
+                                            <td><span t-field="line.openmrs_drug_name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Product</th>
+                                            <td><span t-field="line.selected_orderable_name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Batch</th>
+                                            <td><span t-field="line.selected_lot"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Expiry</th>
+                                            <td><span t-field="line.selected_lot_expiry"/></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Quantity</th>
+                                            <td><span t-field="line.quantity_dispensed"/></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div style="border-top: 1px solid #999; padding-top: 6px;">
+                                    <strong>Instructions:</strong>
+                                    <span t-field="line.dosage_instructions"/>
+                                </div>
+                            </div>
+                        </div>
+                        <p t-if="not dispense.stock_selection_ids" class="text-muted">
+                            No dispense stock selections were captured.
                         </p>
 
-                        <div style="border: 1px solid #333; padding: 12px; margin-bottom: 14px;">
-                            <h3 style="margin-top: 0;">Bag Label</h3>
+                        <div style="page-break-inside: avoid; border: 2px solid #111; padding: 14px; margin-top: 18px;">
+                            <h3 style="margin-top: 0;">BAGGING LABEL</h3>
                             <table class="table table-sm" style="width: 100%;">
                                 <tbody>
                                     <tr>
@@ -44,48 +88,20 @@
                                         <th>Next Pickup Date</th>
                                         <td><span t-field="dispense.next_drug_pickup_date"/></td>
                                     </tr>
+                                    <tr>
+                                        <th>Dispense Ref</th>
+                                        <td><span t-field="dispense.name"/></td>
+                                        <th>Items</th>
+                                        <td><span t-esc="len(dispense.stock_selection_ids)"/></td>
+                                    </tr>
                                 </tbody>
                             </table>
-                        </div>
-
-                        <h3>Product Labels</h3>
-                        <table class="table table-sm o_main_table" style="width: 100%;">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>eRegister Drug / Regimen</th>
-                                    <th>eLMIS Product</th>
-                                    <th>Batch Number</th>
-                                    <th>Expiry</th>
-                                    <th class="text-end">Qty</th>
-                                    <th>Dosing / Instructions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr t-foreach="dispense.stock_selection_ids" t-as="line">
-                                    <td><span t-esc="line_index + 1"/></td>
-                                    <td><span t-field="line.openmrs_drug_name"/></td>
-                                    <td><span t-field="line.selected_orderable_name"/></td>
-                                    <td><span t-field="line.selected_lot"/></td>
-                                    <td><span t-field="line.selected_lot_expiry"/></td>
-                                    <td class="text-end"><span t-field="line.quantity_dispensed"/></td>
-                                    <td><span t-field="line.dosage_instructions"/></td>
-                                </tr>
-                                <tr t-if="not dispense.stock_selection_ids">
-                                    <td colspan="7" class="text-center text-muted">
-                                        No dispense stock selections were captured.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <div style="margin-top: 30px;">
-                            <table class="table table-sm" style="width: 100%;">
+                            <table class="table table-sm" style="width: 100%; margin-top: 8px;">
                                 <tbody>
                                     <tr>
-                                        <td style="width: 33%; padding-top: 22px;">Printed By: <span t-field="dispense.labels_printed_by"/></td>
-                                        <td style="width: 33%; padding-top: 22px;">Printed At: <span t-field="dispense.labels_printed_at"/></td>
-                                        <td style="width: 33%; padding-top: 22px;">Checked By: ____________________</td>
+                                        <td style="width: 33%; padding-top: 18px;">Printed By: <span t-field="dispense.labels_printed_by"/></td>
+                                        <td style="width: 33%; padding-top: 18px;">Printed At: <span t-field="dispense.labels_printed_at"/></td>
+                                        <td style="width: 33%; padding-top: 18px;">Bagged By: ____________________</td>
                                     </tr>
                                 </tbody>
                             </table>

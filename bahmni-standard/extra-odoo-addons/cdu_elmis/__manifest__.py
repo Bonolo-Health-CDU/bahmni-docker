@@ -27,6 +27,11 @@
         "views/cdu_elmis_batch_views.xml",
         "views/cdu_elmis_menus.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "cdu_elmis/static/src/js/box_parcel_scanner.js",
+        ],
+    },
     "installable": True,
     "application": False,
 }
