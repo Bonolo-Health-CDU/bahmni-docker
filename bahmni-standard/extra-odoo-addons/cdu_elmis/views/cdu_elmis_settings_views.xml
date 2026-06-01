@@ -9,12 +9,14 @@
                 <header>
                     <button name="execute" string="Save" type="object" class="btn-primary"/>
                     <button name="action_resolve_elmis_reference_ids" string="Resolve eLMIS UUIDs" type="object" class="btn-secondary"/>
+                    <button name="action_test_collect_go_connection" string="Test Collect-and-Go" type="object" class="btn-secondary"/>
                     <button string="Discard" special="cancel"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
-                        <h1>eLMIS Stock Integration</h1>
+                        <h1>CDU Integrations</h1>
                     </div>
+                    <separator string="eLMIS Stock Integration"/>
                     <group string="Connection">
                         <field name="cdu_elmis_base_url" placeholder="https://elmis.gov.ls"/>
                         <field name="cdu_elmis_api_key" password="True"/>
@@ -53,6 +55,24 @@
                         <field name="cdu_elmis_stock_cache_ttl_seconds"/>
                         <field name="cdu_elmis_max_retry_count"/>
                         <field name="cdu_elmis_mapping_service_backend"/>
+                    </group>
+                    <separator string="Collect-and-Go Dispatch Integration"/>
+                    <group string="Connection">
+                        <field name="cdu_collect_go_base_url" placeholder="https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health"/>
+                        <field name="cdu_collect_go_timeout_seconds"/>
+                    </group>
+                    <group string="Parcel Defaults">
+                        <field name="cdu_collect_go_cdu_location_id"/>
+                        <field name="cdu_collect_go_dispatch_tracking_status_type"/>
+                        <field name="cdu_collect_go_standard_parcel_type"/>
+                        <field name="cdu_collect_go_box_parcel_type"/>
+                    </group>
+                    <group string="Polling">
+                        <field name="cdu_collect_go_poll_attempts"/>
+                        <field name="cdu_collect_go_poll_interval_seconds"/>
+                        <field name="cdu_collect_go_max_retry_count"/>
+                        <field name="cdu_collect_go_status_poll_enabled"/>
+                        <field name="cdu_collect_go_status_poll_interval_minutes"/>
                     </group>
                 </sheet>
             </form>

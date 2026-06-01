@@ -142,6 +142,85 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="cdu.elmis.mapping_service_backend",
         default="local",
     )
+    cdu_collect_go_base_url = fields.Char(
+        string="Collect-and-Go Base URL",
+        config_parameter="cdu.collect_go.base_url",
+        default="https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health",
+    )
+    cdu_collect_go_cdu_location_id = fields.Char(
+        string="Collect-and-Go CDU Location ID",
+        config_parameter="cdu.collect_go.cdu_location_id",
+    )
+    cdu_collect_go_dispatch_tracking_status_type = fields.Integer(
+        string="Dispatch Tracking Status Type",
+        config_parameter="cdu.collect_go.dispatch_tracking_status_type",
+        default=0,
+    )
+    cdu_collect_go_standard_parcel_type = fields.Integer(
+        string="Standard Parcel Type",
+        config_parameter="cdu.collect_go.standard_parcel_type",
+        default=0,
+    )
+    cdu_collect_go_box_parcel_type = fields.Integer(
+        string="Box Parcel Type",
+        config_parameter="cdu.collect_go.box_parcel_type",
+        default=2,
+    )
+    cdu_collect_go_poll_attempts = fields.Integer(
+        string="Poll Attempts",
+        config_parameter="cdu.collect_go.poll_attempts",
+        default=10,
+    )
+    cdu_collect_go_poll_interval_seconds = fields.Integer(
+        string="Poll Interval (Seconds)",
+        config_parameter="cdu.collect_go.poll_interval_seconds",
+        default=3,
+    )
+    cdu_collect_go_timeout_seconds = fields.Integer(
+        string="HTTP Timeout (Seconds)",
+        config_parameter="cdu.collect_go.timeout_seconds",
+        default=30,
+    )
+    cdu_collect_go_max_retry_count = fields.Integer(
+        string="Collect-and-Go Max Retry Count",
+        config_parameter="cdu.collect_go.max_retry_count",
+        default=3,
+    )
+    cdu_collect_go_status_poll_enabled = fields.Boolean(
+        string="Enable Status Polling",
+        config_parameter="cdu.collect_go.status_poll_enabled",
+        default=True,
+    )
+    cdu_collect_go_status_poll_interval_minutes = fields.Integer(
+        string="Status Poll Interval (Minutes)",
+        config_parameter="cdu.collect_go.status_poll_interval_minutes",
+        default=15,
+    )
+
+    def action_test_collect_go_connection(self):
+        self.ensure_one()
+        self.execute()
+        return self.env["cdu.collect.go.service"].action_test_connection()
+
+    def set_values(self):
+        result = super().set_values()
+        self._sync_collect_go_status_poll_cron()
+        return result
+
+    def _sync_collect_go_status_poll_cron(self):
+        cron = self.env.ref("cdu_elmis.ir_cron_cdu_collect_go_status_poll", raise_if_not_found=False)
+        if not cron:
+            return
+        params = self.env["ir.config_parameter"].sudo()
+        enabled = params.get_param("cdu.collect_go.status_poll_enabled", "True") == "True"
+        try:
+            interval = int(params.get_param("cdu.collect_go.status_poll_interval_minutes") or 15)
+        except ValueError:
+            interval = 15
+        cron.sudo().write({
+            "active": enabled,
+            "interval_number": max(interval, 1),
+        })
 
     def action_resolve_elmis_reference_ids(self):
         self.ensure_one()

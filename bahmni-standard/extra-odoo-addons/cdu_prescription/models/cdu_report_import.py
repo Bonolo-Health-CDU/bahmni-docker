@@ -457,18 +457,33 @@ class CduReportRow(models.Model):
         if not name:
             return False
         CollectionPoint = self.env["cdu.collection.point"]
-        point = CollectionPoint.search([("name", "=ilike", name)], limit=1)
-        if point:
-            return point
-        code = re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-").upper()[:32] or "PICKUP"
-        existing_code = CollectionPoint.search([("code", "=", code)], limit=1)
-        if existing_code:
-            code = "%s-%s" % (code[:24], self.id)
-        return CollectionPoint.create({
-            "name": name,
-            "code": code,
-            "point_type": "retail_pharmacy",
-        })
+        normalized_name = self._normalize_collection_point_name(name)
+        code = re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-").upper()[:32]
+        candidates = CollectionPoint.search([("name", "=ilike", name)])
+        if not candidates and code:
+            candidates = CollectionPoint.search([("code", "=", code)])
+        if not candidates:
+            candidates = CollectionPoint.search([("external_reference", "!=", False)]).filtered(
+                lambda point: self._normalize_collection_point_name(point.name) == normalized_name
+            )
+
+        valid_point = candidates.filtered(lambda point: point.external_reference)[:1]
+        if valid_point:
+            return valid_point
+
+        if candidates:
+            raise UserError(_(
+                "Drug Pickup Point '%s' exists in CDU but does not have a Collect-and-Go Reference. "
+                "Sync collection points from Collect-and-Go or map this pickup point before importing."
+            ) % name)
+
+        raise UserError(_(
+            "Drug Pickup Point '%s' is not a valid Collect-and-Go collection location. "
+            "Sync collection points from Collect-and-Go or correct the eRegister pickup point before importing."
+        ) % name)
+
+    def _normalize_collection_point_name(self, name):
+        return re.sub(r"\s+", " ", (name or "").strip()).lower()
 
     def _map_gender(self, value):
         if value == "F":

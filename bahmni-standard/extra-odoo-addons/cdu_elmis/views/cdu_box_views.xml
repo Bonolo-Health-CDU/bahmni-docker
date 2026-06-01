@@ -12,6 +12,7 @@
                 <field name="parcel_count"/>
                 <field name="max_parcels"/>
                 <field name="dispatch_status"/>
+                <field name="collect_go_status"/>
                 <field name="confirmed_by"/>
                 <field name="confirmed_at"/>
                 <field name="dispatched_at"/>
@@ -44,8 +45,27 @@
                             type="object"
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            confirm="This will mark the boxed prescriptions as Dispatched in CDU. Continue?"
-                            attrs="{'invisible': ['|', ('state', '!=', 'confirmed'), ('dispatch_status', '=', 'dispatched')]}"/>
+                            confirm="This will submit the box to Collect-and-Go. Prescriptions will be marked Dispatched only after Collect-and-Go processing succeeds. Continue?"
+                            attrs="{'invisible': ['|', '|', ('state', '!=', 'confirmed'), ('dispatch_status', '=', 'dispatched'), ('collect_go_status', '!=', 'not_submitted')]}"/>
+                    <button name="action_retry_collect_go_submission"
+                            string="Retry Collect-and-Go"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            confirm="This will re-submit the box to Collect-and-Go with a new message reference and link the retry to the original failed request. Continue?"
+                            attrs="{'invisible': [('collect_go_status', '!=', 'failed')]}"/>
+                    <button name="action_check_collect_go_response"
+                            string="Check Collect-and-Go Response"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('collect_go_status', '!=', 'submitted')]}"/>
+                    <button name="action_poll_collect_go_parcel_status"
+                            string="Poll Parcel Status"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('collect_go_status', '!=', 'processed')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
                 </header>
                 <sheet>
@@ -94,6 +114,10 @@
                             <div class="o_cdu_batch_card_fields">
                                 <label for="dispatch_status"/>
                                 <field name="dispatch_status" nolabel="1" readonly="1"/>
+                                <label for="collect_go_status"/>
+                                <field name="collect_go_status" nolabel="1" readonly="1"/>
+                                <label for="collect_go_latest_parcel_status_summary"/>
+                                <field name="collect_go_latest_parcel_status_summary" nolabel="1" readonly="1"/>
                                 <label for="dispatch_ready_at"/>
                                 <field name="dispatch_ready_at" nolabel="1" readonly="1"/>
                                 <label for="dispatched_by"/>
@@ -121,6 +145,10 @@
                                     <field name="patient_name" readonly="1"/>
                                     <field name="collection_point_id" readonly="1"/>
                                     <field name="next_drug_pickup_date" readonly="1"/>
+                                    <field name="collect_go_parcel_status" readonly="1"/>
+                                    <field name="collect_go_parcel_status_type" optional="hide" readonly="1"/>
+                                    <field name="collect_go_status_received_at" optional="hide" readonly="1"/>
+                                    <field name="collect_go_status_date" optional="hide" readonly="1"/>
                                     <field name="prescription_id" optional="hide" readonly="1"/>
                                 </tree>
                             </field>
@@ -129,6 +157,35 @@
                             <field name="dispatch_notes"
                                    placeholder="Capture handover notes, courier reference, or any dispatch exception here."
                                    attrs="{'readonly': [('dispatch_status', '=', 'dispatched')]}"/>
+                        </page>
+                        <page string="Collect-and-Go">
+                            <group>
+                                <group string="Status">
+                                    <field name="collect_go_status" readonly="1"/>
+                                    <field name="collect_go_reference_guid" readonly="1"/>
+                                    <field name="collect_go_submitted_at" readonly="1"/>
+                                    <field name="collect_go_processed_at" readonly="1"/>
+                                    <field name="collect_go_last_status_poll_at" readonly="1"/>
+                                    <field name="collect_go_latest_parcel_status_summary" readonly="1"/>
+                                    <field name="collect_go_last_log_id" readonly="1"/>
+                                </group>
+                                <group string="Latest Error">
+                                    <field name="collect_go_error" readonly="1" nolabel="1"/>
+                                </group>
+                            </group>
+                            <field name="collect_go_log_ids" readonly="1">
+                                <tree>
+                                    <field name="timestamp"/>
+                                    <field name="call_type"/>
+                                    <field name="reference_guid"/>
+                                    <field name="http_status_code"/>
+                                    <field name="bridge_status_code"/>
+                                    <field name="success"/>
+                                    <field name="error_message"/>
+                                    <field name="retry_count"/>
+                                    <field name="user_id"/>
+                                </tree>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>
@@ -153,9 +210,12 @@
                 <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
                 <filter string="Pending Dispatch" name="pending_dispatch" domain="[('state', '=', 'confirmed'), ('dispatch_status', '=', 'pending')]"/>
                 <filter string="Dispatched" name="dispatched" domain="[('dispatch_status', '=', 'dispatched')]"/>
+                <filter string="Collect-and-Go Failed" name="collect_go_failed" domain="[('collect_go_status', '=', 'failed')]"/>
+                <filter string="Collect-and-Go Retry Limit" name="collect_go_retry_limit" domain="[('collect_go_status', '=', 'retry_limit_reached')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                     <filter string="Dispatch Status" name="group_dispatch_status" context="{'group_by': 'dispatch_status'}"/>
+                    <filter string="Collect-and-Go Status" name="group_collect_go_status" context="{'group_by': 'collect_go_status'}"/>
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
                     <filter string="Pickup Date" name="group_pickup_date" context="{'group_by': 'next_drug_pickup_date'}"/>
                 </group>

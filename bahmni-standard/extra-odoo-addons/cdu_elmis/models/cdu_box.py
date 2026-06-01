@@ -49,6 +49,46 @@ class CduBox(models.Model):
     dispatched_by = fields.Many2one("res.users", readonly=True)
     dispatched_at = fields.Datetime(readonly=True)
     dispatch_notes = fields.Text(string="Dispatch Notes", tracking=True)
+    collect_go_status = fields.Selection(
+        [
+            ("not_submitted", "Not Submitted"),
+            ("submitted", "Submitted"),
+            ("processed", "Processed"),
+            ("failed", "Failed"),
+            ("retry_limit_reached", "Retry Limit Reached"),
+        ],
+        string="Collect-and-Go Status",
+        default="not_submitted",
+        required=True,
+        tracking=True,
+        index=True,
+    )
+    collect_go_reference_guid = fields.Char(string="Collect-and-Go Reference GUID", readonly=True, copy=False)
+    collect_go_last_log_id = fields.Many2one(
+        "cdu.collect.go.api.log",
+        string="Last Collect-and-Go Log",
+        readonly=True,
+        copy=False,
+    )
+    collect_go_log_ids = fields.One2many(
+        "cdu.collect.go.api.log",
+        "box_id",
+        string="Collect-and-Go Logs",
+        readonly=True,
+    )
+    collect_go_submitted_at = fields.Datetime(string="Submitted to Collect-and-Go At", readonly=True)
+    collect_go_processed_at = fields.Datetime(string="Processed by Collect-and-Go At", readonly=True)
+    collect_go_error = fields.Char(string="Collect-and-Go Error", readonly=True)
+    collect_go_last_status_poll_at = fields.Datetime(
+        string="Last Status Poll At",
+        readonly=True,
+        copy=False,
+    )
+    collect_go_latest_parcel_status_summary = fields.Char(
+        string="Latest Parcel Status Summary",
+        readonly=True,
+        copy=False,
+    )
 
     @api.model
     def create(self, vals):
@@ -267,40 +307,172 @@ class CduBox(models.Model):
 
     def action_confirm_dispatch_handover(self):
         self._ensure_boxing_access()
-        moved_count = 0
+        submitted_count = 0
         for box in self:
             if box.state != "confirmed":
                 raise UserError(_("Confirm the box before dispatch handover."))
             if box.dispatch_status == "dispatched":
                 raise UserError(_("Dispatch handover has already been confirmed for %s.") % box.name)
+            if box.collect_go_status != "not_submitted":
+                raise UserError(
+                    _(
+                        "%s already has a Collect-and-Go submission status. "
+                        "Use Retry Collect-and-Go if the previous submission failed."
+                    )
+                    % box.name
+                )
             prescriptions = box.line_ids.mapped("prescription_id")
             awaiting_dispatch = prescriptions.filtered(
                 lambda prescription: prescription.state == "awaiting_dispatch"
             )
             if not awaiting_dispatch:
                 raise UserError(_("No prescriptions in this box are awaiting dispatch."))
-            now = fields.Datetime.now()
-            box.write(
-                {
-                    "dispatch_status": "dispatched",
-                    "dispatched_by": self.env.user.id,
-                    "dispatched_at": now,
-                }
-            )
-            awaiting_dispatch.write({"state": "dispatched"})
-            moved_count += len(awaiting_dispatch)
+            self.env["cdu.collect.go.service"].submit_box_create_parcel(box)
+            submitted_count += 1
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
-                "title": _("Dispatch handover confirmed"),
-                "message": _("%(count)s prescription(s) moved to Dispatched.")
-                % {"count": moved_count},
+                "title": _("Submitted to Collect-and-Go"),
+                "message": _(
+                    "%(count)s box(es) were accepted by the Collect-and-Go bridge. "
+                    "Click Check Collect-and-Go Response to confirm final processing."
+                )
+                % {"count": submitted_count},
                 "type": "success",
                 "sticky": False,
                 "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
+
+    def action_retry_collect_go_submission(self):
+        self._ensure_boxing_access()
+        retried_count = 0
+        for box in self:
+            self.env["cdu.collect.go.service"].retry_box_create_parcel(box)
+            retried_count += 1
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Collect-and-Go retry submitted"),
+                "message": _(
+                    "%(count)s box(es) were re-submitted to Collect-and-Go. "
+                    "Click Check Collect-and-Go Response to confirm final processing."
+                )
+                % {"count": retried_count},
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    def action_check_collect_go_response(self):
+        self._ensure_boxing_access()
+        results = []
+        service = self.env["cdu.collect.go.service"]
+        for box in self:
+            results.append(service.poll_box_message(box, raise_on_error=False))
+
+        processed_count = sum(1 for result in results if result.get("state") == "processed")
+        failed_count = sum(1 for result in results if result.get("state") == "failed")
+        pending_count = sum(1 for result in results if result.get("state") == "not_ready")
+
+        if failed_count:
+            title = _("Collect-and-Go processing failed")
+            notification_type = "danger"
+            message = _(
+                "%(failed)s box(es) failed during Collect-and-Go processing. "
+                "The getMessage response was saved in the Collect-and-Go logs."
+            ) % {"failed": failed_count}
+        elif pending_count:
+            title = _("Collect-and-Go response pending")
+            notification_type = "warning"
+            message = _(
+                "%(pending)s box(es) are still waiting for Collect-and-Go processing. "
+                "The getMessage response was saved in the Collect-and-Go logs."
+            ) % {"pending": pending_count}
+        else:
+            title = _("Collect-and-Go processed")
+            notification_type = "success"
+            message = _("%(count)s box(es) were processed and marked as dispatched.") % {
+                "count": processed_count
+            }
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": title,
+                "message": message,
+                "type": notification_type,
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    def action_poll_collect_go_parcel_status(self):
+        self._ensure_boxing_access()
+        result = self.env["cdu.collect.go.service"].poll_parcel_status_updates(boxes=self)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Collect-and-Go status poll complete"),
+                "message": _(
+                    "%(matched)s parcel status update(s) matched CDU parcels. "
+                    "%(received)s status update(s) were received."
+                )
+                % {
+                    "matched": result.get("matched_count", 0),
+                    "received": result.get("received_count", 0),
+                },
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    @api.model
+    def cron_poll_collect_go_parcel_status(self):
+        return self.env["cdu.collect.go.service"].cron_poll_parcel_status_updates()
+
+    def _mark_collect_go_processed(self, log):
+        self.ensure_one()
+        prescriptions = self.line_ids.mapped("prescription_id")
+        awaiting_dispatch = prescriptions.filtered(
+            lambda prescription: prescription.state == "awaiting_dispatch"
+        )
+        now = fields.Datetime.now()
+        self.write(
+            {
+                "collect_go_status": "processed",
+                "collect_go_last_log_id": log.id,
+                "collect_go_processed_at": now,
+                "collect_go_error": False,
+                "dispatch_status": "dispatched",
+                "dispatched_by": self.env.user.id,
+                "dispatched_at": now,
+            }
+        )
+        awaiting_dispatch.write({"state": "dispatched"})
+
+    def _update_collect_go_status_summary(self):
+        for box in self:
+            status_counts = {}
+            for line in box.line_ids:
+                status = line.collect_go_parcel_status or _("Unknown")
+                status_counts[status] = status_counts.get(status, 0) + 1
+            summary = ", ".join(
+                "%s: %s" % (status, count)
+                for status, count in sorted(status_counts.items())
+            )
+            box.write(
+                {
+                    "collect_go_last_status_poll_at": fields.Datetime.now(),
+                    "collect_go_latest_parcel_status_summary": summary,
+                }
+            )
 
     def _submit_consumption_event(self):
         self.ensure_one()
@@ -411,6 +583,31 @@ class CduBoxLine(models.Model):
         store=True,
         readonly=True,
     )
+    collect_go_parcel_status_type = fields.Integer(
+        string="Collect-and-Go Status Type",
+        readonly=True,
+        copy=False,
+    )
+    collect_go_parcel_status = fields.Char(
+        string="Collect-and-Go Status",
+        readonly=True,
+        copy=False,
+    )
+    collect_go_status_received_at = fields.Datetime(
+        string="Collect-and-Go Status Received At",
+        readonly=True,
+        copy=False,
+    )
+    collect_go_status_date = fields.Char(
+        string="Collect-and-Go Status Date",
+        readonly=True,
+        copy=False,
+    )
+    collect_go_status_raw_json = fields.Text(
+        string="Collect-and-Go Raw Status",
+        readonly=True,
+        copy=False,
+    )
 
     _sql_constraints = [
         (
@@ -457,7 +654,17 @@ class CduBoxLine(models.Model):
         return records
 
     def write(self, vals):
-        if self.mapped("box_id").filtered(lambda box: box.state == "confirmed"):
+        status_update_fields = {
+            "collect_go_parcel_status_type",
+            "collect_go_parcel_status",
+            "collect_go_status_received_at",
+            "collect_go_status_date",
+            "collect_go_status_raw_json",
+        }
+        if (
+            self.mapped("box_id").filtered(lambda box: box.state == "confirmed")
+            and set(vals) - status_update_fields
+        ):
             raise UserError(_("Parcels cannot be changed on a confirmed box."))
         if "box_id" in vals or "bagging_qa_id" in vals:
             self._validate_write_values_unique_parcels(vals)

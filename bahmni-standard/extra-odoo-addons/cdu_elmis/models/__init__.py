@@ -1,5 +1,7 @@
 from . import cdu_bagging_qa
 from . import cdu_box
+from . import cdu_collect_go_api_log
+from . import cdu_collect_go_service
 from . import cdu_dispense
 from . import cdu_dispense_stock_option
 from . import cdu_dispense_stock_selection
