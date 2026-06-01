@@ -93,11 +93,14 @@ class CduBatch(models.Model):
         if any(not batch.elmis_stock_option_ids for batch in self) and not service.has_valid_current_user_elmis_token():
             return service.action_open_elmis_auth_wizard(batch=self[:1])
         for batch in self:
+            if not batch.picking_confirmed_at:
+                raise UserError(_("Please confirm the eLMIS picking list before printing."))
             if not batch.elmis_picking_line_ids:
                 batch._generate_elmis_picking_lines()
             batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
             if not batch.elmis_stock_option_ids:
                 batch._refresh_store_stock_options()
+            batch.action_mark_printed()
         return self.env.ref(
             "cdu_elmis.action_report_cdu_elmis_picking_list"
         ).report_action(self)
