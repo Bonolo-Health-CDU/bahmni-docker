@@ -1,5 +1,6 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from werkzeug import urls
 
 
 class CduDispense(models.Model):
@@ -389,6 +390,19 @@ class CduDispense(models.Model):
             self,
             config=False,
         )
+
+    def get_barcode_url(self, value, barcode_type="Code128", width=580, height=160):
+        query = urls.url_encode(
+            {
+                "barcode_type": barcode_type,
+                "value": value or "",
+                "width": width,
+                "height": height,
+                "humanreadable": 0,
+                "quiet": 1,
+            }
+        )
+        return "/report/barcode?%s" % query
 
     def action_open_or_create_for_prescription(self):
         self.ensure_one()

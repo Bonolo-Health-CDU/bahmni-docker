@@ -9,6 +9,7 @@
                     <group>
                         <group string="Print Layout">
                             <field name="label_layout" widget="radio"/>
+                            <field name="dispensing_slip_count" readonly="1"/>
                             <field name="medicine_label_count" readonly="1"/>
                             <field name="bag_label_count" readonly="1"/>
                             <field name="total_label_count" readonly="1"/>
@@ -23,6 +24,17 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Dispensing Slip Preview">
+                            <group>
+                                <field name="dispense_id" readonly="1"/>
+                                <field name="patient_name" readonly="1"/>
+                                <field name="patient_identifier" readonly="1"/>
+                                <field name="patient_phone" readonly="1"/>
+                                <field name="prescription_id" readonly="1"/>
+                                <field name="collection_point_id" readonly="1"/>
+                                <field name="next_drug_pickup_date" readonly="1"/>
+                            </group>
+                        </page>
                         <page string="Medicine Labels Preview">
                             <field name="stock_selection_ids" readonly="1">
                                 <tree create="0" edit="0" delete="0">
