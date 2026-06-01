@@ -21,9 +21,11 @@ class CduBatchPickingLine(models.Model):
 
     elmis_product_name = fields.Char(string="eLMIS Product")
 
+    pack_size = fields.Integer(string="Pack Size")
+
     total_tablets = fields.Float()
 
-    total_bottles = fields.Integer()
+    total_bottles = fields.Float()
 
     prescription_count = fields.Integer()
 

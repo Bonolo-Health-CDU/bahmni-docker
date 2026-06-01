@@ -42,7 +42,7 @@ class CduPickingFulfilmentLine(models.Model):
     selected_orderable_name = fields.Char(string="Fulfil With eLMIS Product")
     selected_lot = fields.Char(string="Batch Number")
     selected_lot_id = fields.Char(string="eLMIS Lot UUID")
-    selected_lot_expiry = fields.Date(string="Expiry")
+    selected_lot_expiry = fields.Date(string="Expiry Date")
     selected_stock_on_hand = fields.Integer(string="Available SOH", readonly=True)
     quantity_picked = fields.Float(string="Picked Qty")
 

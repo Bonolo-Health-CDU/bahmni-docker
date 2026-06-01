@@ -88,19 +88,24 @@
                     <field name="picking_readiness_message" readonly="1" nolabel="1"/>
                 </div>
             </xpath>
-            <xpath expr="//notebook" position="inside">
-                <page string="Picking Summary">
+            <xpath expr="//page[field[@name='picking_line_ids']]" position="replace">
+                <page string="Picking Summary"
+                      groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
                     <field name="picking_line_ids" readonly="1">
                         <tree>
                             <field name="unmapped_drug_name" string="Regimen"/>
                             <field name="elmis_product_name" string="eLMIS Product"/>
+                            <field name="pack_size"/>
                             <field name="total_tablets" string="Total Units (CDU)"/>
                             <field name="total_bottles" string="Total Bottles (CDU)"/>
                             <field name="prescription_count"/>
                         </tree>
                     </field>
                 </page>
-                <page string="Patient Picking Lines">
+            </xpath>
+            <xpath expr="//page[field[@name='patient_picking_line_ids']]" position="replace">
+                <page string="Patient Picking Lines"
+                      groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
                     <field name="patient_picking_line_ids" readonly="1">
                         <tree>
                             <field name="patient_id"/>
@@ -120,6 +125,8 @@
                         </tree>
                     </field>
                 </page>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
                 <page string="Available eLMIS Stock">
                     <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
                          role="alert"
@@ -170,14 +177,14 @@
                             <field name="openmrs_drug_name" readonly="1" optional="hide"/>
                             <field name="required_quantity" readonly="1"/>
                             <field name="selected_stock_option_id" string="Fulfil With" options="{'no_create': True, 'no_open': True}"/>
-                            <field name="selected_orderable_name" readonly="1"/>
-                            <field name="selected_lot" readonly="1"/>
-                            <field name="selected_lot_expiry" readonly="1"/>
-                            <field name="selected_stock_on_hand" readonly="1"/>
+                            <field name="selected_orderable_name" invisible="1" force_save="1"/>
+                            <field name="selected_lot" string="Batch Number" readonly="1" force_save="1"/>
+                            <field name="selected_lot_expiry" string="Expiry Date" readonly="1" force_save="1"/>
+                            <field name="selected_stock_on_hand" readonly="1" force_save="1"/>
                             <field name="quantity_picked"/>
-                            <field name="selected_orderable_code" optional="hide"/>
-                            <field name="selected_orderable_id" optional="hide"/>
-                            <field name="selected_lot_id" optional="hide"/>
+                            <field name="selected_orderable_code" invisible="1" force_save="1"/>
+                            <field name="selected_orderable_id" invisible="1" force_save="1"/>
+                            <field name="selected_lot_id" invisible="1" force_save="1"/>
                         </tree>
                     </field>
                 </page>

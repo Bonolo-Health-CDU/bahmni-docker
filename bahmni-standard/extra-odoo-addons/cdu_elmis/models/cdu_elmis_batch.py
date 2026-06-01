@@ -267,8 +267,12 @@ class CduBatch(models.Model):
 
             for line in batch.elmis_picking_line_ids:
                 if line.summary_line_id:
-                    # Update the Picking Summary line to reflect the actual quantity picked in eLMIS
-                    line.summary_line_id.total_bottles = int(line.total_quantity_picked)
+                    # Reflect the actual picked quantity in the generated Picking Summary.
+                    picked_qty = line.total_quantity_picked
+                    line.summary_line_id.total_bottles = picked_qty
+                    line.summary_line_id.total_tablets = (
+                        (line.summary_line_id.pack_size or 0) * picked_qty
+                    )
 
                     # Synchronize the actual eLMIS products picked from fulfilment lines (aggregating if multiple)
                     names = line.fulfilment_line_ids.filtered("selected_orderable_name").mapped("selected_orderable_name")

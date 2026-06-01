@@ -89,6 +89,9 @@
                                     <!-- PRODUCT -->
                                     <field name="product_id"/>
 
+                                    <!-- PACK SIZE -->
+                                    <field name="pack_size"/>
+
                                     <!-- CDU OPERATIONAL -->
                                     <field name="total_bottles"/>
 

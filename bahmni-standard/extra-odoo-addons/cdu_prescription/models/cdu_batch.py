@@ -439,6 +439,7 @@ class CduBatch(models.Model):
                     summary[key] = {
                         "product_id": product.id if product else False,
                         "unmapped_drug_name": drug_name,
+                        "pack_size": pack_size,
                         "total_tablets": 0,
                         "total_bottles": 0,
                         "prescription_count": 0,
