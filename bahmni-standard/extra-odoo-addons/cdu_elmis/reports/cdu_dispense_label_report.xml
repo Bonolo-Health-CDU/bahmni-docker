@@ -1,12 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <record id="paperformat_cdu_dispense_labels" model="report.paperformat">
+        <field name="name">CDU Dispensing Labels 4x6</field>
+        <field name="default" eval="False"/>
+        <field name="format">custom</field>
+        <field name="page_width">102</field>
+        <field name="page_height">152</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">3</field>
+        <field name="margin_bottom">3</field>
+        <field name="margin_left">3</field>
+        <field name="margin_right">3</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">203</field>
+    </record>
+
     <record id="action_report_cdu_dispense_labels" model="ir.actions.report">
-        <field name="name">CDU Dispense Labels</field>
+        <field name="name">CDU Dispensing Slip, Medicine and Bag Labels</field>
         <field name="model">cdu.dispense</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">cdu_elmis.report_cdu_dispense_labels</field>
         <field name="report_file">cdu_elmis.report_cdu_dispense_labels</field>
-        <field name="print_report_name">'CDU Dispense Labels - %s' % (object.name)</field>
+        <field name="paperformat_id" ref="cdu_elmis.paperformat_cdu_dispense_labels"/>
+        <field name="print_report_name">'CDU Dispensing Labels - %s' % (object.name)</field>
         <field name="binding_model_id" ref="model_cdu_dispense"/>
         <field name="binding_type">report</field>
         <field name="groups_id" eval="[(4, ref('cdu_prescription.group_cdu_dispensing_officer')), (4, ref('cdu_prescription.group_cdu_admin'))]"/>
@@ -15,80 +32,306 @@
     <template id="report_cdu_dispense_labels">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="dispense">
-                <t t-call="web.external_layout">
-                    <div class="page">
-                        <h2>CDU Dispense Labels</h2>
-                        <p class="text-muted">
-                            Placeholder label set for CDU testing. Final label dimensions and barcode/QR content can be refined in the label-design increment.
-                        </p>
+                <t t-call="web.basic_layout">
+                    <t t-set="label_layout" t-value="dispense.env.context.get('cdu_label_layout', 'all')"/>
+                    <t t-set="prescription" t-value="dispense.prescription_id"/>
+                    <t t-set="script_number" t-value="prescription.name or dispense.name"/>
+                    <t t-set="facility_name" t-value="prescription.facility_name or dispense.env.company.name"/>
+                    <t t-set="pickup_point" t-value="dispense.collection_point_id.name or prescription.drug_pickup_point_raw or ''"/>
+                    <style>
+                        .cdu-print-page {
+                            font-family: Arial, sans-serif;
+                            font-size: 12px;
+                            line-height: 1.22;
+                            page-break-after: always;
+                        }
+                        .cdu-print-sheet {
+                            box-sizing: border-box;
+                            min-height: 136mm;
+                            padding: 5mm;
+                        }
+                        .cdu-slip {
+                            font-size: 11px;
+                        }
+                        .cdu-slip-header {
+                            text-align: center;
+                            margin-bottom: 6mm;
+                        }
+                        .cdu-org {
+                            font-size: 18px;
+                            font-weight: 700;
+                            letter-spacing: 0;
+                            text-transform: uppercase;
+                        }
+                        .cdu-muted {
+                            color: #333;
+                        }
+                        .cdu-small {
+                            font-size: 10px;
+                        }
+                        .cdu-rule {
+                            border-top: 1px solid #111;
+                            margin: 4mm 0;
+                        }
+                        .cdu-title {
+                            font-size: 13px;
+                            font-weight: 700;
+                            text-align: center;
+                            text-decoration: underline;
+                            text-transform: uppercase;
+                            margin: 2mm 0 3mm;
+                        }
+                        .cdu-row {
+                            display: table;
+                            width: 100%;
+                            margin-bottom: 2mm;
+                        }
+                        .cdu-row > div {
+                            display: table-cell;
+                            vertical-align: top;
+                        }
+                        .cdu-label-key {
+                            width: 30%;
+                            font-weight: 700;
+                        }
+                        .cdu-table {
+                            border-collapse: collapse;
+                            width: 100%;
+                            margin: 3mm 0;
+                        }
+                        .cdu-table th,
+                        .cdu-table td {
+                            border: 1px solid #555;
+                            padding: 2mm;
+                            text-align: left;
+                            vertical-align: top;
+                        }
+                        .cdu-table th {
+                            background: #e6e6e6;
+                            font-weight: 700;
+                        }
+                        .cdu-medicine-label {
+                            font-size: 15px;
+                            font-weight: 700;
+                        }
+                        .cdu-medicine-label .cdu-org {
+                            font-size: 19px;
+                            margin-bottom: 5mm;
+                        }
+                        .cdu-drug {
+                            font-size: 16px;
+                            line-height: 1.15;
+                            text-transform: uppercase;
+                            margin: 8mm 0 5mm;
+                        }
+                        .cdu-directions {
+                            font-size: 15px;
+                            margin: 4mm 0 9mm;
+                        }
+                        .cdu-script-repeat {
+                            display: table;
+                            width: 100%;
+                            margin: 7mm 0;
+                        }
+                        .cdu-script-repeat > div {
+                            display: table-cell;
+                            font-size: 15px;
+                            font-weight: 700;
+                        }
+                        .cdu-script-repeat > div:last-child {
+                            text-align: right;
+                        }
+                        .cdu-bag-label {
+                            font-size: 17px;
+                            font-weight: 700;
+                        }
+                        .cdu-bag-label .cdu-script {
+                            font-size: 21px;
+                            margin-bottom: 2mm;
+                        }
+                        .cdu-bag-grid {
+                            display: table;
+                            width: 100%;
+                        }
+                        .cdu-bag-main,
+                        .cdu-bag-dates {
+                            display: table-cell;
+                            vertical-align: top;
+                        }
+                        .cdu-bag-main {
+                            width: 68%;
+                        }
+                        .cdu-bag-dates {
+                            width: 32%;
+                            font-size: 13px;
+                            padding-left: 5mm;
+                        }
+                        .cdu-barcode {
+                            display: block;
+                            width: 58mm;
+                            height: 16mm;
+                            margin: 1mm 0 2mm;
+                            background: #fff;
+                        }
+                        .cdu-barcode-caption {
+                            font-size: 14px;
+                            text-align: center;
+                            width: 58mm;
+                            margin-bottom: 8mm;
+                        }
+                        .cdu-bag-section {
+                            margin-top: 5mm;
+                        }
+                    </style>
 
-                        <div style="border: 1px solid #333; padding: 12px; margin-bottom: 14px;">
-                            <h3 style="margin-top: 0;">Bag Label</h3>
-                            <table class="table table-sm" style="width: 100%;">
+                    <div t-if="label_layout in ('all', 'slip')" class="page cdu-print-page">
+                        <div class="cdu-print-sheet cdu-slip">
+                            <div class="cdu-slip-header">
+                                <div class="cdu-org"><span t-esc="facility_name"/></div>
+                                <div class="cdu-muted" t-if="prescription.facility_code">
+                                    <span t-field="prescription.facility_code"/>
+                                </div>
+                                <div class="cdu-muted" t-if="pickup_point">
+                                    Collect at <span t-esc="pickup_point"/>
+                                </div>
+                            </div>
+                            <div>
+                                <strong><span t-field="dispense.patient_name"/></strong>
+                                <span t-if="dispense.patient_identifier">
+                                    (<span t-field="dispense.patient_identifier"/>)
+                                </span>
+                            </div>
+                            <div t-if="dispense.patient_phone" style="margin-top: 16mm;">
+                                <span t-field="dispense.patient_phone"/>
+                            </div>
+                            <div class="cdu-rule"/>
+                            <div>
+                                <strong>Your next collection date is:</strong>
+                                <span t-field="dispense.next_drug_pickup_date"/>
+                            </div>
+                            <div t-if="pickup_point">
+                                <strong>Please collect at:</strong>
+                                <span t-esc="pickup_point"/>
+                            </div>
+                            <div class="cdu-rule"/>
+                            <div class="cdu-title">Dispensing Receipt</div>
+                            <div class="cdu-row">
+                                <div class="cdu-label-key">Prescription:</div>
+                                <div><span t-esc="script_number"/></div>
+                            </div>
+                            <div class="cdu-row" t-if="prescription.prescriber_name">
+                                <div class="cdu-label-key">Prescriber:</div>
+                                <div><span t-field="prescription.prescriber_name"/></div>
+                            </div>
+                            <table class="cdu-table">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Qty</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
-                                    <tr>
-                                        <th style="width: 22%;">Patient</th>
-                                        <td><span t-field="dispense.patient_name"/></td>
-                                        <th style="width: 22%;">Phone</th>
-                                        <td><span t-field="dispense.patient_phone"/></td>
+                                    <tr t-foreach="dispense.stock_selection_ids" t-as="line">
+                                        <td>
+                                            <span t-esc="line.selected_orderable_name or line.openmrs_drug_name"/>
+                                        </td>
+                                        <td><span t-field="line.quantity_dispensed"/></td>
+                                        <td>Dispensed</td>
                                     </tr>
-                                    <tr>
-                                        <th>Prescription</th>
-                                        <td><span t-field="dispense.prescription_id"/></td>
-                                        <th>Batch</th>
-                                        <td><span t-field="dispense.batch_id"/></td>
-                                    </tr>
-                                    <tr>
-                                        <th>Collection Point</th>
-                                        <td><span t-field="dispense.collection_point_id"/></td>
-                                        <th>Next Pickup Date</th>
-                                        <td><span t-field="dispense.next_drug_pickup_date"/></td>
+                                    <tr t-if="not dispense.stock_selection_ids">
+                                        <td colspan="3">No dispense stock selections were captured.</td>
                                     </tr>
                                 </tbody>
                             </table>
+                            <div>
+                                <strong>Pharmacist:</strong>
+                                <span t-field="dispense.confirmed_by"/>
+                            </div>
+                            <div style="margin-top: 4mm;">
+                                <strong>This is Repeat</strong>
+                                <span>1</span>
+                            </div>
+                            <div class="cdu-small" style="text-align: center; margin-top: 8mm;">
+                                If medication was not dispensed it is not available from the automatic dispensing unit and must be collected at the pharmacist's counter.
+                            </div>
                         </div>
+                    </div>
 
-                        <h3>Product Labels</h3>
-                        <table class="table table-sm o_main_table" style="width: 100%;">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>eRegister Drug / Regimen</th>
-                                    <th>eLMIS Product</th>
-                                    <th>Batch Number</th>
-                                    <th>Expiry</th>
-                                    <th class="text-end">Qty</th>
-                                    <th>Dosing / Instructions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr t-foreach="dispense.stock_selection_ids" t-as="line">
-                                    <td><span t-esc="line_index + 1"/></td>
-                                    <td><span t-field="line.openmrs_drug_name"/></td>
-                                    <td><span t-field="line.selected_orderable_name"/></td>
-                                    <td><span t-field="line.selected_lot"/></td>
-                                    <td><span t-field="line.selected_lot_expiry"/></td>
-                                    <td class="text-end"><span t-field="line.quantity_dispensed"/></td>
-                                    <td><span t-field="line.dosage_instructions"/></td>
-                                </tr>
-                                <tr t-if="not dispense.stock_selection_ids">
-                                    <td colspan="7" class="text-center text-muted">
-                                        No dispense stock selections were captured.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <t t-if="label_layout in ('all', 'medicine') and dispense.stock_selection_ids">
+                        <div t-foreach="dispense.stock_selection_ids" t-as="line" class="page cdu-print-page">
+                            <div class="cdu-print-sheet cdu-medicine-label">
+                                <div class="cdu-org"><span t-esc="facility_name"/></div>
+                                <div t-if="prescription.facility_code" class="cdu-muted">
+                                    <span t-field="prescription.facility_code"/>
+                                </div>
+                                <div class="cdu-drug">
+                                    <span t-esc="line.selected_orderable_name or line.openmrs_drug_name"/>
+                                </div>
+                                <div class="cdu-directions">
+                                    <span t-field="line.dosage_instructions"/>
+                                </div>
+                                <div class="cdu-script-repeat">
+                                    <div><span t-esc="script_number"/></div>
+                                    <div>Repeat 1</div>
+                                </div>
+                                <div>
+                                    <span t-if="dispense.labels_printed_at" t-field="dispense.labels_printed_at"/>
+                                    <span t-if="not dispense.labels_printed_at and dispense.confirmed_at" t-field="dispense.confirmed_at"/>
+                                </div>
+                                <div style="font-size: 16px; margin-top: 5mm;">
+                                    <span t-field="dispense.patient_name"/>
+                                </div>
+                                <div style="font-size: 15px; margin-top: 12mm;">
+                                    Dispenser:
+                                    <span t-field="dispense.labels_printed_by"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                    <div t-if="label_layout in ('all', 'medicine') and not dispense.stock_selection_ids" class="page cdu-print-page">
+                        <div class="cdu-print-sheet cdu-medicine-label">
+                            <div class="cdu-org">Medicine Label</div>
+                            No dispense stock selections were captured.
+                        </div>
+                    </div>
 
-                        <div style="margin-top: 30px;">
-                            <table class="table table-sm" style="width: 100%;">
-                                <tbody>
-                                    <tr>
-                                        <td style="width: 33%; padding-top: 22px;">Printed By: <span t-field="dispense.labels_printed_by"/></td>
-                                        <td style="width: 33%; padding-top: 22px;">Printed At: <span t-field="dispense.labels_printed_at"/></td>
-                                        <td style="width: 33%; padding-top: 22px;">Checked By: ____________________</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div t-if="label_layout in ('all', 'bag')" class="page cdu-print-page">
+                        <div class="cdu-print-sheet cdu-bag-label">
+                            <div class="cdu-bag-grid">
+                                <div class="cdu-bag-main">
+                                    <div class="cdu-script">
+                                        Script Number:<span t-esc="script_number"/>
+                                    </div>
+                                    <img class="cdu-barcode"
+                                         t-att-src="dispense.get_barcode_url(script_number)"
+                                         t-att-alt="'Barcode for %s' % script_number"/>
+                                    <div class="cdu-barcode-caption">
+                                        <span t-esc="script_number"/>
+                                    </div>
+                                </div>
+                                <div class="cdu-bag-dates">
+                                    <div>
+                                        Next Collection:<br/>
+                                        <span t-field="dispense.next_drug_pickup_date"/>
+                                    </div>
+                                    <div style="margin-top: 6mm;">
+                                        Collection Date:<br/>
+                                        <span t-field="prescription.prescription_date"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cdu-bag-section">
+                                Pickup Point:<br/>
+                                <span t-esc="pickup_point"/>
+                            </div>
+                            <div class="cdu-bag-section">
+                                Patient:
+                                <span t-field="dispense.patient_name"/>
+                            </div>
+                            <div class="cdu-bag-section">
+                                Produced By:<span t-esc="facility_name"/>
+                            </div>
                         </div>
                     </div>
                 </t>

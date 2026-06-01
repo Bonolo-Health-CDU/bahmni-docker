@@ -1,5 +1,6 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from werkzeug import urls
 
 
 class CduDispense(models.Model):
@@ -360,6 +361,21 @@ class CduDispense(models.Model):
         for dispense in self:
             if dispense.state != "confirmed":
                 raise UserError(_("Confirm dispensing before printing labels."))
+
+        if not self.env.context.get("cdu_skip_label_print_wizard") and len(self) == 1:
+            return {
+                "type": "ir.actions.act_window",
+                "name": _("Preview / Print Labels"),
+                "res_model": "cdu.label.print.wizard",
+                "view_mode": "form",
+                "target": "new",
+                "context": {
+                    "default_dispense_id": self.id,
+                    "default_label_layout": self.env.context.get("cdu_label_layout", "all"),
+                },
+            }
+
+        for dispense in self:
             if not dispense.labels_printed_at:
                 dispense.write(
                     {
@@ -367,7 +383,26 @@ class CduDispense(models.Model):
                         "labels_printed_at": fields.Datetime.now(),
                     }
                 )
-        return self.env.ref("cdu_elmis.action_report_cdu_dispense_labels").report_action(self)
+        label_layout = self.env.context.get("cdu_label_layout", "all")
+        return self.env.ref("cdu_elmis.action_report_cdu_dispense_labels").with_context(
+            cdu_label_layout=label_layout,
+        ).report_action(
+            self,
+            config=False,
+        )
+
+    def get_barcode_url(self, value, barcode_type="Code128", width=580, height=160):
+        query = urls.url_encode(
+            {
+                "barcode_type": barcode_type,
+                "value": value or "",
+                "width": width,
+                "height": height,
+                "humanreadable": 0,
+                "quiet": 1,
+            }
+        )
+        return "/report/barcode?%s" % query
 
     def action_open_or_create_for_prescription(self):
         self.ensure_one()

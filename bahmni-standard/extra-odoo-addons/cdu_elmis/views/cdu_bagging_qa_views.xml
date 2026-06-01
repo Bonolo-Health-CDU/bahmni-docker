@@ -42,6 +42,18 @@
         <field name="arch" type="xml">
             <form class="o_cdu_prescription_form o_cdu_batch_form">
                 <header>
+                    <button name="action_print_labels"
+                            string="Print Labels"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('labels_printed', '=', True)]}"/>
+                    <button name="action_print_labels"
+                            string="Reprint Labels"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('labels_printed', '=', False)]}"/>
                     <button name="action_confirm_bagging_qa"
                             string="Confirm Bagging / QA"
                             type="object"
