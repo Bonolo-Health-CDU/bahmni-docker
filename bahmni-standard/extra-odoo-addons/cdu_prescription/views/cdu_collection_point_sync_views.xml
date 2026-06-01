@@ -40,6 +40,11 @@
                             <field name="poll_interval_seconds"/>
                         </group>
                     </group>
+                    <group string="CDU Dispatch Location">
+                        <field name="resolve_cdu_location"/>
+                        <field name="cdu_location_lookup" attrs="{'invisible': [('resolve_cdu_location', '=', False)]}"/>
+                        <field name="resolved_cdu_location_id"/>
+                    </group>
                     <group>
                         <group string="Latest Sync">
                             <field name="last_sync_at" readonly="1"/>

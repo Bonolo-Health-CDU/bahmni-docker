@@ -29,6 +29,21 @@ class CduCollectionPointSyncConfig(models.Model):
     request_method = fields.Char(default="GetLocation", required=True)
     poll_attempts = fields.Integer(default=10, required=True)
     poll_interval_seconds = fields.Integer(default=3, required=True)
+    resolve_cdu_location = fields.Boolean(
+        string="Resolve CDU Location ID",
+        default=True,
+        help="When enabled, the sync will also look for the CDU location in the Collect-and-Go location response.",
+    )
+    cdu_location_lookup = fields.Char(
+        string="CDU Location Lookup",
+        default="CDU",
+        help="Name, code, or remote LocationID used to identify the CDU location in the Collect-and-Go location response.",
+    )
+    resolved_cdu_location_id = fields.Char(
+        string="Resolved CDU Location ID",
+        readonly=True,
+        help="The Collect-and-Go LocationID saved into cdu.collect_go.cdu_location_id.",
+    )
     last_sync_at = fields.Datetime(readonly=True)
     last_sync_result = fields.Text(readonly=True)
     last_sync_log_id = fields.Many2one("cdu.collection.point.sync.log", readonly=True)
@@ -87,6 +102,7 @@ class CduCollectionPointSyncConfig(models.Model):
             message_payload = self._poll_for_message(reference)
             normalized = self._normalize_locations_payload(message_payload)
             counts = self._upsert_collection_points(normalized)
+            cdu_location_id = self._resolve_cdu_location_id(normalized)
             summary = _(
                 "Locations fetched: %(fetched)s, created: %(created)s, updated: %(updated)s."
             ) % {
@@ -94,6 +110,16 @@ class CduCollectionPointSyncConfig(models.Model):
                 "created": counts["created"],
                 "updated": counts["updated"],
             }
+            if cdu_location_id:
+                summary = "%s %s" % (
+                    summary,
+                    _("CDU LocationID resolved: %s.") % cdu_location_id,
+                )
+            elif self.resolve_cdu_location:
+                summary = "%s %s" % (
+                    summary,
+                    _("CDU LocationID was not found using lookup '%s'.") % self.cdu_location_lookup,
+                )
             log.write({
                 "responded_at": fields.Datetime.now(),
                 "state": "completed",
@@ -108,6 +134,7 @@ class CduCollectionPointSyncConfig(models.Model):
                 "last_sync_at": fields.Datetime.now(),
                 "last_sync_result": summary,
                 "last_sync_log_id": log.id,
+                "resolved_cdu_location_id": cdu_location_id or self.resolved_cdu_location_id,
             })
         except Exception as exc:
             message = str(exc)
@@ -304,6 +331,37 @@ class CduCollectionPointSyncConfig(models.Model):
                 CollectionPoint.create(vals)
                 counts["created"] += 1
         return counts
+
+    def _resolve_cdu_location_id(self, locations):
+        self.ensure_one()
+        if not self.resolve_cdu_location:
+            return False
+        lookup = (self.cdu_location_lookup or "").strip().lower()
+        if not lookup:
+            return False
+
+        for location in locations:
+            candidates = [
+                location.get("name"),
+                location.get("code"),
+                location.get("remote_location_id"),
+                location.get("external_reference"),
+            ]
+            normalized_candidates = [
+                str(candidate or "").strip().lower()
+                for candidate in candidates
+                if str(candidate or "").strip()
+            ]
+            if any(candidate == lookup or lookup in candidate for candidate in normalized_candidates):
+                location_id = location.get("external_reference") or location.get("remote_location_id")
+                if location_id:
+                    location_id = str(location_id).strip()
+                    self.env["ir.config_parameter"].sudo().set_param(
+                        "cdu.collect_go.cdu_location_id",
+                        location_id,
+                    )
+                    return location_id
+        return False
 
     def _expand_json_strings(self, value):
         if isinstance(value, str):
