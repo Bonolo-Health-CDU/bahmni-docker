@@ -295,6 +295,7 @@ class CduBatch(models.Model):
                 ),
                 "type": "success",
                 "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
 
