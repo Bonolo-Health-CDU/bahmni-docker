@@ -8,6 +8,11 @@ class ResConfigSettings(models.TransientModel):
         string="eLMIS Base URL",
         config_parameter="cdu.elmis.base_url",
     )
+    cdu_elmis_verify_ssl = fields.Boolean(
+        string="Verify eLMIS SSL Certificate",
+        config_parameter="cdu.elmis.verify_ssl",
+        default=True,
+    )
     cdu_elmis_api_key = fields.Char(
         string="eLMIS API Key",
         config_parameter="cdu.elmis.api_key",

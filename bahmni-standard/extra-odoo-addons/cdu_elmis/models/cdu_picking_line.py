@@ -32,7 +32,7 @@ class CduPickingLine(models.Model):
         index=True,
     )
     prescription_count = fields.Integer(readonly=True)
-    openmrs_drug_name = fields.Char(string="eRegister Drug / Regimen", required=True)
+    openmrs_drug_name = fields.Char(string="Regimen", required=True)
     openmrs_drug_uuid = fields.Char(
         help="Retained for Phase 2 product mapping from OpenMRS drugs to OpenLMIS orderables.",
     )
@@ -48,7 +48,11 @@ class CduPickingLine(models.Model):
         domain="[('batch_id', '=', batch_id), ('stock_on_hand', '>', 0)]",
     )
     selected_stock_on_hand = fields.Integer(string="Available SOH", readonly=True)
-    quantity_to_pick = fields.Float(string="Required Qty", required=True)
+    # quantity_to_pick = fields.Float(string="Required Qty", required=True)
+    quantity_to_pick = fields.Float(
+        string="Required Qty", 
+        required=True
+    )
     quantity_picked = fields.Float(string="Picked Qty")
     fulfilment_line_ids = fields.One2many(
         "cdu.picking.fulfilment.line",
@@ -121,6 +125,4 @@ class CduPickingLine(models.Model):
             line.selected_lot = option.lot
             line.selected_lot_id = option.lot_id
             line.selected_lot_expiry = option.expiration_date
-            line.selected_stock_on_hand = option.stock_on_hand
-            if not line.quantity_picked:
-                line.quantity_picked = line.quantity_to_pick
+ 

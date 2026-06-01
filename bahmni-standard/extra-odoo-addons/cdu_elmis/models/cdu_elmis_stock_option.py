@@ -33,7 +33,7 @@ class CduElmisStockOption(models.Model):
                 "Batch: %s" % (option.lot or "N/A"),
             ]
             if option.expiration_date:
-                bits.append("Expiry: %s" % option.expiration_date)
+                bits.append("Expiry Date: %s" % option.expiration_date)
             bits.append("Available: %s" % option.stock_on_hand)
             option.name = " | ".join(bits)
 

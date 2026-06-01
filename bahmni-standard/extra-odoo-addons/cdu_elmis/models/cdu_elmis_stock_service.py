@@ -51,6 +51,7 @@ class CduElmisStockService(models.AbstractModel):
                 params=params,
                 headers=auth["headers"],
                 timeout=30,
+                verify=self._get_verify_ssl(),
             )
             response_text = response.text
             success = response.status_code == 200
@@ -105,6 +106,7 @@ class CduElmisStockService(models.AbstractModel):
                 data=json.dumps(payload),
                 headers=auth["headers"],
                 timeout=30,
+                verify=self._get_verify_ssl(),
             )
             response_text = response.text
             success = response.status_code == 201
@@ -195,6 +197,7 @@ class CduElmisStockService(models.AbstractModel):
                 data=json.dumps(payload),
                 headers=auth["headers"],
                 timeout=30,
+                verify=self._get_verify_ssl(),
             )
             response_text = response.text
             success = response.status_code == 201
@@ -405,6 +408,7 @@ class CduElmisStockService(models.AbstractModel):
                     "Authorization": "Basic %s" % basic_token,
                 },
                 timeout=30,
+                verify=self._get_verify_ssl(),
             )
         except requests.RequestException as error:
             raise UserError(_("Could not reach eLMIS authentication service: %s") % error) from error
@@ -427,6 +431,10 @@ class CduElmisStockService(models.AbstractModel):
         if not value:
             raise UserError("%s is not configured." % label)
         return value
+
+    def _get_verify_ssl(self):
+        params = self.env["ir.config_parameter"].sudo()
+        return params.get_param("cdu.elmis.verify_ssl", "True") == "True"
 
     def resolve_configured_reference_ids(self):
         params = self.env["ir.config_parameter"].sudo()
@@ -716,6 +724,7 @@ class CduElmisStockService(models.AbstractModel):
             params=params or {},
             headers=self._auth_headers(),
             timeout=30,
+            verify=self._get_verify_ssl(),
         )
         if response.status_code != 200:
             raise UserError("eLMIS reference lookup failed: %s" % response.text[:250])

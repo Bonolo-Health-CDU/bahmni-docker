@@ -76,7 +76,22 @@ class CduPrescription(models.Model):
     secondary_contact = fields.Char(string="Secondary Contact")
     prescriber_name = fields.Char(string="Prescriber Name")
     next_clinical_visit_date = fields.Date(string="Next Clinical Appointment Date")
-    cdu_days_supply = fields.Integer(compute="_compute_cdu_days_supply", store=True,
+    # cdu_days_supply = fields.Integer(compute="_compute_cdu_days_supply", store=True,
+    # )
+    facility_days_supply = fields.Integer(
+        compute="_compute_prescription_durations", 
+        store=True,
+        string="Facility Dispensing Days"
+    )
+    cdu_days_supply = fields.Integer(
+        compute="_compute_prescription_durations", 
+        store=True,
+        string="CDU Dispensing Days"
+    )
+    total_days_supply = fields.Integer(
+        compute="_compute_prescription_durations",
+        store=True,
+        string="Total Dispensing Days"
     )
     state = fields.Selection(
         [
@@ -170,7 +185,8 @@ class CduPrescription(models.Model):
         if not raw_value:
             return False
         prefix = str(raw_value).split('=')[0].strip().lower()
-        match = re.match(r"([a-z0-9]+)", prefix)
+        # Match everything before the first space or equal sign, allowing slashes and hyphens
+        match = re.match(r"([^=\s]+)", prefix)
         return match.group(1) if match else False
     
     def action_remap_regimens(self):
@@ -305,24 +321,27 @@ class CduPrescription(models.Model):
         return missing
 
     @api.depends(
-    "next_drug_pickup_date",
-    "next_clinical_visit_date",
+        "prescription_date",
+        "next_drug_pickup_date",
+        "next_clinical_visit_date",
     )
-    def _compute_cdu_days_supply(self):
-
+    def _compute_prescription_durations(self):
         for prescription in self:
+            # 1. Calculate Facility Days: Next Drug Pickup Date - Prescription Date
+            if prescription.prescription_date and prescription.next_drug_pickup_date:
+                facility_delta = prescription.next_drug_pickup_date - prescription.prescription_date
+                prescription.facility_days_supply = max(0, facility_delta.days)
+            else:
+                prescription.facility_days_supply = 0
 
-            if (
-                prescription.next_drug_pickup_date
-                and prescription.next_clinical_visit_date
-            ):
-
-                delta = (
-                    prescription.next_clinical_visit_date
-                    - prescription.next_drug_pickup_date
-                )
-
-                prescription.cdu_days_supply = delta.days
-
+            # 2. Calculate CDU Days: Next Clinical Appointment Date - Next Drug Pickup Date
+            if prescription.next_drug_pickup_date and prescription.next_clinical_visit_date:
+                cdu_delta = prescription.next_clinical_visit_date - prescription.next_drug_pickup_date
+                prescription.cdu_days_supply = max(0, cdu_delta.days)
             else:
                 prescription.cdu_days_supply = 0
+
+            # 3. Total Days
+            prescription.total_days_supply = (
+                prescription.facility_days_supply + prescription.cdu_days_supply
+            )

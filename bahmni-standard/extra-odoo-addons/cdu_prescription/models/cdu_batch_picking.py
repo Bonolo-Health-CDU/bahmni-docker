@@ -15,12 +15,17 @@ class CduBatchPickingLine(models.Model):
 
     product_id = fields.Many2one(
         "product.product",
-        required=True,
     )
+
+    unmapped_drug_name = fields.Char(string="Drug (Unmapped)")
+
+    elmis_product_name = fields.Char(string="eLMIS Product")
+
+    pack_size = fields.Integer(string="Pack Size")
 
     total_tablets = fields.Float()
 
-    total_bottles = fields.Integer()
+    total_bottles = fields.Float()
 
     prescription_count = fields.Integer()
 
@@ -46,8 +51,9 @@ class CduBatchPatientLine(models.Model):
 
     product_id = fields.Many2one(
         "product.product",
-        required=True,
     )
+
+    drug_name = fields.Char(string="Drug Name")
 
     cdu_days = fields.Integer()
 
@@ -56,3 +62,13 @@ class CduBatchPatientLine(models.Model):
     tablets_required = fields.Float()
 
     bottles_required = fields.Integer()
+
+    facility_days_supply = fields.Integer()
+
+    total_days_supply = fields.Integer()
+
+    facility_bottles_required = fields.Integer()
+
+    cdu_bottles_required = fields.Integer()
+
+    total_bottles_required = fields.Integer()

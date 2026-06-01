@@ -11,6 +11,8 @@
                 <field name="patient_first_name"/>
                 <field name="prescription_date"/>
                 <field name="next_drug_pickup_date"/>
+                <field name="facility_days_supply" optional="show"/>
+                <field name="cdu_days_supply"/>
                 <field name="regimen_prescribed_raw"/>
                 <field name="drug_pickup_point_raw"/>
                 <field name="collection_point_id"/>
@@ -109,6 +111,8 @@
                                     <field name="drug_pickup_point_raw"/>
                                     <field name="collection_point_id"/>
                                     <field name="e_locker_district"/>
+                                    <field name="facility_days_supply" readonly="1"/>
+                                    <field name="cdu_days_supply" readonly="1"/>
                                 </group>
                             </group>
                         </page>

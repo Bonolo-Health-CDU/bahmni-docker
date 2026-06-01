@@ -21,7 +21,7 @@
                 <button name="action_print_elmis_picking_list"
                         string="Print Picking List"
                         type="object"
-                        class="btn-secondary"
+                        class="btn-primary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
                 <button name="action_confirm_elmis_picking"
@@ -73,6 +73,12 @@
                 <span class="o_cdu_batch_readiness_badge o_cdu_batch_readiness_ready" attrs="{'invisible': [('picking_ready', '=', False)]}">
                     <span>Ready for picking</span>
                 </span>
+                <button name="action_print_elmis_picking_list"
+                        string="Print Picking List"
+                        type="object"
+                        class="btn-primary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
                 <span class="o_cdu_batch_readiness_badge o_cdu_batch_readiness_needs_attention" attrs="{'invisible': [('picking_ready', '=', True)]}">
                     <span>Picking needs attention</span>
                 </span>
@@ -81,6 +87,44 @@
                 <div class="o_cdu_batch_readiness_message" attrs="{'invisible': [('picking_ready', '=', True)]}">
                     <field name="picking_readiness_message" readonly="1" nolabel="1"/>
                 </div>
+            </xpath>
+            <xpath expr="//page[field[@name='picking_line_ids']]" position="replace">
+                <page string="Picking Summary"
+                      groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
+                    <field name="picking_line_ids" readonly="1">
+                        <tree>
+                            <field name="unmapped_drug_name" string="Regimen"/>
+                            <field name="elmis_product_name" string="eLMIS Product"/>
+                            <field name="pack_size"/>
+                            <field name="total_tablets" string="Total Units (CDU)"/>
+                            <field name="total_bottles" string="Total Bottles (CDU)"/>
+                            <field name="prescription_count"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+            <xpath expr="//page[field[@name='patient_picking_line_ids']]" position="replace">
+                <page string="Patient Picking Lines"
+                      groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
+                    <field name="patient_picking_line_ids" readonly="1">
+                        <tree>
+                            <field name="patient_id"/>
+                            <field name="product_id" optional="hide"/>
+                            <field name="drug_name" string="Product/Drug"/>
+                            <field name="daily_dose"/>
+                            <field name="facility_days_supply" optional="show"/>
+                            <field name="cdu_days" string="CDU Days" optional="show"/>
+                            <field name="total_days_supply" optional="show"/>
+                            <field name="tablets_required" string="Total Units"/>
+                            <field name="facility_bottles_required" optional="hide"/>
+                            <field name="cdu_bottles_required" string="CDU Bottles"/>
+                            <field name="total_bottles_required" optional="hide"/>
+                            <field name="bottles_required" string="Dispense Qty" 
+                                   help="Operational quantity used for picking." 
+                                   decoration-bf="1"/>
+                        </tree>
+                    </field>
+                </page>
             </xpath>
             <xpath expr="//notebook" position="inside">
                 <page string="Available eLMIS Stock">
@@ -121,7 +165,6 @@
                             <field name="openmrs_drug_uuid" readonly="1" optional="hide"/>
                             <field name="prescription_count" readonly="1"/>
                             <field name="quantity_to_pick" readonly="1"/>
-                            <field name="total_quantity_picked" readonly="1"/>
                         </tree>
                     </field>
                     <div class="o_cdu_elmis_section_title">Fulfil with eLMIS stock</div>
@@ -134,14 +177,14 @@
                             <field name="openmrs_drug_name" readonly="1" optional="hide"/>
                             <field name="required_quantity" readonly="1"/>
                             <field name="selected_stock_option_id" string="Fulfil With" options="{'no_create': True, 'no_open': True}"/>
-                            <field name="selected_orderable_name" readonly="1"/>
-                            <field name="selected_lot" readonly="1"/>
-                            <field name="selected_lot_expiry" readonly="1"/>
-                            <field name="selected_stock_on_hand" readonly="1"/>
+                            <field name="selected_orderable_name" invisible="1" force_save="1"/>
+                            <field name="selected_lot" string="Batch Number" readonly="1" force_save="1"/>
+                            <field name="selected_lot_expiry" string="Expiry Date" readonly="1" force_save="1"/>
+                            <field name="selected_stock_on_hand" readonly="1" force_save="1"/>
                             <field name="quantity_picked"/>
-                            <field name="selected_orderable_code" optional="hide"/>
-                            <field name="selected_orderable_id" optional="hide"/>
-                            <field name="selected_lot_id" optional="hide"/>
+                            <field name="selected_orderable_code" invisible="1" force_save="1"/>
+                            <field name="selected_orderable_id" invisible="1" force_save="1"/>
+                            <field name="selected_lot_id" invisible="1" force_save="1"/>
                         </tree>
                     </field>
                 </page>
