@@ -58,21 +58,19 @@ class CduBatch(models.Model):
     )
 
     def action_confirm_batch(self):
-        result = super().action_confirm_batch()
-        for batch in self:
-            batch._generate_elmis_picking_lines()
-        return {"type": "ir.actions.client", "tag": "reload"}
+        return super().action_confirm_batch()
 
     def action_generate_picking_list(self):
+        self._ensure_batch_workflow_access()
         service = self.env["cdu.elmis.stock.service"]
         if not service.has_valid_current_user_elmis_token():
             return service.action_open_elmis_auth_wizard(batch=self[:1])
-        result = super().action_generate_picking_list()
         for batch in self:
+            if not batch.prescription_ids:
+                continue
             batch._generate_elmis_picking_lines()
             batch._refresh_store_stock_options()
-        if result:
-            return result
+        self.write({"state": "picking_generated"})
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -113,22 +111,22 @@ class CduBatch(models.Model):
 
     def _generate_elmis_picking_lines(self):
         for batch in self:
-            # Always force regeneration of core batch lines to ensure fresh clinical data
-            batch._generate_picking_lines()
-            
-            # Ensure the current transaction sees the new records in the O2M cache
-            batch.invalidate_recordset(['picking_line_ids', 'patient_picking_line_ids'])
+            _patient_line_vals, summary_vals = batch._prepare_picking_line_values()
 
             elmis_line_vals = []
             
-            for item in batch.picking_line_ids:
+            for item in summary_vals:
+                product = self.env["product.product"].browse(item["product_id"]).exists()
                 elmis_line_vals.append({
                     "batch_id": batch.id,
-                    "summary_line_id": item.id,
-                    "openmrs_drug_name": item.product_id.display_name if item.product_id else item.unmapped_drug_name,
-                    "openmrs_drug_uuid": item.product_id.product_tmpl_id.cdu_openmrs_drug_uuid if item.product_id else False,
-                    "quantity_to_pick": item.total_bottles or 1.0,
-                    "prescription_count": item.prescription_count,
+                    "openmrs_drug_name": item["unmapped_drug_name"],
+                    "openmrs_drug_uuid": (
+                        product.product_tmpl_id.cdu_openmrs_drug_uuid
+                        if product
+                        else False
+                    ),
+                    "quantity_to_pick": item["total_bottles"] or 1.0,
+                    "prescription_count": item["prescription_count"],
                 })
             
             # Use write with command tuples to ensure elmis_picking_line_ids is refreshed in UI
@@ -238,6 +236,9 @@ class CduBatch(models.Model):
             if batch.picking_confirmed_at:
                 raise UserError(_("Picking has already been confirmed for %s.") % batch.name)
             batch._ensure_picking_ready()
+            batch._generate_picking_lines()
+            batch.invalidate_recordset(["picking_line_ids", "patient_picking_line_ids"])
+            batch._link_elmis_lines_to_summary_lines()
             batch.stock_event_status = "pending"
             store_items = batch._build_picking_stock_event_items(store_debit_reason)
             production_items = batch._build_picking_stock_event_items(
@@ -301,6 +302,18 @@ class CduBatch(models.Model):
                 "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
+
+    def _link_elmis_lines_to_summary_lines(self):
+        for batch in self:
+            summary_lines_by_name = {
+                (line.unmapped_drug_name or "").strip().lower(): line
+                for line in batch.picking_line_ids
+            }
+            for line in batch.elmis_picking_line_ids:
+                key = (line.openmrs_drug_name or "").strip().lower()
+                summary_line = summary_lines_by_name.get(key)
+                if summary_line:
+                    line.summary_line_id = summary_line.id
 
     def _build_picking_stock_event_items(self, reason_name):
         self.ensure_one()

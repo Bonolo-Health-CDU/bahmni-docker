@@ -4,6 +4,20 @@ from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
 
+E_LOCKER_DISTRICT_SELECTION = [
+    ("Butha-Buthe", "Butha-Buthe"),
+    ("Leribe", "Leribe"),
+    ("Berea", "Berea"),
+    ("Maseru", "Maseru"),
+    ("Mafeteng", "Mafeteng"),
+    ("Mohaleshoek", "Mohaleshoek"),
+    ("Quthing", "Quthing"),
+    ("Qacha's Nek", "Qacha's Nek"),
+    ("Thaba-Tseka", "Thaba-Tseka"),
+    ("Mokhotlong", "Mokhotlong"),
+]
+
+
 class CduBatch(models.Model):
     _name = "cdu.batch"
     _description = "CDU Workload Batch"
@@ -30,7 +44,10 @@ class CduBatch(models.Model):
     )
     filter_next_drug_pickup_date_from = fields.Date(string="Pickup Date From")
     filter_next_drug_pickup_date_to = fields.Date(string="Pickup Date To")
-    filter_e_locker_district = fields.Char(string="E-locker District")
+    filter_e_locker_district = fields.Selection(
+        E_LOCKER_DISTRICT_SELECTION,
+        string="E-locker District",
+    )
     filter_collection_point_id = fields.Many2one(
         "cdu.collection.point",
         string="Collection Location",
@@ -85,7 +102,7 @@ class CduBatch(models.Model):
                 )
             if batch.filter_e_locker_district:
                 domain.append(
-                    ("e_locker_district", "=ilike", batch.filter_e_locker_district.strip())
+                    ("e_locker_district", "=ilike", batch.filter_e_locker_district)
                 )
             prescriptions = self.env["cdu.prescription"].search(
                 domain, order="facility_name, collection_point_id, prescription_date, id"
@@ -107,10 +124,19 @@ class CduBatch(models.Model):
 
     def _get_prescription_domain(self):
         self.ensure_one()
+        current_batch_id = self._origin.id
+
         domain = [
             ("state", "=", "awaiting_batching"),
-            ("batch_id", "=", False),
         ]
+        if current_batch_id:
+            domain.extend([
+                "|",
+                ("batch_id", "=", False),
+                ("batch_id", "=", current_batch_id),
+            ])
+        else:
+            domain.append(("batch_id", "=", False))
         if self.filter_next_drug_pickup_date_from:
             domain.append(("next_drug_pickup_date", ">=", self.filter_next_drug_pickup_date_from))
         if self.filter_next_drug_pickup_date_to:
@@ -130,8 +156,8 @@ class CduBatch(models.Model):
             if not batch.prescription_ids:
                 raise ValidationError(_("Add at least one prescription before confirming the batch."))
             batch.prescription_ids.write({"state": "awaiting_picking"})
-            # Ensure picking summary and patient lines are populated upon confirmation
-            batch._generate_picking_lines()
+            batch.picking_line_ids.unlink()
+            batch.patient_picking_line_ids.unlink()
         self.write({"state": "confirmed"})
         return {"type": "ir.actions.client", "tag": "reload"}
 
@@ -279,8 +305,7 @@ class CduBatch(models.Model):
     #         vals["batch_id"] = self.id
     #         self.env["cdu.batch.picking.line"].create(vals)
 
-    def _generate_picking_lines(self):
-
+    def _prepare_picking_line_values(self):
         self.ensure_one()
 
         summary = {}
@@ -426,12 +451,20 @@ class CduBatch(models.Model):
 
                 summary[key]["prescription_count"] += 1
 
+        return patient_line_vals, list(summary.values())
+
+    def _generate_picking_lines(self):
+
+        self.ensure_one()
+
+        patient_line_vals, summary_vals = self._prepare_picking_line_values()
+
         # -------------------------------------------------------------------------
         # UPDATE ONE2MANY RELATIONS (Native ORM approach for UI consistency)
         # -------------------------------------------------------------------------
         self.write({
             "patient_picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in patient_line_vals],
-            "picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in summary.values()]
+            "picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in summary_vals]
         })
 
         # Ensure the changes are flushed to the database so eLMIS logic can read them
