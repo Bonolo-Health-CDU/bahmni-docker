@@ -1,5 +1,6 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.osv import expression
 
 
 class CduBox(models.Model):
@@ -105,6 +106,12 @@ class CduBox(models.Model):
 
         collection_points = self.line_ids.mapped("collection_point_id")
         pickup_dates = set(self.line_ids.mapped("next_drug_pickup_date"))
+        duplicate_parcels = self._get_duplicate_parcel_labels()
+        if duplicate_parcels:
+            errors.append(
+                _("Each parcel can only be added to a box once. Duplicate parcel(s): %s")
+                % ", ".join(duplicate_parcels)
+            )
         if self.collection_point_id and collection_points != self.collection_point_id:
             errors.append(_("All parcels must match the selected box collection point."))
         if self.next_drug_pickup_date and pickup_dates != {self.next_drug_pickup_date}:
@@ -114,6 +121,28 @@ class CduBox(models.Model):
         if len(pickup_dates) > 1:
             errors.append(_("All parcels in a box must have the same next drug pickup date."))
         return errors
+
+    def _get_duplicate_parcel_labels(self):
+        self.ensure_one()
+        seen = set()
+        duplicates = []
+        for line in self.line_ids:
+            parcel = line.bagging_qa_id
+            if not parcel:
+                continue
+            if parcel.id in seen:
+                duplicates.append(parcel.parcel_reference or parcel.display_name)
+            seen.add(parcel.id)
+        return duplicates
+
+    def _validate_unique_parcels(self):
+        for box in self:
+            duplicate_parcels = box._get_duplicate_parcel_labels()
+            if duplicate_parcels:
+                raise ValidationError(
+                    _("Each parcel can only be added to a box once. Duplicate parcel(s): %s")
+                    % ", ".join(duplicate_parcels)
+                )
 
     def _sync_from_lines(self):
         for box in self:
@@ -385,29 +414,110 @@ class CduBoxLine(models.Model):
 
     _sql_constraints = [
         (
-            "unique_bagging_qa_box_line",
-            "unique(bagging_qa_id)",
-            "This parcel has already been added to a box.",
+            "unique_box_bagging_qa_line",
+            "unique(box_id, bagging_qa_id)",
+            "This parcel has already been added to this box.",
         ),
     ]
+
+    def init(self):
+        self.env.cr.execute(
+            """
+            ALTER TABLE cdu_box_line
+            DROP CONSTRAINT IF EXISTS cdu_box_line_unique_bagging_qa_box_line
+            """
+        )
+        self.env.cr.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                      FROM pg_constraint
+                     WHERE conname = 'cdu_box_line_unique_box_bagging_qa_line'
+                ) THEN
+                    ALTER TABLE cdu_box_line
+                    ADD CONSTRAINT cdu_box_line_unique_box_bagging_qa_line
+                    UNIQUE (box_id, bagging_qa_id);
+                END IF;
+            END $$;
+            """
+        )
 
     @api.model_create_multi
     def create(self, vals_list):
         box_ids = [vals.get("box_id") for vals in vals_list if vals.get("box_id")]
         if self.env["cdu.box"].browse(box_ids).filtered(lambda box: box.state == "confirmed"):
             raise UserError(_("Parcels cannot be added to a confirmed box."))
+        self._validate_create_values_unique_parcels(vals_list)
         records = super().create(vals_list)
         records.mapped("box_id")._sync_from_lines()
+        records.mapped("box_id")._validate_unique_parcels()
         records._validate_box_rule_matches()
         return records
 
     def write(self, vals):
         if self.mapped("box_id").filtered(lambda box: box.state == "confirmed"):
             raise UserError(_("Parcels cannot be changed on a confirmed box."))
+        if "box_id" in vals or "bagging_qa_id" in vals:
+            self._validate_write_values_unique_parcels(vals)
         result = super().write(vals)
         self.mapped("box_id")._sync_from_lines()
+        self.mapped("box_id")._validate_unique_parcels()
         self._validate_box_rule_matches()
         return result
+
+    @api.model
+    def _validate_create_values_unique_parcels(self, vals_list):
+        parcels_by_box = {}
+        for vals in vals_list:
+            box_id = vals.get("box_id")
+            parcel_id = vals.get("bagging_qa_id")
+            if not (box_id and parcel_id):
+                continue
+            parcels_by_box.setdefault(box_id, []).append(parcel_id)
+
+        for box_id, parcel_ids in parcels_by_box.items():
+            if len(parcel_ids) != len(set(parcel_ids)):
+                self._raise_duplicate_parcel_error(parcel_ids[0])
+
+        if not parcels_by_box:
+            return
+
+        domains = []
+        for box_id, parcel_ids in parcels_by_box.items():
+            domains.append(
+                [
+                    ("box_id", "=", box_id),
+                    ("bagging_qa_id", "in", list(set(parcel_ids))),
+                ]
+            )
+        domain = expression.OR(domains)
+        duplicate = self.search(domain, limit=1)
+        if duplicate:
+            self._raise_duplicate_parcel_error(duplicate.bagging_qa_id.id)
+
+    def _validate_write_values_unique_parcels(self, vals):
+        for line in self:
+            box_id = vals.get("box_id", line.box_id.id)
+            parcel_id = vals.get("bagging_qa_id", line.bagging_qa_id.id)
+            if not (box_id and parcel_id):
+                continue
+            duplicate = self.search(
+                [
+                    ("id", "!=", line.id),
+                    ("box_id", "=", box_id),
+                    ("bagging_qa_id", "=", parcel_id),
+                ],
+                limit=1,
+            )
+            if duplicate:
+                self._raise_duplicate_parcel_error(parcel_id)
+
+    def _raise_duplicate_parcel_error(self, parcel_id):
+        parcel = self.env["cdu.bagging.qa"].browse(parcel_id)
+        parcel_label = parcel.parcel_reference or parcel.display_name
+        raise ValidationError(_("%s has already been added to this box.") % parcel_label)
 
     def unlink(self):
         boxes = self.mapped("box_id")
