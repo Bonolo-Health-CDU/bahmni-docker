@@ -32,7 +32,7 @@ class CduPickingLine(models.Model):
         index=True,
     )
     prescription_count = fields.Integer(readonly=True)
-    openmrs_drug_name = fields.Char(string="eRegister Drug / Regimen", required=True)
+    openmrs_drug_name = fields.Char(string="Regimen", required=True)
     openmrs_drug_uuid = fields.Char(
         help="Retained for Phase 2 product mapping from OpenMRS drugs to OpenLMIS orderables.",
     )

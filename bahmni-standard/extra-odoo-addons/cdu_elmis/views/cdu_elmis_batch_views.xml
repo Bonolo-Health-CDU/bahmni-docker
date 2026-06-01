@@ -86,8 +86,7 @@
                 <page string="Picking Summary">
                     <field name="picking_line_ids" readonly="1">
                         <tree>
-                            <field name="product_id" optional="show"/>
-                            <field name="unmapped_drug_name" string="Drug Name"/>
+                            <field name="unmapped_drug_name" string="Regimen"/>
                             <field name="elmis_product_name" string="eLMIS Product"/>
                             <field name="total_tablets" string="Total Units (CDU)"/>
                             <field name="total_bottles" string="Total Bottles (CDU)"/>

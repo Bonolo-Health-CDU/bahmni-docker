@@ -15,14 +15,14 @@ class CduPickingFulfilmentLine(models.Model):
     )
     picking_line_id = fields.Many2one(
         "cdu.picking.line",
-        string="eRegister Drug / Regimen",
+        string="Regimen",
         required=True,
         ondelete="cascade",
         index=True,
         domain="[('batch_id', '=', batch_id)]",
     )
     openmrs_drug_name = fields.Char(
-        string="eRegister Drug / Regimen",
+        string="Regimen",
         related="picking_line_id.openmrs_drug_name",
         store=True,
         readonly=True,
