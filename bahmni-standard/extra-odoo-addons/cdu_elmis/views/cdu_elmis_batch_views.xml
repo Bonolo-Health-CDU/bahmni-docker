@@ -21,7 +21,7 @@
                 <button name="action_print_elmis_picking_list"
                         string="Print Picking List"
                         type="object"
-                        class="btn-secondary"
+                        class="btn-primary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
                 <button name="action_confirm_elmis_picking"
@@ -76,7 +76,7 @@
                 <button name="action_print_elmis_picking_list"
                         string="Print Picking List"
                         type="object"
-                        class="btn-secondary"
+                        class="btn-primary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
                 <span class="o_cdu_batch_readiness_badge o_cdu_batch_readiness_needs_attention" attrs="{'invisible': [('picking_ready', '=', True)]}">
