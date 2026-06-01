@@ -11,6 +11,7 @@
     "data": [
         "security/ir.model.access.csv",
         "data/cdu_elmis_defaults.xml",
+        "data/cdu_collect_go_cron.xml",
         "data/cdu_dispense_sequence.xml",
         "data/cdu_bagging_qa_sequence.xml",
         "data/cdu_box_sequence.xml",
@@ -20,6 +21,7 @@
         "views/cdu_box_views.xml",
         "views/cdu_elmis_settings_views.xml",
         "views/cdu_elmis_api_log_views.xml",
+        "views/cdu_collect_go_api_log_views.xml",
         "views/cdu_elmis_stock_cache_views.xml",
         "views/cdu_elmis_user_views.xml",
         "reports/cdu_picking_list_report.xml",

@@ -78,6 +78,14 @@
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_collect_go_api_logs"
+        name="Collect-and-Go API Logs"
+        parent="cdu_prescription.menu_cdu_configuration"
+        action="action_cdu_collect_go_api_log"
+        sequence="85"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_elmis_stock_cache"
         name="eLMIS Stock Cache"
         parent="cdu_prescription.menu_cdu_configuration"
