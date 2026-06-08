@@ -1,6 +1,5 @@
-import math
-
-from odoo import fields, models
+from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class CduBatchPickingLine(models.Model):
@@ -57,6 +56,22 @@ class CduBatchPatientLine(models.Model):
 
     cdu_days = fields.Integer()
 
+    repeat_days = fields.Integer(string="Repeats in Days")
+
+    served_days = fields.Integer(string="Served Days")
+
+    remaining_days = fields.Integer(string="Remaining Days")
+
+    required_quantity = fields.Float(string="Required Quantity")
+
+    available_quantity = fields.Float(string="Available Quantity")
+
+    picked_quantity = fields.Float(string="Picked Quantity")
+
+    recalculated_next_drug_pickup_date = fields.Date(
+        string="Recalculated Next Drug Pickup Date",
+    )
+
     daily_dose = fields.Float()
 
     tablets_required = fields.Float()
@@ -72,3 +87,13 @@ class CduBatchPatientLine(models.Model):
     cdu_bottles_required = fields.Integer()
 
     total_bottles_required = fields.Integer()
+
+    @api.constrains("repeat_days", "served_days", "remaining_days")
+    def _check_repeat_day_quantities(self):
+        for line in self:
+            if line.repeat_days < 0:
+                raise ValidationError("Repeats in Days cannot be negative.")
+            if line.served_days < 0:
+                raise ValidationError("Served Days cannot be negative.")
+            if line.remaining_days < 0:
+                raise ValidationError("Remaining Days cannot be negative.")

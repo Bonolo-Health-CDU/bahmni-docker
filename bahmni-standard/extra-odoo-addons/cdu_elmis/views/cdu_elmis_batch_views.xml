@@ -18,12 +18,6 @@
                         class="btn-secondary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
-                <button name="action_print_elmis_picking_list"
-                        string="Print Picking List"
-                        type="object"
-                        class="btn-primary"
-                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                        attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
                 <button name="action_confirm_elmis_picking"
                         string="Confirm eLMIS Picking"
                         type="object"
@@ -114,14 +108,14 @@
                             <field name="daily_dose"/>
                             <field name="facility_days_supply" optional="show"/>
                             <field name="cdu_days" string="CDU Days" optional="show"/>
-                            <field name="total_days_supply" optional="show"/>
+                            <field name="repeat_days" string="Repeats in Days" optional="show"/>
+                            <field name="available_quantity" optional="hide"/>
+                            <field name="picked_quantity" optional="show"/>
                             <field name="tablets_required" string="Total Units"/>
                             <field name="facility_bottles_required" optional="hide"/>
                             <field name="cdu_bottles_required" string="CDU Bottles"/>
                             <field name="total_bottles_required" optional="hide"/>
-                            <field name="bottles_required" string="Dispense Qty" 
-                                   help="Operational quantity used for picking." 
-                                   decoration-bf="1"/>
+                            <field name="recalculated_next_drug_pickup_date" optional="show"/>
                         </tree>
                     </field>
                 </page>
@@ -164,6 +158,10 @@
                             <field name="openmrs_drug_name" readonly="1"/>
                             <field name="openmrs_drug_uuid" readonly="1" optional="hide"/>
                             <field name="prescription_count" readonly="1"/>
+                            <field name="required_units" readonly="1" optional="show"/>
+                            <field name="available_quantity" readonly="1" optional="hide"/>
+                            <field name="picked_quantity" readonly="1" optional="show"/>
+                            <field name="remaining_quantity" readonly="1" optional="show"/>
                             <field name="quantity_to_pick" readonly="1"/>
                         </tree>
                     </field>

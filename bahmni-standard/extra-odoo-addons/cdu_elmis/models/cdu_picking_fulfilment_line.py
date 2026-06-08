@@ -156,6 +156,6 @@ class CduPickingFulfilmentLine(models.Model):
             line.selected_lot_expiry = option.expiration_date
             line.selected_stock_on_hand = option.stock_on_hand
             
-            # Ensure quantity picked updates cleanly against the new calculation logic
-            if not line.quantity_picked:
-                line.quantity_picked = line.required_quantity
+            default_quantity = min(line.required_quantity or 0, option.stock_on_hand or 0)
+            if not line.quantity_picked or line.quantity_picked > option.stock_on_hand:
+                line.quantity_picked = default_quantity

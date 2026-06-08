@@ -64,17 +64,18 @@
                                 All prescriptions matching the filters are selected by default. Remove any prescription that should not be included before confirming the batch.
                             </div>
                             <field name="prescription_ids" attrs="{'readonly': [('state', '!=', 'draft')]}">
-                                <tree create="false" delete="true">
-                                    <field name="name"/>
-                                    <field name="patient_identifier" optional="hide"/>
-                                    <field name="patient_first_name"/>
-                                    <field name="facility_name"/>
-                                    <field name="next_drug_pickup_date"/>
-                                    <field name="regimen_prescribed_raw"/>
-                                    <field name="e_locker_district"/>
-                                    <field name="collection_point_id"/>
-                                    <field name="hiv_program_id" optional="hide"/>
-                                    <field name="state"/>
+                                <tree create="false" delete="true" editable="bottom">
+                                    <field name="name" readonly="1"/>
+                                    <field name="patient_identifier" optional="hide" readonly="1"/>
+                                    <field name="patient_first_name" readonly="1"/>
+                                    <field name="facility_name" readonly="1"/>
+                                    <field name="next_drug_pickup_date" readonly="1"/>
+                                    <field name="repeat_days" string="Repeats in Days" class="o_cdu_repeat_days_input_cell"/>
+                                    <field name="regimen_prescribed_raw" readonly="1"/>
+                                    <field name="e_locker_district" readonly="1"/>
+                                    <field name="collection_point_id" readonly="1"/>
+                                    <field name="hiv_program_id" optional="hide" readonly="1"/>
+                                    <field name="state" readonly="1"/>
                                 </tree>
                             </field>
                         </page>
@@ -132,6 +133,12 @@
 
                                     <field name="cdu_days"/>
 
+                                    <field name="repeat_days"/>
+
+                                    <field name="served_days"/>
+
+                                    <field name="remaining_days"/>
+
                                     <field name="total_days_supply"/>
 
 
@@ -140,6 +147,12 @@
 
 
                                     <!-- UNITS -->
+                                    <field name="required_quantity"/>
+
+                                    <field name="available_quantity"/>
+
+                                    <field name="picked_quantity"/>
+
                                     <field name="tablets_required"/>
 
 
@@ -153,6 +166,8 @@
 
                                     <!-- CDU OPERATIONAL -->
                                     <field name="bottles_required"/>
+
+                                    <field name="recalculated_next_drug_pickup_date"/>
 
                                 </tree>
 

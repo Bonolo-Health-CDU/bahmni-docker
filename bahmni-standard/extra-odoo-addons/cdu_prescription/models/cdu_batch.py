@@ -155,6 +155,7 @@ class CduBatch(models.Model):
         for batch in self:
             if not batch.prescription_ids:
                 raise ValidationError(_("Add at least one prescription before confirming the batch."))
+            batch._validate_selected_prescription_repeat_days()
             batch.prescription_ids.write({"state": "awaiting_picking"})
             batch.picking_line_ids.unlink()
             batch.patient_picking_line_ids.unlink()
@@ -244,6 +245,18 @@ class CduBatch(models.Model):
     #             "cdu.batch.picking.line"
     #         ].create(vals)
 
+    def _validate_selected_prescription_repeat_days(self):
+        for batch in self:
+            invalid = batch.prescription_ids.filtered(lambda prescription: prescription.repeat_days <= 0)
+            if invalid:
+                names = ", ".join(invalid.mapped("name")[:5])
+                if len(invalid) > 5:
+                    names += ", ..."
+                raise ValidationError(
+                    _("Repeats in Days must be greater than zero for selected prescriptions: %s")
+                    % names
+                )
+
     # Locate the _generate_picking_lines method in cdu_batch.py and update the loop logic:
 
     # def _generate_picking_lines(self):
@@ -310,6 +323,7 @@ class CduBatch(models.Model):
 
         summary = {}
         patient_line_vals = []
+        self._validate_selected_prescription_repeat_days()
 
         for prescription in self.prescription_ids:
 
@@ -329,9 +343,8 @@ class CduBatch(models.Model):
                 prescription.total_days_supply or 0
             )
 
-            # Keep operational picking computable even when CDU days are not yet present.
-            # Fallback to total days so picking lines are still generated for the batch.
-            operational_days = cdu_days if cdu_days > 0 else total_days
+            repeat_days = prescription.repeat_days or 0
+            operational_days = repeat_days
             if operational_days <= 0:
                 continue
 
@@ -410,10 +423,18 @@ class CduBatch(models.Model):
                     # DAYS
                     "facility_days_supply": facility_days,
                     "cdu_days": cdu_days,
+                    "repeat_days": repeat_days,
+                    "served_days": 0,
+                    "remaining_days": repeat_days,
                     "total_days_supply": total_days,
 
                     # DOSING
                     "daily_dose": daily_dose,
+
+                    # REPEAT-BASED QUANTITY
+                    "required_quantity": cdu_units_required,
+                    "available_quantity": 0,
+                    "picked_quantity": 0,
 
                     # TOTAL TABLETS
                     "tablets_required": total_units_required,
