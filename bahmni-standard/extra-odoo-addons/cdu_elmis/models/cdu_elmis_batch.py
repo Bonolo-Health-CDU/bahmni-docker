@@ -234,8 +234,12 @@ class CduBatch(models.Model):
             
             # Estimate requirement for unmapped drugs: 
             # Assume 1 unit/day and 30 units/pack as a safer fallback than +1
-            cdu_days = prescription.repeat_days or 0
-            estimated_bottles = math.ceil(cdu_days / 30) if cdu_days > 0 else 1
+            effective_days = (
+                prescription.repeat_days
+                or prescription.cdu_days_supply
+                or 0
+            )
+            estimated_bottles = math.ceil(effective_days / 30) if effective_days > 0 else 1
             
             fallback_summary[key]["prescription_count"] += 1
             fallback_summary[key]["quantity_to_pick"] += estimated_bottles
@@ -403,10 +407,14 @@ class CduBatch(models.Model):
                 patient_line.write(
                     {
                         "served_days": 0,
-                        "remaining_days": patient_line.repeat_days,
+                        "remaining_days": patient_line.back_order_days,
                         "available_quantity": 0,
                         "picked_quantity": 0,
+                        "picked_units": 0,
+                        "actual_supplied_days": 0,
+                        "back_order_days": patient_line.cdu_days,
                         "recalculated_next_drug_pickup_date": False,
+                        "calculated_next_pickup_date": False,
                     }
                 )
 
@@ -424,12 +432,13 @@ class CduBatch(models.Model):
 
                 for patient_line in patient_lines.sorted("id"):
                     daily_dose = patient_line.daily_dose or 0
-                    repeat_days = patient_line.repeat_days or 0
-                    required_quantity = daily_dose * repeat_days
+                    effective_repeat_days = patient_line.effective_repeat_days or patient_line.repeat_days or 0
+                    required_quantity = daily_dose * effective_repeat_days
                     line_available_quantity = min(required_quantity, available_units)
                     bottle_quantity = (
                         (patient_line.cdu_bottles_required or 0)
                         * (patient_line.pack_size or pack_size or 30)
+<<<<<<< HEAD
                     )
                     picked_quantity = min(required_quantity, remaining_units)
                     picked_bottle_quantity = min(bottle_quantity, remaining_units)
@@ -437,14 +446,18 @@ class CduBatch(models.Model):
                         min(int(picked_quantity // daily_dose), repeat_days)
                         if daily_dose > 0
                         else 0
+=======
+>>>>>>> c63fca7 (patient picking line display)
                     )
-                    served_quantity = served_days * daily_dose
-                    remaining_days = max(repeat_days - served_days, 0)
+                    picked_bottle_quantity = min(bottle_quantity, remaining_units)
+                    actual_supplied_days = picked_bottle_quantity / daily_dose if daily_dose else 0
+                    served_days = int(actual_supplied_days)
+                    back_order_days = max((patient_line.cdu_days or 0) - actual_supplied_days, 0)
                     recalculated_date = False
                     if patient_line.prescription_id.next_drug_pickup_date:
                         recalculated_date = (
                             patient_line.prescription_id.next_drug_pickup_date
-                            + timedelta(days=served_days)
+                            + timedelta(days=int(actual_supplied_days))
                         )
 
                     patient_line.write(
@@ -452,9 +465,16 @@ class CduBatch(models.Model):
                             "required_quantity": required_quantity,
                             "available_quantity": line_available_quantity,
                             "picked_quantity": picked_bottle_quantity,
+<<<<<<< HEAD
+=======
+                            "picked_units": picked_bottle_quantity,
+                            "actual_supplied_days": actual_supplied_days,
+                            "back_order_days": back_order_days,
+>>>>>>> c63fca7 (patient picking line display)
                             "served_days": served_days,
-                            "remaining_days": remaining_days,
+                            "remaining_days": int(back_order_days),
                             "recalculated_next_drug_pickup_date": recalculated_date,
+                            "calculated_next_pickup_date": recalculated_date,
                         }
                     )
                     available_units = max(available_units - required_quantity, 0)
@@ -466,10 +486,10 @@ class CduBatch(models.Model):
                 )
                 if not lines:
                     continue
-                served_days = min(lines.mapped("served_days") or [0])
+                served_days = min(lines.mapped("actual_supplied_days") or [0])
                 if prescription.next_drug_pickup_date:
                     prescription.next_drug_pickup_date = (
-                        prescription.next_drug_pickup_date + timedelta(days=served_days)
+                        prescription.next_drug_pickup_date + timedelta(days=int(served_days))
                     )
 
     def _link_elmis_lines_to_summary_lines(self):

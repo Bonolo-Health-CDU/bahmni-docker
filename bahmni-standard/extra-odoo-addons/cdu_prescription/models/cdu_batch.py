@@ -1,4 +1,5 @@
 import math
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
@@ -74,10 +75,50 @@ class CduBatch(models.Model):
         string="Patient Picking Lines",
     )
 
+    repeat_apply_regimen_domain_ids = fields.Many2many(
+        "cdu.prescription",
+        compute="_compute_repeat_apply_regimen_domain_ids",
+        string="Regimens In Batch",
+    )
+    repeat_apply_regimen_id = fields.Many2one(
+        "cdu.prescription",
+        string="Regimen",
+    )
+    repeat_apply_days_to_serve = fields.Integer(
+        string="Repeat Days To Serve",
+    )
+
     @api.depends("prescription_ids")
     def _compute_prescription_count(self):
         for batch in self:
             batch.prescription_count = len(batch.prescription_ids)
+
+    def _normalize_repeat_regimen_text(self, regimen):
+        return (regimen or "").strip()
+
+    @api.depends("prescription_ids.regimen_prescribed_raw")
+    def _compute_repeat_apply_regimen_domain_ids(self):
+        for batch in self:
+            regimen_option_ids = []
+            seen_regimens = set()
+            for prescription in batch.prescription_ids:
+                regimen = batch._normalize_repeat_regimen_text(
+                    prescription.regimen_prescribed_raw
+                )
+                key = regimen.casefold()
+                if regimen and key not in seen_regimens:
+                    regimen_option_ids.append(prescription.id)
+                    seen_regimens.add(key)
+            batch.repeat_apply_regimen_domain_ids = [(6, 0, regimen_option_ids)]
+
+    @api.onchange("prescription_ids")
+    def _onchange_prescriptions_repeat_apply_regimen_id(self):
+        for batch in self:
+            if (
+                batch.repeat_apply_regimen_id
+                and batch.repeat_apply_regimen_id not in batch.repeat_apply_regimen_domain_ids
+            ):
+                batch.repeat_apply_regimen_id = False
 
     @api.model
     def create(self, vals):
@@ -156,6 +197,7 @@ class CduBatch(models.Model):
         for batch in self:
             if not batch.prescription_ids:
                 raise ValidationError(_("Add at least one prescription before confirming the batch."))
+            batch.prescription_ids._sync_repeat_days_from_cdu_days()
             batch._validate_selected_prescription_repeat_days()
             batch.prescription_ids.write({"state": "awaiting_picking"})
             batch.picking_line_ids.unlink()
@@ -248,16 +290,75 @@ class CduBatch(models.Model):
 
     def _validate_selected_prescription_repeat_days(self):
         for batch in self:
+<<<<<<< HEAD
             batch.prescription_ids._sync_repeat_days_from_cdu_days()
             invalid = batch.prescription_ids.filtered(lambda prescription: prescription.repeat_days <= 0)
+=======
+            invalid = batch.prescription_ids.filtered(lambda prescription: prescription.repeat_days < 0)
+>>>>>>> c63fca7 (patient picking line display)
             if invalid:
                 names = ", ".join(invalid.mapped("name")[:5])
                 if len(invalid) > 5:
                     names += ", ..."
                 raise ValidationError(
-                    _("Repeats in Days must be greater than zero for selected prescriptions: %s")
+                    _("Repeats in Days cannot be negative for selected prescriptions: %s")
                     % names
                 )
+
+    def action_apply_regimen_repeat_days(self):
+        self.ensure_one()
+        self._ensure_batch_workflow_access()
+        if not self.repeat_apply_regimen_domain_ids:
+            raise ValidationError(_("No regimens found in selected prescriptions."))
+        if not self.repeat_apply_regimen_id:
+            raise ValidationError(_("Select a regimen before applying repeat days."))
+        if self.repeat_apply_days_to_serve <= 0:
+            raise ValidationError(_("Repeat Days To Serve must be greater than zero."))
+
+        selected_regimen = self._normalize_repeat_regimen_text(
+            self.repeat_apply_regimen_id.regimen_prescribed_raw
+        )
+        if not selected_regimen:
+            raise ValidationError(_("No regimens found in selected prescriptions."))
+
+        matching_prescriptions = self.prescription_ids.filtered(
+            lambda prescription: self._normalize_repeat_regimen_text(
+                prescription.regimen_prescribed_raw
+            ).casefold() == selected_regimen.casefold()
+        )
+        if not matching_prescriptions:
+            raise ValidationError(_("No selected prescriptions match the selected regimen."))
+
+        excessive_prescriptions = matching_prescriptions.filtered(
+            lambda prescription: self.repeat_apply_days_to_serve
+            > (prescription.cdu_days_supply or 0)
+        )
+        if excessive_prescriptions:
+            names = ", ".join(excessive_prescriptions.mapped("name")[:5])
+            if len(excessive_prescriptions) > 5:
+                names += ", ..."
+            raise ValidationError(
+                _(
+                    "Repeat Days To Serve cannot exceed CDU Days for matching prescriptions: %s"
+                )
+                % names
+            )
+
+        matching_prescriptions.write({"repeat_days": self.repeat_apply_days_to_serve})
+
+        if self.patient_picking_line_ids:
+            self._generate_picking_lines()
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Applied"),
+                "message": _("Repeat days applied to matching prescriptions."),
+                "type": "success",
+                "sticky": False,
+            },
+        }
 
     # Locate the _generate_picking_lines method in cdu_batch.py and update the loop logic:
 
@@ -345,14 +446,16 @@ class CduBatch(models.Model):
                 prescription.total_days_supply or 0
             )
 
-            repeat_days = prescription.repeat_days or 0
-            operational_days = repeat_days
+            regimen = prescription.regimen_id
+            regimen_repeat_days = 0
+            prescription_repeat_days = prescription.repeat_days or 0
+            effective_repeat_days = prescription_repeat_days or regimen_repeat_days or cdu_days
+            operational_days = effective_repeat_days
             if operational_days <= 0:
                 continue
 
             # If there is no regimen, we create a virtual line for the raw drug name
             # to ensure it appears in the picking list.
-            regimen = prescription.regimen_id
             lines = regimen.line_ids if regimen else [False]
 
             for line in lines:
@@ -395,6 +498,15 @@ class CduBatch(models.Model):
                 cdu_bottles_required = math.ceil(
                     cdu_units_required / pack_size
                 )
+                picked_units = cdu_bottles_required * pack_size
+                actual_supplied_days = picked_units / daily_dose if daily_dose else 0
+                back_order_days = max(cdu_days - actual_supplied_days, 0)
+                calculated_next_pickup_date = False
+                if prescription.next_drug_pickup_date and actual_supplied_days:
+                    calculated_next_pickup_date = (
+                        prescription.next_drug_pickup_date
+                        + timedelta(days=int(actual_supplied_days))
+                    )
 
                 # -------------------------------------------------
                 # TOTAL SUPPLY
@@ -425,9 +537,12 @@ class CduBatch(models.Model):
                     # DAYS
                     "facility_days_supply": facility_days,
                     "cdu_days": cdu_days,
-                    "repeat_days": repeat_days,
-                    "served_days": 0,
-                    "remaining_days": repeat_days,
+                    "regimen_repeat_days": regimen_repeat_days,
+                    "prescription_repeat_days": prescription_repeat_days,
+                    "effective_repeat_days": effective_repeat_days,
+                    "repeat_days": effective_repeat_days,
+                    "served_days": int(actual_supplied_days),
+                    "remaining_days": int(back_order_days),
                     "total_days_supply": total_days,
 
                     # DOSING
@@ -436,8 +551,15 @@ class CduBatch(models.Model):
 
                     # REPEAT-BASED QUANTITY
                     "required_quantity": cdu_units_required,
+                    "required_units": cdu_units_required,
                     "available_quantity": 0,
-                    "picked_quantity": 0,
+                    "picked_quantity": picked_units,
+                    "picked_units": picked_units,
+                    "packs_to_pick": cdu_bottles_required,
+                    "actual_supplied_days": actual_supplied_days,
+                    "back_order_days": back_order_days,
+                    "recalculated_next_drug_pickup_date": calculated_next_pickup_date,
+                    "calculated_next_pickup_date": calculated_next_pickup_date,
 
                     # TOTAL TABLETS
                     "tablets_required": total_units_required,
@@ -494,6 +616,49 @@ class CduBatch(models.Model):
 
         # Ensure the changes are flushed to the database so eLMIS logic can read them
         self.flush_recordset(['patient_picking_line_ids', 'picking_line_ids'])
+
+    def _refresh_picking_summary_from_patient_lines(self):
+        for batch in self:
+            summary = {}
+            for line in batch.patient_picking_line_ids:
+                key = line.product_id.id if line.product_id else line.drug_name
+                if not key:
+                    continue
+                summary.setdefault(
+                    key,
+                    {
+                        "product_id": line.product_id.id if line.product_id else False,
+                        "unmapped_drug_name": line.drug_name,
+                        "pack_size": line.pack_size,
+                        "total_tablets": 0,
+                        "total_bottles": 0,
+                        "prescription_count": 0,
+                    },
+                )
+                summary[key]["total_tablets"] += line.required_units or line.required_quantity
+                summary[key]["total_bottles"] += line.packs_to_pick or line.bottles_required
+                summary[key]["prescription_count"] += 1
+
+            existing_by_key = {
+                line.product_id.id if line.product_id else line.unmapped_drug_name: line
+                for line in batch.picking_line_ids
+            }
+            active_keys = set(summary)
+            for key, vals in summary.items():
+                existing = existing_by_key.get(key)
+                if existing:
+                    existing.write(vals)
+                else:
+                    vals["batch_id"] = batch.id
+                    self.env["cdu.batch.picking.line"].create(vals)
+            batch.picking_line_ids.filtered(
+                lambda line: (line.product_id.id if line.product_id else line.unmapped_drug_name)
+                not in active_keys
+            ).unlink()
+
+            for elmis_line in batch.elmis_picking_line_ids:
+                if elmis_line.summary_line_id:
+                    elmis_line.quantity_to_pick = elmis_line.summary_line_id.total_bottles or 1.0
 
     def action_generate_picking_list(self):
         self._ensure_batch_workflow_access()

@@ -146,7 +146,8 @@ class CduPickingLine(models.Model):
         "quantity_to_pick",
         "summary_line_id.pack_size",
         "summary_line_id.total_tablets",
-        "batch_id.patient_picking_line_ids.repeat_days",
+        "batch_id.patient_picking_line_ids.effective_repeat_days",
+        "batch_id.patient_picking_line_ids.required_units",
         "batch_id.patient_picking_line_ids.daily_dose",
         "batch_id.patient_picking_line_ids.drug_name",
         "batch_id.patient_picking_line_ids.product_id",
@@ -155,10 +156,7 @@ class CduPickingLine(models.Model):
         for line in self:
             matching_patient_lines = line._get_matching_patient_picking_lines()
             pack_size = line.summary_line_id.pack_size or 30
-            required_units = sum(
-                patient_line.daily_dose * patient_line.repeat_days
-                for patient_line in matching_patient_lines
-            )
+            required_units = sum(matching_patient_lines.mapped("required_units"))
 
             line.pack_size = pack_size
             line.required_units = (
@@ -167,7 +165,7 @@ class CduPickingLine(models.Model):
             line.packs_to_pick = line.quantity_to_pick
 
     @api.depends(
-        "batch_id.patient_picking_line_ids.repeat_days",
+        "batch_id.patient_picking_line_ids.effective_repeat_days",
         "batch_id.patient_picking_line_ids.drug_name",
         "batch_id.patient_picking_line_ids.product_id",
         "summary_line_id.product_id",
@@ -176,7 +174,7 @@ class CduPickingLine(models.Model):
     def _compute_repeat_report_fields(self):
         for line in self:
             matching_patient_lines = line._get_matching_patient_picking_lines()
-            total_coverage_days = sum(matching_patient_lines.mapped("repeat_days"))
+            total_coverage_days = sum(matching_patient_lines.mapped("effective_repeat_days"))
 
             if total_coverage_days:
                 estimated_repeats = total_coverage_days / 30.0

@@ -127,6 +127,20 @@ class CduPrescription(models.Model):
         ("unique_source_key", "unique(source_key)", "This eRegister prescription has already been ingested."),
     ]
 
+
+    def name_get(self):
+        if self.env.context.get("display_regimen_prescribed_raw"):
+            return [
+                (
+                    prescription.id,
+                    prescription.regimen_prescribed_raw
+                    or prescription.name
+                    or _("No regimen"),
+                )
+                for prescription in self
+            ]
+        return super().name_get()
+
     @api.model
     def create(self, vals):
 
@@ -145,8 +159,6 @@ class CduPrescription(models.Model):
             regimen = self._find_matching_regimen(vals.get("regimen_prescribed_raw"))
             if regimen:
                 vals["regimen_id"] = regimen.id
-
-        vals.setdefault("repeat_days", self._calculate_repeat_days_from_values(vals))
 
         prescription = super().create(vals)
         prescription._sync_repeat_days_from_cdu_days()
@@ -168,6 +180,7 @@ class CduPrescription(models.Model):
             vals["regimen_id"] = (regimen.id if regimen else False )
         result = super().write(vals)
 
+<<<<<<< HEAD
         if (
             "repeat_days" not in vals
             and (
@@ -184,6 +197,14 @@ class CduPrescription(models.Model):
                 )
                 if repeat_days:
                     prescription.repeat_days = repeat_days
+=======
+        duration_fields = {
+            "prescription_date",
+            "next_drug_pickup_date",
+            "next_clinical_visit_date",
+        }
+        if duration_fields.intersection(vals) and "repeat_days" not in vals:
+>>>>>>> c63fca7 (patient picking line display)
             self._sync_repeat_days_from_cdu_days()
 
         if "next_drug_pickup_date" in vals:
@@ -275,15 +296,7 @@ class CduPrescription(models.Model):
 
     @api.onchange("next_drug_pickup_date", "next_clinical_visit_date")
     def _onchange_repeat_days_dates(self):
-        for prescription in self:
-            if prescription.repeat_days:
-                continue
-            prescription.repeat_days = prescription._calculate_repeat_days_from_values(
-                {
-                    "next_drug_pickup_date": prescription.next_drug_pickup_date,
-                    "next_clinical_visit_date": prescription.next_clinical_visit_date,
-                }
-            )
+        return
 
     @api.onchange("repeat_days")
     def _onchange_repeat_days(self):

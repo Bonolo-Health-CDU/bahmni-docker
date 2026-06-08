@@ -58,6 +58,28 @@
                             <span>prescriptions selected</span>
                         </span>
                     </div>
+                    <div class="o_cdu_repeat_control_panel">
+                        <div class="o_cdu_repeat_control_title">REGIMEN REPEAT DAYS</div>
+                        <field name="repeat_apply_regimen_domain_ids" invisible="1"/>
+                        <div class="o_cdu_repeat_control_fields">
+                            <div class="o_cdu_repeat_control_field">
+                                <label for="repeat_apply_regimen_id"/>
+                                <field name="repeat_apply_regimen_id"
+                                       nolabel="1"
+                                       domain="[('id', 'in', repeat_apply_regimen_domain_ids)]"
+                                       context="{'display_regimen_prescribed_raw': True}"
+                                       options="{'no_create': True, 'no_open': True}"/>
+                            </div>
+                            <div class="o_cdu_repeat_control_field">
+                                <label for="repeat_apply_days_to_serve"/>
+                                <field name="repeat_apply_days_to_serve" nolabel="1"/>
+                            </div>
+                            <button name="action_apply_regimen_repeat_days"
+                                    string="Apply"
+                                    type="object"
+                                    class="btn-primary o_cdu_repeat_apply_button"/>
+                        </div>
+                    </div>
                     <notebook>
                         <page string="Selected Prescriptions">
                             <div class="alert alert-info" role="alert" attrs="{'invisible': [('state', '!=', 'draft')]}">
@@ -71,7 +93,11 @@
                                     <field name="facility_name" readonly="1"/>
                                     <field name="next_drug_pickup_date" readonly="1"/>
                                     <field name="cdu_days_supply" string="CDU Days" readonly="1"/>
+<<<<<<< HEAD
                                     <field name="repeat_days" string="Repeats in Days" class="o_cdu_repeat_days_input_cell"/>
+=======
+                                    <field name="repeat_days" string="Prescription Repeat Days" class="o_cdu_repeat_days_input_cell"/>
+>>>>>>> c63fca7 (patient picking line display)
                                     <field name="regimen_prescribed_raw" readonly="1"/>
                                     <field name="e_locker_district" readonly="1"/>
                                     <field name="collection_point_id" readonly="1"/>
@@ -116,10 +142,9 @@
 
                             <field
                                 name="patient_picking_line_ids"
-                                readonly="1"
                             >
 
-                                <tree create="0" delete="0">
+                                <tree editable="bottom" create="0" delete="0">
 
                                     <!-- PATIENT -->
                                     <field name="patient_id"/>
@@ -132,29 +157,31 @@
                                     <!-- DAYS SUPPLY -->
                                     <field name="facility_days_supply"/>
 
-                                    <field name="cdu_days"/>
+                                    <field name="cdu_days" string="CDU Days" readonly="1"/>
 
-                                    <field name="repeat_days"/>
+                                    <field name="regimen_repeat_days" string="Regimen Repeat Days" readonly="1"/>
 
-                                    <field name="served_days"/>
+                                    <field name="prescription_repeat_days" string="Repeat Days To Serve"/>
 
-                                    <field name="remaining_days"/>
+                                    <field name="effective_repeat_days" string="Effective Repeat Days" readonly="1"/>
 
-                                    <field name="total_days_supply"/>
+                                    <field name="total_days_supply" readonly="1"/>
 
 
                                     <!-- DOSING -->
-                                    <field name="daily_dose"/>
+                                    <field name="daily_dose" readonly="1"/>
 
 
                                     <!-- UNITS -->
-                                    <field name="required_quantity"/>
+                                    <field name="required_units" string="Required Units" readonly="1"/>
 
-                                    <field name="available_quantity"/>
+                                    <field name="packs_to_pick" string="Packs/Bottles To Pick" readonly="1"/>
 
-                                    <field name="picked_quantity"/>
+                                    <field name="picked_units" string="Picked Units" readonly="1"/>
 
-                                    <field name="tablets_required"/>
+                                    <field name="actual_supplied_days" string="Actual Supplied Days" readonly="1"/>
+
+                                    <field name="back_order_days" string="Back Order Days" readonly="1"/>
 
 
                                     <!-- BOTTLES -->
@@ -166,9 +193,9 @@
 
 
                                     <!-- CDU OPERATIONAL -->
-                                    <field name="bottles_required"/>
+                                    <field name="bottles_required" readonly="1"/>
 
-                                    <field name="recalculated_next_drug_pickup_date"/>
+                                    <field name="calculated_next_pickup_date" string="Calculated Next Pickup Date" readonly="1"/>
 
                                 </tree>
 
