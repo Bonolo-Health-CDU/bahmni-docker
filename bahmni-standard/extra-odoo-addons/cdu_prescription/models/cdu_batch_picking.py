@@ -74,6 +74,8 @@ class CduBatchPatientLine(models.Model):
 
     daily_dose = fields.Float()
 
+    pack_size = fields.Integer(string="Pack Size")
+
     tablets_required = fields.Float()
 
     bottles_required = fields.Integer()

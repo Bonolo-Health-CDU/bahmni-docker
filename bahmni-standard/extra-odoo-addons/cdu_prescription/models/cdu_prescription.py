@@ -149,6 +149,7 @@ class CduPrescription(models.Model):
         vals.setdefault("repeat_days", self._calculate_repeat_days_from_values(vals))
 
         prescription = super().create(vals)
+        prescription._sync_repeat_days_from_cdu_days()
         prescription._check_required_next_drug_pickup_date()
 
         return prescription
@@ -183,6 +184,7 @@ class CduPrescription(models.Model):
                 )
                 if repeat_days:
                     prescription.repeat_days = repeat_days
+            self._sync_repeat_days_from_cdu_days()
 
         if "next_drug_pickup_date" in vals:
             self._check_required_next_drug_pickup_date()
@@ -302,6 +304,11 @@ class CduPrescription(models.Model):
         if not next_pickup or not next_clinical:
             return 0
         return max(0, (next_clinical - next_pickup).days)
+
+    def _sync_repeat_days_from_cdu_days(self):
+        for prescription in self:
+            if prescription.repeat_days <= 0 and prescription.cdu_days_supply > 0:
+                prescription.repeat_days = prescription.cdu_days_supply
 
     def _ensure_cdu_groups(self, *xml_ids):
         if self.env.user.has_group("cdu_prescription.group_cdu_admin"):

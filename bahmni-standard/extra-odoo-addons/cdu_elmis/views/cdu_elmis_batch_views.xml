@@ -115,7 +115,9 @@
                             <field name="facility_bottles_required" optional="hide"/>
                             <field name="cdu_bottles_required" string="CDU Bottles"/>
                             <field name="total_bottles_required" optional="hide"/>
-                            <field name="recalculated_next_drug_pickup_date" optional="show"/>
+                            <field name="recalculated_next_drug_pickup_date"
+                                   string="Next Pickup Date (recalculated)"
+                                   optional="show"/>
                         </tree>
                     </field>
                 </page>

@@ -107,6 +107,7 @@ class CduBatch(models.Model):
             prescriptions = self.env["cdu.prescription"].search(
                 domain, order="facility_name, collection_point_id, prescription_date, id"
             )
+            prescriptions._sync_repeat_days_from_cdu_days()
             batch.prescription_ids = [(6, 0, prescriptions.ids)]
 
     @api.constrains(
@@ -247,6 +248,7 @@ class CduBatch(models.Model):
 
     def _validate_selected_prescription_repeat_days(self):
         for batch in self:
+            batch.prescription_ids._sync_repeat_days_from_cdu_days()
             invalid = batch.prescription_ids.filtered(lambda prescription: prescription.repeat_days <= 0)
             if invalid:
                 names = ", ".join(invalid.mapped("name")[:5])
@@ -430,6 +432,7 @@ class CduBatch(models.Model):
 
                     # DOSING
                     "daily_dose": daily_dose,
+                    "pack_size": pack_size,
 
                     # REPEAT-BASED QUANTITY
                     "required_quantity": cdu_units_required,

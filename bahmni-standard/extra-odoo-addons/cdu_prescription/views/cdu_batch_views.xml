@@ -70,6 +70,7 @@
                                     <field name="patient_first_name" readonly="1"/>
                                     <field name="facility_name" readonly="1"/>
                                     <field name="next_drug_pickup_date" readonly="1"/>
+                                    <field name="cdu_days_supply" string="CDU Days" readonly="1"/>
                                     <field name="repeat_days" string="Repeats in Days" class="o_cdu_repeat_days_input_cell"/>
                                     <field name="regimen_prescribed_raw" readonly="1"/>
                                     <field name="e_locker_district" readonly="1"/>
