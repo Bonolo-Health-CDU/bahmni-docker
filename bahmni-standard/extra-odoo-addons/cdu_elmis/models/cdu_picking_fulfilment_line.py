@@ -32,6 +32,41 @@ class CduPickingFulfilmentLine(models.Model):
         related="picking_line_id.quantity_to_pick",
         readonly=True,
     )
+    prescription_count = fields.Integer(
+        string="Rx Count",
+        related="picking_line_id.prescription_count",
+        readonly=True,
+    )
+    estimated_available_repeats = fields.Char(
+        string="Estimated Available Repeats",
+        related="picking_line_id.estimated_available_repeats",
+        readonly=True,
+    )
+    repeats_to_dispense = fields.Char(
+        string="Repeats To Dispense",
+        related="picking_line_id.repeats_to_dispense",
+        readonly=True,
+    )
+    coverage_days = fields.Char(
+        string="Coverage Days",
+        related="picking_line_id.coverage_days",
+        readonly=True,
+    )
+    required_units = fields.Float(
+        string="Required Units/Tablets",
+        related="picking_line_id.required_units",
+        readonly=True,
+    )
+    pack_size = fields.Integer(
+        string="Pack Size",
+        related="picking_line_id.pack_size",
+        readonly=True,
+    )
+    packs_to_pick = fields.Float(
+        string="Packs/Bottles To Pick",
+        related="picking_line_id.packs_to_pick",
+        readonly=True,
+    )
     selected_stock_option_id = fields.Many2one(
         "cdu.elmis.stock.option",
         string="Fulfil With",

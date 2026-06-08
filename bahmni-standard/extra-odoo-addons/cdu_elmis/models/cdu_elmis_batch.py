@@ -1,4 +1,7 @@
+import base64
+import json
 import math
+from io import BytesIO
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -56,6 +59,10 @@ class CduBatch(models.Model):
         "batch_id",
         string="Residual Stock Return Lines",
     )
+    qr_code = fields.Binary(
+        string="Picking List QR Code",
+        compute="_compute_qr_code",
+    )
 
     def action_confirm_batch(self):
         return super().action_confirm_batch()
@@ -108,6 +115,70 @@ class CduBatch(models.Model):
         return self.env["cdu.elmis.stock.service"].action_open_elmis_auth_wizard(
             batch=self[:1]
         )
+
+    @api.depends(
+        "name",
+        "filter_next_drug_pickup_date_from",
+        "filter_next_drug_pickup_date_to",
+        "filter_collection_point_id",
+        "prescription_count",
+    )
+    def _compute_qr_code(self):
+        for batch in self:
+            batch.qr_code = False
+            payload = batch._get_picking_list_qr_payload()
+            if not payload:
+                continue
+            batch.qr_code = batch._generate_qr_code(payload)
+
+    def _get_picking_list_qr_payload(self):
+        self.ensure_one()
+        payload = {
+            "batch": self.name or "",
+            "pickup_from": (
+                fields.Date.to_string(self.filter_next_drug_pickup_date_from)
+                if self.filter_next_drug_pickup_date_from
+                else ""
+            ),
+            "pickup_to": (
+                fields.Date.to_string(self.filter_next_drug_pickup_date_to)
+                if self.filter_next_drug_pickup_date_to
+                else ""
+            ),
+            "collection_location": self.filter_collection_point_id.display_name or "",
+            "prescriptions": self.prescription_count or 0,
+        }
+        return json.dumps(payload, separators=(",", ":"))
+
+    def _generate_qr_code(self, payload):
+        try:
+            import qrcode
+
+            qr = qrcode.QRCode(
+                version=None,
+                error_correction=qrcode.constants.ERROR_CORRECT_M,
+                box_size=4,
+                border=2,
+            )
+            qr.add_data(payload)
+            qr.make(fit=True)
+            image = qr.make_image(fill_color="black", back_color="white")
+            stream = BytesIO()
+            image.save(stream, format="PNG")
+            return base64.b64encode(stream.getvalue())
+        except Exception:
+            try:
+                image = self.env["ir.actions.report"].barcode(
+                    "QR",
+                    payload,
+                    width=80,
+                    height=80,
+                    humanreadable=0,
+                    quiet=1,
+                )
+                return base64.b64encode(image)
+            except Exception:
+                return False
 
     def _generate_elmis_picking_lines(self):
         for batch in self:
