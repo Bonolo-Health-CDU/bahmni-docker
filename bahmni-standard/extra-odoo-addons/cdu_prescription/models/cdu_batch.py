@@ -1,5 +1,6 @@
 import math
 from datetime import timedelta
+from typing import Any
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
@@ -80,12 +81,10 @@ class CduBatch(models.Model):
         compute="_compute_repeat_apply_regimen_domain_ids",
         string="Regimens In Batch",
     )
-    repeat_apply_regimen_id = fields.Many2one(
-        "cdu.prescription",
-        string="Regimen",
-    )
-    repeat_apply_days_to_serve = fields.Integer(
-        string="Repeat Days To Serve",
+    repeat_apply_line_ids = fields.One2many(
+        "cdu.batch.regimen.repeat.line",
+        "batch_id",
+        string="Regimen Repeat Days",
     )
 
     @api.depends("prescription_ids")
@@ -112,19 +111,114 @@ class CduBatch(models.Model):
             batch.repeat_apply_regimen_domain_ids = [(6, 0, regimen_option_ids)]
 
     @api.onchange("prescription_ids")
-    def _onchange_prescriptions_repeat_apply_regimen_id(self):
+    def _onchange_prescriptions_repeat_apply_lines(self):
         for batch in self:
-            if (
-                batch.repeat_apply_regimen_id
-                and batch.repeat_apply_regimen_id not in batch.repeat_apply_regimen_domain_ids
-            ):
-                batch.repeat_apply_regimen_id = False
+            batch._set_single_default_repeat_apply_line()
+
+    def _get_available_repeat_regimen_prescriptions(self):
+        self.ensure_one()
+        used_keys = {
+            self._normalize_repeat_regimen_text(
+                line.regimen_prescription_id.regimen_prescribed_raw
+            ).casefold()
+            for line in self.repeat_apply_line_ids
+            if line.regimen_prescription_id
+        }
+        return self.repeat_apply_regimen_domain_ids.filtered(
+            lambda prescription: self._normalize_repeat_regimen_text(
+                prescription.regimen_prescribed_raw
+            ).casefold() not in used_keys
+        )
+
+    def _ensure_default_repeat_apply_line(self):
+        for batch in self:
+            if batch.repeat_apply_line_ids:
+                continue
+            available_regimens = batch._get_available_repeat_regimen_prescriptions()
+            if available_regimens:
+                batch.repeat_apply_line_ids = [
+                    (
+                        0,
+                        0,
+                        {
+                            "regimen_prescription_id": available_regimens[0].id,
+                            "days_to_serve": 0,
+                        },
+                    )
+                ]
+
+    def _set_single_default_repeat_apply_line(self):
+        for batch in self:
+            available_regimens = batch.repeat_apply_regimen_domain_ids
+            commands = [(5, 0, 0)]
+            if available_regimens:
+                commands.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "regimen_prescription_id": available_regimens[0].id,
+                            "days_to_serve": 0,
+                        },
+                    )
+                )
+            batch.repeat_apply_line_ids = commands
+
+    def action_add_regimen_repeat_line(self):
+        self.ensure_one()
+        self._ensure_batch_workflow_access()
+        available_regimens = self._get_available_repeat_regimen_prescriptions()
+        if not available_regimens:
+            raise ValidationError(_("No additional regimens are available in this batch."))
+        self.write(
+            {
+                "repeat_apply_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "regimen_prescription_id": available_regimens[0].id,
+                            "days_to_serve": 0,
+                        },
+                    )
+                ]
+            }
+        )
+        return {"type": "ir.actions.client", "tag": "reload"}
+
+    def _get_prescriptions_for_repeat_regimen(self, regimen):
+        self.ensure_one()
+        regimen_key = self._normalize_repeat_regimen_text(regimen).casefold()
+        return self.prescription_ids.filtered(
+            lambda prescription: self._normalize_repeat_regimen_text(
+                prescription.regimen_prescribed_raw
+            ).casefold() == regimen_key
+        )
+
+    def _get_regimen_repeat_days_by_key(self):
+        self.ensure_one()
+        return {
+            self._normalize_repeat_regimen_text(
+                line.regimen_prescription_id.regimen_prescribed_raw
+            ).casefold(): line.days_to_serve
+            for line in self.repeat_apply_line_ids
+            if line.regimen_prescription_id and line.days_to_serve > 0
+        }
 
     @api.model
     def create(self, vals):
         if vals.get("name", "/") == "/":
             vals["name"] = self.env["ir.sequence"].next_by_code("cdu.batch") or "/"
-        return super().create(vals)
+        batch = super().create(vals)
+        if "prescription_ids" in vals and "repeat_apply_line_ids" not in vals:
+            batch._set_single_default_repeat_apply_line()
+        return batch
+
+    def write(self, vals):
+        result = super().write(vals)
+        if "prescription_ids" in vals and "repeat_apply_line_ids" not in vals:
+            self._set_single_default_repeat_apply_line()
+        return result
 
     @api.onchange(
         "filter_next_drug_pickup_date_from",
@@ -150,6 +244,7 @@ class CduBatch(models.Model):
             )
             prescriptions._sync_repeat_days_from_cdu_days()
             batch.prescription_ids = [(6, 0, prescriptions.ids)]
+            batch._set_single_default_repeat_apply_line()
 
     @api.constrains(
         "filter_next_drug_pickup_date_from",
@@ -168,7 +263,7 @@ class CduBatch(models.Model):
         self.ensure_one()
         current_batch_id = self._origin.id
 
-        domain = [
+        domain: list[Any] = [
             ("state", "=", "awaiting_batching"),
         ]
         if current_batch_id:
@@ -290,12 +385,8 @@ class CduBatch(models.Model):
 
     def _validate_selected_prescription_repeat_days(self):
         for batch in self:
-<<<<<<< HEAD
             batch.prescription_ids._sync_repeat_days_from_cdu_days()
-            invalid = batch.prescription_ids.filtered(lambda prescription: prescription.repeat_days <= 0)
-=======
             invalid = batch.prescription_ids.filtered(lambda prescription: prescription.repeat_days < 0)
->>>>>>> c63fca7 (patient picking line display)
             if invalid:
                 names = ", ".join(invalid.mapped("name")[:5])
                 if len(invalid) > 5:
@@ -304,47 +395,69 @@ class CduBatch(models.Model):
                     _("Repeats in Days cannot be negative for selected prescriptions: %s")
                     % names
                 )
+            excessive = batch.prescription_ids.filtered(
+                lambda prescription: prescription.repeat_days
+                and prescription.repeat_days > (prescription.cdu_days_supply or 0)
+            )
+            if excessive:
+                names = ", ".join(excessive.mapped("name")[:5])
+                if len(excessive) > 5:
+                    names += ", ..."
+                raise ValidationError(
+                    _("Repeat Days cannot exceed CDU Days for selected prescriptions: %s")
+                    % names
+                )
 
     def action_apply_regimen_repeat_days(self):
         self.ensure_one()
         self._ensure_batch_workflow_access()
-        if not self.repeat_apply_regimen_domain_ids:
-            raise ValidationError(_("No regimens found in selected prescriptions."))
-        if not self.repeat_apply_regimen_id:
-            raise ValidationError(_("Select a regimen before applying repeat days."))
-        if self.repeat_apply_days_to_serve <= 0:
-            raise ValidationError(_("Repeat Days To Serve must be greater than zero."))
-
-        selected_regimen = self._normalize_repeat_regimen_text(
-            self.repeat_apply_regimen_id.regimen_prescribed_raw
-        )
-        if not selected_regimen:
+        if not self.repeat_apply_line_ids:
             raise ValidationError(_("No regimens found in selected prescriptions."))
 
-        matching_prescriptions = self.prescription_ids.filtered(
-            lambda prescription: self._normalize_repeat_regimen_text(
-                prescription.regimen_prescribed_raw
-            ).casefold() == selected_regimen.casefold()
-        )
-        if not matching_prescriptions:
-            raise ValidationError(_("No selected prescriptions match the selected regimen."))
+        seen_regimen_keys = set()
+        applied_prescription_count = 0
+        for line in self.repeat_apply_line_ids:
+            if not line.regimen_prescription_id:
+                raise ValidationError(_("Regimen is required."))
+            if line.days_to_serve <= 0:
+                raise ValidationError(_("Repeat Days To Serve must be greater than zero."))
 
-        excessive_prescriptions = matching_prescriptions.filtered(
-            lambda prescription: self.repeat_apply_days_to_serve
-            > (prescription.cdu_days_supply or 0)
-        )
-        if excessive_prescriptions:
-            names = ", ".join(excessive_prescriptions.mapped("name")[:5])
-            if len(excessive_prescriptions) > 5:
-                names += ", ..."
-            raise ValidationError(
-                _(
-                    "Repeat Days To Serve cannot exceed CDU Days for matching prescriptions: %s"
-                )
-                % names
+            selected_regimen = self._normalize_repeat_regimen_text(
+                line.regimen_prescription_id.regimen_prescribed_raw
             )
+            selected_regimen_key = selected_regimen.casefold()
+            if selected_regimen_key in seen_regimen_keys:
+                raise ValidationError(
+                    _("The same regimen cannot appear more than once.")
+                )
+            seen_regimen_keys.add(selected_regimen_key)
 
-        matching_prescriptions.write({"repeat_days": self.repeat_apply_days_to_serve})
+            matching_prescriptions = self._get_prescriptions_for_repeat_regimen(
+                selected_regimen
+            )
+            if not matching_prescriptions:
+                continue
+            excessive_prescriptions = matching_prescriptions.filtered(
+                lambda prescription: line.days_to_serve
+                > (prescription.cdu_days_supply or 0)
+            )
+            if excessive_prescriptions:
+                names = ", ".join(excessive_prescriptions.mapped("name")[:5])
+                if len(excessive_prescriptions) > 5:
+                    names += ", ..."
+                raise ValidationError(
+                    _(
+                        "%(regimen)s: Repeat Days To Serve cannot exceed CDU Days "
+                        "for matching prescriptions: %(names)s"
+                    )
+                    % {"regimen": selected_regimen, "names": names}
+                )
+
+            matching_prescriptions.write({"repeat_days": line.days_to_serve})
+            applied_prescription_count += len(matching_prescriptions)
+
+        if not applied_prescription_count:
+            raise ValidationError(_("No selected prescriptions match the configured regimens."))
 
         if self.patient_picking_line_ids:
             self._generate_picking_lines()
@@ -354,7 +467,10 @@ class CduBatch(models.Model):
             "tag": "display_notification",
             "params": {
                 "title": _("Applied"),
-                "message": _("Repeat days applied to matching prescriptions."),
+                "message": _(
+                    "Repeat days applied to %(count)s matching prescription(s)."
+                )
+                % {"count": applied_prescription_count},
                 "type": "success",
                 "sticky": False,
             },
@@ -427,6 +543,7 @@ class CduBatch(models.Model):
         summary = {}
         patient_line_vals = []
         self._validate_selected_prescription_repeat_days()
+        regimen_repeat_days_by_key = self._get_regimen_repeat_days_by_key()
 
         for prescription in self.prescription_ids:
 
@@ -447,7 +564,10 @@ class CduBatch(models.Model):
             )
 
             regimen = prescription.regimen_id
-            regimen_repeat_days = 0
+            regimen_key = self._normalize_repeat_regimen_text(
+                prescription.regimen_prescribed_raw
+            ).casefold()
+            regimen_repeat_days = regimen_repeat_days_by_key.get(regimen_key, 0)
             prescription_repeat_days = prescription.repeat_days or 0
             effective_repeat_days = prescription_repeat_days or regimen_repeat_days or cdu_days
             operational_days = effective_repeat_days
@@ -456,11 +576,11 @@ class CduBatch(models.Model):
 
             # If there is no regimen, we create a virtual line for the raw drug name
             # to ensure it appears in the picking list.
-            lines = regimen.line_ids if regimen else [False]
+            lines = regimen.line_ids if regimen else [None]
 
             for line in lines:
 
-                if line:
+                if line is not None:
                     product = line.product_id
                     daily_dose = line.daily_dose or 0
                     pack_size = product.product_tmpl_id.cdu_pack_size or 30
@@ -674,3 +794,50 @@ class CduBatch(models.Model):
             "state": "picking_generated"
         })
         return {"type": "ir.actions.client", "tag": "reload"}
+
+
+class CduBatchRegimenRepeatLine(models.Model):
+    _name = "cdu.batch.regimen.repeat.line"
+    _description = "CDU Batch Regimen Repeat Days"
+    _order = "id"
+
+    batch_id = fields.Many2one(
+        "cdu.batch",
+        required=True,
+        ondelete="cascade",
+    )
+    regimen_prescription_id = fields.Many2one(
+        "cdu.prescription",
+        string="Regimen",
+    )
+    days_to_serve = fields.Integer(
+        string="Repeat Days To Serve",
+    )
+
+    def _get_regimen_key(self):
+        self.ensure_one()
+        return self.batch_id._normalize_repeat_regimen_text(
+            self.regimen_prescription_id.regimen_prescribed_raw
+        ).casefold()
+
+    @api.constrains("batch_id", "regimen_prescription_id")
+    def _check_unique_regimen_per_batch(self):
+        for line in self:
+            if not line.batch_id or not line.regimen_prescription_id:
+                continue
+            if line.regimen_prescription_id not in line.batch_id.repeat_apply_regimen_domain_ids:
+                raise ValidationError(
+                    _("Regimen must be selected from prescriptions in the current batch.")
+                )
+            regimen_key = line._get_regimen_key()
+            duplicate = line.batch_id.repeat_apply_line_ids.filtered(
+                lambda other: (
+                    other != line
+                    and other.regimen_prescription_id
+                    and other._get_regimen_key() == regimen_key
+                )
+            )
+            if duplicate:
+                raise ValidationError(
+                    _("The same regimen cannot appear more than once.")
+                )

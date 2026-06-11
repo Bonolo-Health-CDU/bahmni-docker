@@ -438,16 +438,6 @@ class CduBatch(models.Model):
                     bottle_quantity = (
                         (patient_line.cdu_bottles_required or 0)
                         * (patient_line.pack_size or pack_size or 30)
-<<<<<<< HEAD
-                    )
-                    picked_quantity = min(required_quantity, remaining_units)
-                    picked_bottle_quantity = min(bottle_quantity, remaining_units)
-                    served_days = (
-                        min(int(picked_quantity // daily_dose), repeat_days)
-                        if daily_dose > 0
-                        else 0
-=======
->>>>>>> c63fca7 (patient picking line display)
                     )
                     picked_bottle_quantity = min(bottle_quantity, remaining_units)
                     actual_supplied_days = picked_bottle_quantity / daily_dose if daily_dose else 0
@@ -465,12 +455,9 @@ class CduBatch(models.Model):
                             "required_quantity": required_quantity,
                             "available_quantity": line_available_quantity,
                             "picked_quantity": picked_bottle_quantity,
-<<<<<<< HEAD
-=======
                             "picked_units": picked_bottle_quantity,
                             "actual_supplied_days": actual_supplied_days,
                             "back_order_days": back_order_days,
->>>>>>> c63fca7 (patient picking line display)
                             "served_days": served_days,
                             "remaining_days": int(back_order_days),
                             "recalculated_next_drug_pickup_date": recalculated_date,

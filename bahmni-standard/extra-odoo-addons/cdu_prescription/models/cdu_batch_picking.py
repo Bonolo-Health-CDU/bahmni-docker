@@ -126,6 +126,13 @@ class CduBatchPatientLine(models.Model):
         for line in self:
             if line.prescription_repeat_days < 0:
                 raise ValidationError("Prescription Repeat Days cannot be negative.")
+            if (
+                line.prescription_repeat_days
+                and line.prescription_repeat_days > (line.cdu_days or 0)
+            ):
+                raise ValidationError(
+                    "Prescription Repeat Days cannot exceed CDU Days."
+                )
 
     @api.onchange("prescription_repeat_days")
     def _onchange_prescription_repeat_days(self):

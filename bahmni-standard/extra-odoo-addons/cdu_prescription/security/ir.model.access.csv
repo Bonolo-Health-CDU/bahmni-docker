@@ -5,6 +5,8 @@ access_cdu_prescription_dispensing_officer,cdu.prescription dispensing officer,m
 access_cdu_prescription_admin,cdu.prescription admin,model_cdu_prescription,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_batch_dispensing_officer,cdu.batch dispensing officer,model_cdu_batch,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0
 access_cdu_batch_admin,cdu.batch admin,model_cdu_batch,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_batch_regimen_repeat_line_dispensing_officer,cdu.batch.regimen.repeat.line dispensing officer,model_cdu_batch_regimen_repeat_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
+access_cdu_batch_regimen_repeat_line_admin,cdu.batch.regimen.repeat.line admin,model_cdu_batch_regimen_repeat_line,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_facility_data_clerk,cdu.facility data clerk,model_cdu_facility,cdu_prescription.group_cdu_data_clerk,1,0,0,0
 access_cdu_facility_call_agent,cdu.facility call agent,model_cdu_facility,cdu_prescription.group_cdu_call_agent,1,0,0,0
 access_cdu_facility_dispensing_officer,cdu.facility dispensing officer,model_cdu_facility,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0

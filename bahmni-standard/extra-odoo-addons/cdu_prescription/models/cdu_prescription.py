@@ -180,31 +180,12 @@ class CduPrescription(models.Model):
             vals["regimen_id"] = (regimen.id if regimen else False )
         result = super().write(vals)
 
-<<<<<<< HEAD
-        if (
-            "repeat_days" not in vals
-            and (
-                "next_drug_pickup_date" in vals
-                or "next_clinical_visit_date" in vals
-            )
-        ):
-            for prescription in self.filtered(lambda record: not record.repeat_days):
-                repeat_days = prescription._calculate_repeat_days_from_values(
-                    {
-                        "next_drug_pickup_date": prescription.next_drug_pickup_date,
-                        "next_clinical_visit_date": prescription.next_clinical_visit_date,
-                    }
-                )
-                if repeat_days:
-                    prescription.repeat_days = repeat_days
-=======
         duration_fields = {
             "prescription_date",
             "next_drug_pickup_date",
             "next_clinical_visit_date",
         }
         if duration_fields.intersection(vals) and "repeat_days" not in vals:
->>>>>>> c63fca7 (patient picking line display)
             self._sync_repeat_days_from_cdu_days()
 
         if "next_drug_pickup_date" in vals:

@@ -121,13 +121,8 @@
                             <field name="facility_bottles_required" optional="hide"/>
                             <field name="cdu_bottles_required" string="CDU Bottles" optional="hide"/>
                             <field name="total_bottles_required" optional="hide"/>
-<<<<<<< HEAD
-                            <field name="recalculated_next_drug_pickup_date"
-                                   string="Next Pickup Date (recalculated)"
-=======
                             <field name="calculated_next_pickup_date"
                                    string="Calculated Next Pickup Date"
->>>>>>> c63fca7 (patient picking line display)
                                    optional="show"/>
                         </tree>
                     </field>
