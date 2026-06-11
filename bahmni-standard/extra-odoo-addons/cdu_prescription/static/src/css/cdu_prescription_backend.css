@@ -41,6 +41,87 @@
     border-left: 4px solid #005baa;
 }
 
+.o_cdu_prescription_form .o_form_statusbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    overflow: hidden;
+    padding: 6px 12px;
+}
+
+.o_cdu_prescription_form .o_form_statusbar .o_statusbar_buttons {
+    align-items: center;
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 52%;
+    min-width: 0;
+}
+
+.o_cdu_prescription_form .o_form_statusbar .o_statusbar_buttons > button {
+    align-items: center;
+    border-radius: 4px;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 700;
+    justify-content: center;
+    line-height: 1.1;
+    margin: 0;
+    min-height: 30px;
+    padding: 6px 12px;
+    white-space: nowrap;
+}
+
+.o_cdu_prescription_form .o_form_statusbar .o_field_statusbar {
+    flex: 0 1 auto;
+    margin-left: auto;
+    max-width: 60%;
+    min-width: 0;
+}
+
+.o_cdu_prescription_form .o_form_statusbar .o_statusbar_status {
+    display: flex !important;
+    flex: 0 1 auto;
+    flex-direction: row-reverse;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-top: 2px;
+}
+
+.o_cdu_prescription_form .o_form_statusbar .o_statusbar_status .o_arrow_button {
+    flex: 0 0 auto;
+    float: none;
+    font-size: 12px;
+    min-height: 34px;
+    white-space: nowrap;
+}
+
+@media (max-width: 992px) {
+    .o_cdu_prescription_form .o_form_statusbar {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+
+    .o_cdu_prescription_form .o_form_statusbar .o_statusbar_buttons,
+    .o_cdu_prescription_form .o_form_statusbar .o_field_statusbar,
+    .o_cdu_prescription_form .o_form_statusbar .o_statusbar_status {
+        flex-basis: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .o_cdu_prescription_form .o_form_statusbar .o_statusbar_status {
+        justify-content: flex-start;
+    }
+}
+
 .o_cdu_batch_form .oe_title {
     margin-bottom: 8px;
 }
