@@ -111,6 +111,163 @@ class CduBatchPatientLine(models.Model):
 
     total_bottles_required = fields.Integer()
 
+    medication_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Medication",
+    )
+
+    regimen_code_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Regimen Code",
+    )
+
+    daily_dose_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Daily Dose Display",
+    )
+
+    days_to_dispense_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Days to Dispense",
+    )
+
+    to_pick_pack_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Packs to Pick",
+    )
+
+    to_pick_units_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Units to Pick",
+    )
+
+    next_pickup_supply_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Supply Coverage",
+    )
+
+    picking_variance_label = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Picking Variance",
+    )
+
+    picking_variance_class = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Picking Variance Style",
+    )
+
+    prescribed_days_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Prescribed",
+    )
+
+    facility_cap_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Facility Cap",
+    )
+
+    cdu_cycle_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="CDU Cycle",
+    )
+
+    regimen_override_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Regimen Override",
+    )
+
+    required_units_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Required",
+    )
+
+    picked_units_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Picked",
+    )
+
+    back_order_display = fields.Char(
+        compute="_compute_picking_display_fields",
+        string="Back Order",
+    )
+
+    def _format_cdu_number(self, value, decimals=0):
+        value = value or 0
+        if decimals:
+            formatted = f"{value:.{decimals}f}"
+            return formatted.rstrip("0").rstrip(".") if "." in formatted else formatted
+        if float(value).is_integer():
+            return str(int(value))
+        return f"{value:.2f}".rstrip("0").rstrip(".")
+
+    def _format_cdu_units(self, value, decimals=0):
+        return "%s units" % self._format_cdu_number(value, decimals=decimals)
+
+    def _format_cdu_days(self, value, decimals=0):
+        return "%s days" % self._format_cdu_number(value, decimals=decimals)
+
+    @api.depends(
+        "patient_id",
+        "product_id",
+        "drug_name",
+        "prescription_id.regimen_prescribed_raw",
+        "daily_dose",
+        "effective_repeat_days",
+        "prescription_repeat_days",
+        "regimen_repeat_days",
+        "facility_days_supply",
+        "cdu_days",
+        "required_units",
+        "picked_units",
+        "packs_to_pick",
+        "actual_supplied_days",
+        "back_order_days",
+    )
+    def _compute_picking_display_fields(self):
+        for line in self:
+            medication = line.product_id.display_name or line.drug_name or ""
+            regimen_code = line.prescription_id.regimen_prescribed_raw or line.drug_name or ""
+            daily_dose = line.daily_dose or 0
+            effective_days = line.effective_repeat_days or line.prescription_repeat_days or 0
+            picked_units = line.picked_units or 0
+            required_units = line.required_units or line.required_quantity or 0
+            extra_units = max(picked_units - required_units, 0)
+            short_units = max((line.back_order_days or 0) * daily_dose, 0)
+
+            line.medication_display = medication
+            line.regimen_code_display = regimen_code
+            line.daily_dose_display = "%s/day" % self._format_cdu_number(daily_dose)
+            line.days_to_dispense_display = self._format_cdu_days(effective_days)
+            line.to_pick_pack_display = "%s packs" % self._format_cdu_number(line.packs_to_pick)
+            line.to_pick_units_display = self._format_cdu_units(picked_units or required_units)
+            line.next_pickup_supply_display = "%s supply" % self._format_cdu_days(
+                line.actual_supplied_days,
+                decimals=0,
+            )
+            line.prescribed_days_display = self._format_cdu_days(
+                line.prescription_repeat_days or effective_days
+            )
+            line.facility_cap_display = self._format_cdu_days(line.facility_days_supply)
+            line.cdu_cycle_display = self._format_cdu_days(line.cdu_days)
+            line.regimen_override_display = (
+                self._format_cdu_days(line.regimen_repeat_days)
+                if line.regimen_repeat_days and line.regimen_repeat_days != line.cdu_days
+                else "None"
+            )
+            line.required_units_display = self._format_cdu_units(required_units, decimals=2)
+            line.picked_units_display = self._format_cdu_units(picked_units, decimals=2)
+            line.back_order_display = self._format_cdu_days(line.back_order_days, decimals=2)
+
+            if short_units:
+                line.picking_variance_label = "Short %s" % self._format_cdu_units(short_units)
+                line.picking_variance_class = "is-warning"
+            elif extra_units:
+                line.picking_variance_label = "+%s" % self._format_cdu_units(extra_units)
+                line.picking_variance_class = "is-info"
+            else:
+                line.picking_variance_label = False
+                line.picking_variance_class = False
+
     @api.constrains("repeat_days", "served_days", "remaining_days")
     def _check_repeat_day_quantities(self):
         for line in self:
@@ -150,12 +307,7 @@ class CduBatchPatientLine(models.Model):
 
     def _apply_repeat_day_calculation(self):
         for line in self:
-            effective_days = (
-                line.prescription_repeat_days
-                or line.regimen_repeat_days
-                or line.cdu_days
-                or 0
-            )
+            effective_days = line.prescription_repeat_days
             daily_dose = line.daily_dose or 0
             pack_size = line.pack_size or 30
             required_units = daily_dose * effective_days

@@ -37,7 +37,7 @@
                             <h3>Pickup Dates</h3>
                             <div class="o_cdu_batch_card_fields">
                                 <label for="filter_next_drug_pickup_date_from"/>
-                                <field name="filter_next_drug_pickup_date_from" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                                <field name="filter_next_drug_pickup_date_from" nolabel="1" required="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                                 <label for="filter_next_drug_pickup_date_to"/>
                                 <field name="filter_next_drug_pickup_date_to" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                             </div>
@@ -72,6 +72,7 @@
                                            domain="[('id', 'in', parent.repeat_apply_regimen_domain_ids)]"
                                            context="{'display_regimen_prescribed_raw': True}"
                                            class="o_cdu_regimen_repeat_regimen_cell"
+                                           placeholder="--Select Regimen--"
                                            options="{'no_create': True, 'no_open': True}"/>
                                     <field name="days_to_serve"
                                            string="Repeat Days To Serve"
@@ -101,7 +102,7 @@
                                     <field name="facility_name" readonly="1"/>
                                     <field name="next_drug_pickup_date" readonly="1"/>
                                     <field name="cdu_days_supply" string="CDU Days" readonly="1"/>
-                                    <field name="repeat_days" string="Prescription Repeat Days" class="o_cdu_repeat_days_input_cell"/>
+                                    <field name="repeat_days" string="Repeats in Days" class="o_cdu_repeat_days_input_cell"/>
                                     <field name="regimen_prescribed_raw" readonly="1"/>
                                     <field name="e_locker_district" readonly="1"/>
                                     <field name="collection_point_id" readonly="1"/>

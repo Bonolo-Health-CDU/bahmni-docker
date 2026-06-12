@@ -98,32 +98,112 @@
             <xpath expr="//page[field[@name='patient_picking_line_ids']]" position="replace">
                 <page string="Patient Picking Lines"
                       groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
-                    <field name="patient_picking_line_ids">
-                        <tree editable="bottom" create="0" delete="0">
-                            <field name="patient_id"/>
-                            <field name="product_id" optional="hide"/>
-                            <field name="drug_name" string="Product/Drug"/>
-                            <field name="daily_dose" readonly="1"/>
-                            <field name="facility_days_supply" optional="show"/>
-                            <field name="cdu_days" string="CDU Days" optional="show" readonly="1"/>
-                            <field name="regimen_repeat_days" string="Regimen Repeat Days" optional="show" readonly="1"/>
-                            <field name="prescription_repeat_days" string="Repeat Days To Serve" optional="show"/>
-                            <field name="effective_repeat_days" string="Effective Repeat Days" optional="show" readonly="1"/>
-                            <field name="required_units" string="Required Units" readonly="1"/>
-                            <field name="packs_to_pick" string="Packs/Bottles To Pick" readonly="1"/>
-                            <field name="picked_units" string="Picked Units" readonly="1"/>
-                            <field name="actual_supplied_days" string="Actual Supplied Days" readonly="1"/>
-                            <field name="back_order_days" string="Back Order Days" readonly="1"/>
-                            <field name="available_quantity" optional="hide"/>
-                            <field name="tablets_required" string="Total Units" optional="hide"/>
-                            <field name="facility_bottles_required" optional="hide"/>
-                            <field name="cdu_bottles_required" string="CDU Bottles" optional="hide"/>
-                            <field name="total_bottles_required" optional="hide"/>
-                            <field name="calculated_next_pickup_date"
-                                   string="Calculated Next Pickup Date"
-                                   optional="show"/>
-                        </tree>
-                    </field>
+                    <div class="o_cdu_patient_pick_table">
+                        <div class="o_cdu_patient_pick_header">
+                            <span>Patient</span>
+                            <span>Medication</span>
+                            <span>Daily dose</span>
+                            <span>Days to dispense</span>
+                            <span>To pick</span>
+                            <span>Next pickup</span>
+                            <span/>
+                        </div>
+                        <field name="patient_picking_line_ids"
+                               mode="kanban"
+                               readonly="1"
+                               class="o_cdu_patient_pick_lines">
+                            <kanban create="0" delete="0" edit="0" class="o_cdu_patient_pick_kanban">
+                                <field name="patient_id"/>
+                                <field name="medication_display"/>
+                                <field name="regimen_code_display"/>
+                                <field name="daily_dose_display"/>
+                                <field name="days_to_dispense_display"/>
+                                <field name="to_pick_pack_display"/>
+                                <field name="to_pick_units_display"/>
+                                <field name="calculated_next_pickup_date"/>
+                                <field name="next_pickup_supply_display"/>
+                                <field name="picking_variance_label"/>
+                                <field name="picking_variance_class"/>
+                                <field name="prescribed_days_display"/>
+                                <field name="facility_cap_display"/>
+                                <field name="cdu_cycle_display"/>
+                                <field name="regimen_override_display"/>
+                                <field name="required_units_display"/>
+                                <field name="picked_units_display"/>
+                                <field name="back_order_display"/>
+                                <templates>
+                                    <t t-name="kanban-box">
+                                        <details class="o_cdu_patient_pick_record">
+                                            <summary class="o_cdu_patient_pick_summary">
+                                                <span class="o_cdu_patient_pick_cell o_cdu_patient_pick_patient">
+                                                    <field name="patient_id"/>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell o_cdu_patient_pick_medication">
+                                                    <strong><field name="medication_display"/></strong>
+                                                    <small><field name="regimen_code_display"/></small>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <field name="daily_dose_display"/>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <strong><field name="days_to_dispense_display"/></strong>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <strong><field name="to_pick_pack_display"/></strong>
+                                                    <small><field name="to_pick_units_display"/></small>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <strong>
+                                                        <t t-if="record.calculated_next_pickup_date.raw_value">
+                                                            <field name="calculated_next_pickup_date"/>
+                                                        </t>
+                                                        <t t-else="">-</t>
+                                                    </strong>
+                                                    <small><field name="next_pickup_supply_display"/></small>
+                                                    <t t-if="record.picking_variance_label.raw_value">
+                                                        <em t-att-class="'o_cdu_patient_pick_badge ' + (record.picking_variance_class.raw_value || '')">
+                                                            <field name="picking_variance_label"/>
+                                                        </em>
+                                                    </t>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_toggle" aria-hidden="true"/>
+                                            </summary>
+                                            <div class="o_cdu_patient_pick_detail">
+                                                <div>
+                                                    <span>Prescribed</span>
+                                                    <strong><field name="prescribed_days_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Facility cap</span>
+                                                    <strong><field name="facility_cap_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>CDU cycle</span>
+                                                    <strong><field name="cdu_cycle_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Regimen override</span>
+                                                    <strong><field name="regimen_override_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Required</span>
+                                                    <strong><field name="required_units_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Picked</span>
+                                                    <strong><field name="picked_units_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Back order</span>
+                                                    <strong><field name="back_order_display"/></strong>
+                                                </div>
+                                            </div>
+                                        </details>
+                                    </t>
+                                </templates>
+                            </kanban>
+                        </field>
+                    </div>
                 </page>
             </xpath>
             <xpath expr="//notebook" position="inside">
