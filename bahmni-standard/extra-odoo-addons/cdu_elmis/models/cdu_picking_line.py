@@ -60,6 +60,10 @@ class CduPickingLine(models.Model):
         string="Remaining Quantity",
         compute="_compute_stock_quantities",
     )
+    remaining_packs_to_pick = fields.Float(
+        string="Remaining Packs",
+        compute="_compute_stock_quantities",
+    )
     pack_size = fields.Integer(
         string="Pack Size",
         compute="_compute_report_quantity_fields",
@@ -141,6 +145,7 @@ class CduPickingLine(models.Model):
             line.available_quantity = available_packs * pack_size
             line.picked_quantity = picked_packs * pack_size
             line.remaining_quantity = max((line.required_units or 0.0) - line.picked_quantity, 0.0)
+            line.remaining_packs_to_pick = max((line.quantity_to_pick or 0.0) - picked_packs, 0.0)
 
     @api.depends(
         "quantity_to_pick",

@@ -70,26 +70,31 @@ class CduBatch(models.Model):
 
     def action_generate_picking_list(self):
         self._ensure_batch_workflow_access()
+        self.ensure_one()
         service = self.env["cdu.elmis.stock.service"]
         if not service.has_valid_current_user_elmis_token():
             return service.action_open_elmis_auth_wizard(batch=self[:1])
-        for batch in self:
-            if not batch.prescription_ids:
-                continue
-            batch._generate_elmis_picking_lines()
-            batch._refresh_store_stock_options()
-        self.write({"state": "picking_generated"})
+        return self.action_open_elmis_picking_wizard(refresh_stock=True)
+
+    def action_open_elmis_picking_wizard(self, refresh_stock=False):
+        self._ensure_batch_workflow_access()
+        self.ensure_one()
+        if not self.prescription_ids:
+            raise UserError(_("Add prescriptions to this batch before generating a picking list."))
+        if not self.elmis_picking_line_ids:
+            self._generate_elmis_picking_lines()
+        if refresh_stock:
+            self._refresh_store_stock_options()
+        wizard = self.env["cdu.elmis.picking.wizard"].create({"batch_id": self.id})
         return {
-            "type": "ir.actions.client",
-            "tag": "display_notification",
-            "params": {
-                "title": _("Picking list generated"),
-                "message": _(
-                    "eRegister drug lines and available CDU Store stock were prepared."
-                ),
-                "type": "success",
-                "sticky": False,
-                "next": {"type": "ir.actions.client", "tag": "reload"},
+            "type": "ir.actions.act_window",
+            "name": _("Generate Picking List"),
+            "res_model": "cdu.elmis.picking.wizard",
+            "res_id": wizard.id,
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_batch_id": self.id,
             },
         }
 
@@ -359,24 +364,11 @@ class CduBatch(models.Model):
                 batch.stock_event_status = "failed"
                 raise
 
-            for line in batch.elmis_picking_line_ids:
-                if line.summary_line_id:
-                    # Reflect the actual picked quantity in the generated Picking Summary.
-                    picked_qty = line.total_quantity_picked
-                    line.summary_line_id.total_bottles = picked_qty
-                    line.summary_line_id.total_tablets = (
-                        (line.summary_line_id.pack_size or 0) * picked_qty
-                    )
-
-                    # Synchronize the actual eLMIS products picked from fulfilment lines (aggregating if multiple)
-                    names = line.fulfilment_line_ids.filtered("selected_orderable_name").mapped("selected_orderable_name")
-                    if names:
-                        line.summary_line_id.elmis_product_name = ", ".join(sorted(set(names)))
-                    else:
-                        line.summary_line_id.elmis_product_name = line.selected_orderable_name
+            batch._sync_picking_summary_from_elmis_lines()
 
             batch.write(
                 {
+                    "state": "picking_generated",
                     "stock_event_status": "sent",
                     "picking_confirmed_at": fields.Datetime.now(),
                 }
@@ -400,6 +392,26 @@ class CduBatch(models.Model):
                 "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
+
+    def _sync_picking_summary_from_elmis_lines(self):
+        for batch in self:
+            for line in batch.elmis_picking_line_ids:
+                if not line.summary_line_id:
+                    continue
+                picked_qty = line.total_quantity_picked
+                line.summary_line_id.total_bottles = picked_qty
+                line.summary_line_id.total_tablets = (
+                    (line.summary_line_id.pack_size or 0) * picked_qty
+                )
+
+                names = line.fulfilment_line_ids.filtered("selected_orderable_name").mapped(
+                    "selected_orderable_name"
+                )
+                line.summary_line_id.elmis_product_name = (
+                    ", ".join(sorted(set(names)))
+                    if names
+                    else line.selected_orderable_name
+                )
 
     def _apply_repeat_fulfilment_results(self):
         for batch in self:
@@ -751,11 +763,22 @@ class CduBatch(models.Model):
                     _("%s: add at least one eLMIS fulfilment line.")
                     % (picking_line.openmrs_drug_name or _("Picking line"))
                 )
+                continue
+            required_qty = picking_line.quantity_to_pick or 0.0
+            picked_qty = picking_line.total_quantity_picked or 0.0
+            if picked_qty > required_qty + 0.0001:
+                errors.append(
+                    _("%s: picked quantity exceeds required packs by %.2f.")
+                    % (
+                        picking_line.openmrs_drug_name or _("Picking line"),
+                        picked_qty - required_qty,
+                    )
+                )
 
         for index, line in enumerate(self.elmis_picking_fulfilment_line_ids, start=1):
             label = line.openmrs_drug_name or _("Fulfilment line %s") % index
             if not line.selected_stock_option_id:
-                errors.append(_("%s: select an eLMIS stock option in Fulfil With.") % label)
+                errors.append(_("%s: choose an eLMIS stock option before generating the picking list.") % label)
             if line.quantity_picked <= 0:
                 errors.append(_("%s: picked quantity must be greater than zero.") % label)
             if (

@@ -18,13 +18,6 @@
                         class="btn-secondary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
-                <button name="action_confirm_elmis_picking"
-                        string="Confirm eLMIS Picking"
-                        type="object"
-                        class="btn-primary"
-                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                        confirm="This will submit stock movement events to eLMIS: debit CDU Store, then credit CDU Production Floor. Continue?"
-                        attrs="{'invisible': ['|', ('state', 'not in', ('picking_generated', 'printed')), ('picking_confirmed_at', '!=', False)]}"/>
                 <button name="action_calculate_residual_stock"
                         string="Calculate Residual Stock"
                         type="object"
@@ -79,7 +72,12 @@
             </xpath>
             <xpath expr="//div[contains(@class, 'o_cdu_batch_table_context')]" position="after">
                 <div class="o_cdu_batch_readiness_message" attrs="{'invisible': [('picking_ready', '=', True)]}">
-                    <field name="picking_readiness_message" readonly="1" nolabel="1"/>
+                    <span>Picking selections are incomplete.</span>
+                    <button name="action_open_elmis_picking_wizard"
+                            string="Open stock selection"
+                            type="object"
+                            class="btn-link p-0"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
                 </div>
             </xpath>
             <xpath expr="//page[field[@name='picking_line_ids']]" position="replace">
@@ -153,6 +151,12 @@
                     </field>
                 </page>
                 <page string="eLMIS Picking Selections">
+                    <button name="action_open_elmis_picking_wizard"
+                            string="Revise Selection"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'picking_generated')]}"/>
                     <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
                         Each eRegister drug/regimen below is generated from the prescriptions in this batch.
                         Add one or more eLMIS fulfilment rows for each regimen when multiple eLMIS products
@@ -174,7 +178,8 @@
                         </tree>
                     </field>
                     <div class="o_cdu_elmis_section_title">Fulfil with eLMIS stock</div>
-                    <field name="elmis_picking_fulfilment_line_ids">
+                    <field name="elmis_picking_fulfilment_line_ids"
+                           attrs="{'readonly': [('state', 'in', ('picking_generated', 'printed', 'done'))]}">
                         <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
                             <field name="batch_id" invisible="1"/>
                             <field name="picking_line_id"

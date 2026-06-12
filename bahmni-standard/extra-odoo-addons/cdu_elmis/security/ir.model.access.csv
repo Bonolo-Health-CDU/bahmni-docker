@@ -29,3 +29,5 @@ access_cdu_residual_return_line_dispensing_officer,cdu.residual.return.line disp
 access_cdu_residual_return_line_admin,cdu.residual.return.line admin,model_cdu_residual_return_line,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_elmis_auth_wizard_dispensing_officer,cdu.elmis.auth.wizard dispensing officer,model_cdu_elmis_auth_wizard,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
 access_cdu_elmis_auth_wizard_admin,cdu.elmis.auth.wizard admin,model_cdu_elmis_auth_wizard,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_elmis_picking_wizard_dispensing_officer,cdu.elmis.picking.wizard dispensing officer,model_cdu_elmis_picking_wizard,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
+access_cdu_elmis_picking_wizard_admin,cdu.elmis.picking.wizard admin,model_cdu_elmis_picking_wizard,cdu_prescription.group_cdu_admin,1,1,1,1
