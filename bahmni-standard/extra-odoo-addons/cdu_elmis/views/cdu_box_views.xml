@@ -45,7 +45,7 @@
                             type="object"
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            confirm="This will submit the box to Collect-and-Go. Prescriptions will be marked Dispatched only after Collect-and-Go processing succeeds. Continue?"
+                            confirm="This will send the box and its parcels to Collect-and-Go using UpdateParcel. Prescriptions will be marked Dispatched only after Collect-and-Go processing succeeds. Continue?"
                             attrs="{'invisible': ['|', '|', ('state', '!=', 'confirmed'), ('dispatch_status', '=', 'dispatched'), ('collect_go_status', '!=', 'not_submitted')]}"/>
                     <button name="action_retry_collect_go_submission"
                             string="Retry Collect-and-Go"

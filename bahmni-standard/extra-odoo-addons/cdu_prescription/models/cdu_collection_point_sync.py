@@ -19,11 +19,11 @@ class CduCollectionPointSyncConfig(models.Model):
     enabled = fields.Boolean(default=True)
     request_endpoint = fields.Char(
         required=True,
-        default="http://api.bonolohealth.gov.ls/api/Ministry%20of%20Health",
+        default="https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health",
     )
     response_endpoint_template = fields.Char(
         required=True,
-        default="http://api.bonolohealth.gov.ls/api/Ministry%20of%20Health/getMessage/{guid}",
+        default="https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health/getMessage/{guid}",
     )
     request_type = fields.Integer(default=0, required=True)
     request_method = fields.Char(default="GetLocation", required=True)

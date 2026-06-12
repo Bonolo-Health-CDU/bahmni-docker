@@ -146,10 +146,10 @@ class ResConfigSettings(models.TransientModel):
         string="Collect-and-Go CDU Location ID",
         config_parameter="cdu.collect_go.cdu_location_id",
     )
-    cdu_collect_go_dispatch_tracking_status_type = fields.Integer(
+    cdu_collect_go_dispatch_tracking_status_type = fields.Char(
         string="Dispatch Tracking Status Type",
         config_parameter="cdu.collect_go.dispatch_tracking_status_type",
-        default=0,
+        default="ReadyForDispatch",
     )
     cdu_collect_go_standard_parcel_type = fields.Integer(
         string="Standard Parcel Type",

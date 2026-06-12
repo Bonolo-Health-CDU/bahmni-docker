@@ -50,19 +50,26 @@
         <field name="value">changeme</field>
     </record>
 
-    <record id="param_cdu_collect_go_base_url" model="ir.config_parameter">
-        <field name="key">cdu.collect_go.base_url</field>
-        <field name="value">https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health</field>
-    </record>
+    <data noupdate="1">
+        <record id="param_cdu_collect_go_base_url" model="ir.config_parameter">
+            <field name="key">cdu.collect_go.base_url</field>
+            <field name="value">https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health</field>
+        </record>
 
-    <record id="param_cdu_collect_go_cdu_location_id" model="ir.config_parameter">
-        <field name="key">cdu.collect_go.cdu_location_id</field>
-        <field name="value"></field>
-    </record>
+        <record id="param_cdu_collect_go_cdu_location_id" model="ir.config_parameter">
+            <field name="key">cdu.collect_go.cdu_location_id</field>
+            <field name="value">1</field>
+        </record>
+
+        <record id="param_cdu_collect_go_max_retry_count" model="ir.config_parameter">
+            <field name="key">cdu.collect_go.max_retry_count</field>
+            <field name="value">3</field>
+        </record>
+    </data>
 
     <record id="param_cdu_collect_go_dispatch_tracking_status_type" model="ir.config_parameter">
         <field name="key">cdu.collect_go.dispatch_tracking_status_type</field>
-        <field name="value">0</field>
+        <field name="value">ReadyForDispatch</field>
     </record>
 
     <record id="param_cdu_collect_go_standard_parcel_type" model="ir.config_parameter">
@@ -88,11 +95,6 @@
     <record id="param_cdu_collect_go_timeout_seconds" model="ir.config_parameter">
         <field name="key">cdu.collect_go.timeout_seconds</field>
         <field name="value">30</field>
-    </record>
-
-    <record id="param_cdu_collect_go_max_retry_count" model="ir.config_parameter">
-        <field name="key">cdu.collect_go.max_retry_count</field>
-        <field name="value">3</field>
     </record>
 
     <record id="param_cdu_collect_go_status_poll_enabled" model="ir.config_parameter">

@@ -10,6 +10,7 @@ class CduCollectGoApiLog(models.Model):
         [
             ("TEST_CONNECTION", "Test Connection"),
             ("CREATE_PARCEL", "Create Parcel"),
+            ("UPDATE_PARCEL", "Update Parcel"),
             ("GET_MESSAGE", "Get Message"),
             ("GET_PARCEL_STATUS", "Get Parcel Status"),
             ("RETURN_PARCEL", "Return Parcel"),
