@@ -1,6 +1,7 @@
 import base64
 import json
 import math
+import re
 from datetime import timedelta
 from io import BytesIO
 
@@ -398,10 +399,28 @@ class CduBatch(models.Model):
             for line in batch.elmis_picking_line_ids:
                 if not line.summary_line_id:
                     continue
-                picked_qty = line.total_quantity_picked
-                line.summary_line_id.total_bottles = picked_qty
-                line.summary_line_id.total_tablets = (
-                    (line.summary_line_id.pack_size or 0) * picked_qty
+                pack_size = (
+                    batch._get_selected_elmis_pack_size(line)
+                    or line.summary_line_id.pack_size
+                    or line.pack_size
+                    or 30
+                )
+                matching_patient_lines = line._get_matching_patient_picking_lines()
+                required_units = (
+                    sum(matching_patient_lines.mapped("required_units"))
+                    or line.summary_line_id.total_tablets
+                    or 0.0
+                )
+                line.summary_line_id.write(
+                    {
+                        "pack_size": pack_size,
+                        "total_tablets": required_units,
+                        "total_bottles": (
+                            math.ceil(required_units / pack_size)
+                            if required_units > 0
+                            else 0
+                        ),
+                    }
                 )
 
                 names = line.fulfilment_line_ids.filtered("selected_orderable_name").mapped(
@@ -412,6 +431,71 @@ class CduBatch(models.Model):
                     if names
                     else line.selected_orderable_name
                 )
+
+    def _sync_picking_quantities_from_elmis_pack_sizes(self):
+        for batch in self:
+            for line in batch.elmis_picking_line_ids:
+                if not line.summary_line_id:
+                    continue
+                pack_size = batch._get_selected_elmis_pack_size(line)
+                if not pack_size:
+                    continue
+
+                matching_patient_lines = line._get_matching_patient_picking_lines()
+                required_units = (
+                    sum(matching_patient_lines.mapped("required_units"))
+                    or line.summary_line_id.total_tablets
+                    or 0.0
+                )
+                packs_to_pick = (
+                    math.ceil(required_units / pack_size)
+                    if required_units > 0
+                    else 0
+                )
+
+                line.summary_line_id.write(
+                    {
+                        "pack_size": pack_size,
+                        "total_tablets": required_units,
+                        "total_bottles": packs_to_pick,
+                    }
+                )
+                line.quantity_to_pick = packs_to_pick or line.quantity_to_pick or 1
+                for fulfilment_line in line.fulfilment_line_ids:
+                    if (
+                        not fulfilment_line.quantity_picked
+                        or fulfilment_line.quantity_picked > packs_to_pick
+                    ):
+                        fulfilment_line.quantity_picked = min(
+                            line.quantity_to_pick,
+                            fulfilment_line.selected_stock_on_hand or line.quantity_to_pick,
+                        )
+
+    def _get_selected_elmis_pack_size(self, picking_line):
+        self.ensure_one()
+        pack_sizes = [
+            pack_size
+            for pack_size in picking_line.fulfilment_line_ids.mapped(
+                "selected_stock_option_id.pack_size"
+            )
+            if pack_size
+        ]
+        if not pack_sizes and picking_line.selected_stock_option_id.pack_size:
+            pack_sizes = [picking_line.selected_stock_option_id.pack_size]
+        if not pack_sizes:
+            options = (
+                picking_line.fulfilment_line_ids.mapped("selected_stock_option_id")
+                or picking_line.selected_stock_option_id
+            )
+            for option in options:
+                pack_size = self._extract_elmis_pack_size(
+                    {},
+                    option.orderable_name if option else None,
+                )
+                if pack_size:
+                    pack_sizes.append(pack_size)
+                    break
+        return pack_sizes[0] if pack_sizes else 0
 
     def _apply_repeat_fulfilment_results(self):
         for batch in self:
@@ -870,10 +954,15 @@ class CduBatch(models.Model):
                 or summary.get("orderableDisplayName")
                 or orderable
             )
+            pack_size = self._extract_elmis_pack_size(summary, orderable_name)
             for card in summary.get("stockCards") or []:
                 stock_on_hand = card.get("stockOnHand") or 0
                 if stock_on_hand <= 0:
                     continue
+                card_pack_size = (
+                    self._extract_elmis_pack_size(card, orderable_name)
+                    or pack_size
+                )
                 option_values.append(
                     {
                         "batch_id": self.id,
@@ -881,6 +970,7 @@ class CduBatch(models.Model):
                         "program_code": summary.get("program") or program_code,
                         "orderable_code": orderable,
                         "orderable_name": orderable_name,
+                        "pack_size": card_pack_size,
                         "lot": card.get("lot"),
                         "stock_on_hand": stock_on_hand,
                         "expiration_date": fields.Date.to_date(card.get("expirationDate")),
@@ -908,6 +998,7 @@ class CduBatch(models.Model):
             orderable_id = orderable.get("id")
             lot_id = lot.get("id")
             orderable_name = entry.get("orderableName") or orderable_id
+            pack_size = self._extract_elmis_pack_size(entry, orderable_name)
             option_values.append(
                 {
                     "batch_id": self.id,
@@ -916,6 +1007,7 @@ class CduBatch(models.Model):
                     "orderable_code": orderable_id,
                     "orderable_id": orderable_id,
                     "orderable_name": orderable_name,
+                    "pack_size": pack_size,
                     "lot": entry.get("lotCode"),
                     "lot_id": lot_id,
                     "stock_on_hand": stock_on_hand,
@@ -926,6 +1018,41 @@ class CduBatch(models.Model):
                 }
             )
         return option_values
+
+    def _extract_elmis_pack_size(self, payload, product_name=None):
+        direct_keys = (
+            "packSize",
+            "pack_size",
+            "netContent",
+            "net_content",
+            "dispensingUnitsPerPack",
+            "unitsPerPack",
+        )
+        for key in direct_keys:
+            value = self._coerce_pack_size(payload.get(key)) if isinstance(payload, dict) else 0
+            if value:
+                return value
+
+        if isinstance(payload, dict):
+            for key in ("orderable", "commodityType", "tradeItem"):
+                nested = payload.get(key)
+                if isinstance(nested, dict):
+                    value = self._extract_elmis_pack_size(nested)
+                    if value:
+                        return value
+
+        if product_name:
+            match = re.search(r"(\d+)\s*$", product_name.strip())
+            if match:
+                return int(match.group(1))
+        return 0
+
+    def _coerce_pack_size(self, value):
+        try:
+            pack_size = int(float(value or 0))
+        except (TypeError, ValueError):
+            return 0
+        return pack_size if pack_size > 0 else 0
 
     def _extract_stock_summaries(self, payload):
         if isinstance(payload, list):

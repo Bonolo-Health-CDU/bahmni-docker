@@ -75,6 +75,7 @@ class CduPickingFulfilmentLine(models.Model):
     selected_orderable_code = fields.Char(string="eLMIS Orderable Code")
     selected_orderable_id = fields.Char(string="eLMIS Orderable UUID")
     selected_orderable_name = fields.Char(string="Fulfil With eLMIS Product")
+    selected_pack_size = fields.Integer(string="Selected Pack Size")
     selected_lot = fields.Char(string="Batch Number")
     selected_lot_id = fields.Char(string="eLMIS Lot UUID")
     selected_lot_expiry = fields.Date(string="Expiry Date")
@@ -92,6 +93,7 @@ class CduPickingFulfilmentLine(models.Model):
         records = super().create(vals_list)
         if any(values.get("selected_stock_option_id") for values in vals_list):
             records._sync_selected_stock_option()
+            records.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return records
 
     @api.onchange("picking_line_id")
@@ -109,6 +111,7 @@ class CduPickingFulfilmentLine(models.Model):
         result = super().write(vals)
         if "selected_stock_option_id" in vals:
             self._sync_selected_stock_option()
+            self.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return result
 
             # def _sync_selected_stock_option(self):
@@ -142,6 +145,7 @@ class CduPickingFulfilmentLine(models.Model):
                 line.selected_orderable_code = False
                 line.selected_orderable_id = False
                 line.selected_orderable_name = False
+                line.selected_pack_size = 0
                 line.selected_lot = False
                 line.selected_lot_id = False
                 line.selected_lot_expiry = False
@@ -151,6 +155,7 @@ class CduPickingFulfilmentLine(models.Model):
             line.selected_orderable_code = option.orderable_code
             line.selected_orderable_id = option.orderable_id
             line.selected_orderable_name = option.orderable_name
+            line.selected_pack_size = option.pack_size
             line.selected_lot = option.lot
             line.selected_lot_id = option.lot_id
             line.selected_lot_expiry = option.expiration_date

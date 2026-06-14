@@ -150,6 +150,8 @@ class CduPickingLine(models.Model):
     @api.depends(
         "quantity_to_pick",
         "summary_line_id.pack_size",
+        "selected_stock_option_id.pack_size",
+        "fulfilment_line_ids.selected_stock_option_id.pack_size",
         "summary_line_id.total_tablets",
         "batch_id.patient_picking_line_ids.effective_repeat_days",
         "batch_id.patient_picking_line_ids.required_units",
@@ -160,7 +162,21 @@ class CduPickingLine(models.Model):
     def _compute_report_quantity_fields(self):
         for line in self:
             matching_patient_lines = line._get_matching_patient_picking_lines()
-            pack_size = line.summary_line_id.pack_size or 30
+            pack_size = (
+                line.selected_stock_option_id.pack_size
+                or next(
+                    (
+                        option.pack_size
+                        for option in line.fulfilment_line_ids.mapped(
+                            "selected_stock_option_id"
+                        )
+                        if option.pack_size
+                    ),
+                    0,
+                )
+                or line.summary_line_id.pack_size
+                or 30
+            )
             required_units = sum(matching_patient_lines.mapped("required_units"))
 
             line.pack_size = pack_size
@@ -241,12 +257,20 @@ class CduPickingLine(models.Model):
         result = super().write(vals)
         if "selected_stock_option_id" in vals:
             self._sync_selected_stock_option()
+            self.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return result
 
     def _sync_selected_stock_option(self):
         for line in self:
             option = line.selected_stock_option_id
             if not option:
+                line.selected_orderable_code = False
+                line.selected_orderable_id = False
+                line.selected_orderable_name = False
+                line.selected_lot = False
+                line.selected_lot_id = False
+                line.selected_lot_expiry = False
+                line.selected_stock_on_hand = 0
                 continue
             line.selected_orderable_code = option.orderable_code
             line.selected_orderable_id = option.orderable_id
@@ -254,4 +278,5 @@ class CduPickingLine(models.Model):
             line.selected_lot = option.lot
             line.selected_lot_id = option.lot_id
             line.selected_lot_expiry = option.expiration_date
+            line.selected_stock_on_hand = option.stock_on_hand
  
