@@ -296,7 +296,15 @@ class CduBatch(models.Model):
             batch.picking_line_ids.unlink()
             batch.patient_picking_line_ids.unlink()
         self.write({"state": "confirmed"})
-        return {"type": "ir.actions.client", "tag": "reload"}
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Workload Batch"),
+            "res_model": "cdu.batch",
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
     def action_mark_printed(self):
         self._ensure_batch_workflow_access()
