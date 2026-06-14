@@ -35,6 +35,7 @@ REPORT_HEADER_ALIASES = {
     "DOB": "dob",
     "Address": "address",
     "Location": "location",
+    "Remaining Days": "remaining_days",
 }
 
 
@@ -392,7 +393,7 @@ class CduReportRow(models.Model):
         facility = self._get_facility(values)
         collection_point = self._get_collection_point(values.get("drug_pickup_point"))
         status = "awaiting_verification"
-        return {
+        vals = {
             "source_key": source_key,
             "row_hash": self.row_hash,
             "report_run_id": self.run_id.id,
@@ -429,6 +430,9 @@ class CduReportRow(models.Model):
             "prescriber_name": values.get("prescriber_name") or False,
             "secondary_contact": values.get("secondary_contact") or False,
         }
+        if "remaining_days" in values:
+            vals["remaining_days_supply"] = self._parse_integer(values.get("remaining_days"))
+        return vals
 
     def _prescription_source_key(self, values):
         parts = [
@@ -511,3 +515,9 @@ class CduReportRow(models.Model):
         if value == "unknown":
             return "unknown"
         return False
+
+    def _parse_integer(self, value):
+        if value in (None, False, ""):
+            return 0
+        match = re.search(r"-?\d+", str(value))
+        return int(match.group(0)) if match else 0

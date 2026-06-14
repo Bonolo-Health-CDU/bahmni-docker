@@ -145,7 +145,6 @@ class CduBox(models.Model):
             )
 
         collection_points = self.line_ids.mapped("collection_point_id")
-        pickup_dates = set(self.line_ids.mapped("next_drug_pickup_date"))
         duplicate_parcels = self._get_duplicate_parcel_labels()
         if duplicate_parcels:
             errors.append(
@@ -154,12 +153,8 @@ class CduBox(models.Model):
             )
         if self.collection_point_id and collection_points != self.collection_point_id:
             errors.append(_("All parcels must match the selected box collection point."))
-        if self.next_drug_pickup_date and pickup_dates != {self.next_drug_pickup_date}:
-            errors.append(_("All parcels must match the selected box next drug pickup date."))
         if len(collection_points) > 1:
             errors.append(_("All parcels in a box must have the same collection point."))
-        if len(pickup_dates) > 1:
-            errors.append(_("All parcels in a box must have the same next drug pickup date."))
         return errors
 
     def _get_duplicate_parcel_labels(self):
@@ -256,6 +251,136 @@ class CduBox(models.Model):
                 "type": "success",
                 "sticky": False,
                 "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    def _get_scan_parcel_id(self, parcel_value):
+        if isinstance(parcel_value, (list, tuple)):
+            parcel_value = parcel_value[0] if parcel_value else False
+        if isinstance(parcel_value, dict):
+            parcel_value = (
+                parcel_value.get("resId")
+                or parcel_value.get("id")
+                or (parcel_value.get("data") or {}).get("resId")
+                or (parcel_value.get("data") or {}).get("id")
+            )
+        if isinstance(parcel_value, (list, tuple)):
+            parcel_value = parcel_value[0] if parcel_value else False
+        if isinstance(parcel_value, str):
+            parcel_value = int(parcel_value) if parcel_value.isdigit() else False
+        return parcel_value if isinstance(parcel_value, int) else False
+
+    @api.model
+    def action_scan_parcel_in_new_box(self, parcel_id, max_parcels=False):
+        self._ensure_boxing_access()
+        values = {}
+        if isinstance(max_parcels, str):
+            max_parcels = int(max_parcels) if max_parcels.isdigit() else False
+        if isinstance(max_parcels, int) and max_parcels > 0:
+            values["max_parcels"] = max_parcels
+        box = self.create(values)
+        return box.action_scan_parcel(parcel_id)
+
+    def action_scan_parcel(self, parcel_id):
+        self._ensure_boxing_access()
+        self.ensure_one()
+        parcel_id = self._get_scan_parcel_id(parcel_id)
+        if not parcel_id:
+            raise UserError(_("Select or scan a parcel first."))
+
+        BoxLine = self.env["cdu.box.line"]
+        parcel = self.env["cdu.bagging.qa"].browse(parcel_id).exists()
+        if (
+            not parcel
+            or parcel.state != "confirmed"
+            or parcel.prescription_id.state != "awaiting_boxing"
+        ):
+            raise UserError(
+                _("Only confirmed parcels awaiting boxing can be added to a box.")
+            )
+
+        existing_line = BoxLine.search([("bagging_qa_id", "=", parcel.id)], limit=1)
+        if existing_line:
+            raise UserError(
+                _("%(parcel)s has already been added to box %(box)s.")
+                % {
+                    "parcel": parcel.parcel_reference or parcel.display_name,
+                    "box": existing_line.box_id.name,
+                }
+            )
+
+        current_box = self
+        closed_box = self.env["cdu.box"]
+        if current_box.line_ids and (
+            current_box.parcel_count >= current_box.max_parcels
+            or current_box.collection_point_id != parcel.collection_point_id
+        ):
+            confirm_action = current_box.action_confirm_box()
+            if confirm_action.get("type") != "ir.actions.client":
+                return confirm_action
+            closed_box = current_box
+            current_box = self.create(
+                {
+                    "collection_point_id": parcel.collection_point_id.id,
+                    "next_drug_pickup_date": parcel.next_drug_pickup_date,
+                    "max_parcels": closed_box.max_parcels,
+                }
+            )
+        elif not current_box.line_ids:
+            current_box.with_context(skip_box_rule_change_guard=True).write(
+                {
+                    "collection_point_id": parcel.collection_point_id.id,
+                    "next_drug_pickup_date": parcel.next_drug_pickup_date,
+                }
+            )
+
+        BoxLine.create(
+            {
+                "box_id": current_box.id,
+                "bagging_qa_id": parcel.id,
+            }
+        )
+
+        if closed_box:
+            title = _("Box closed, new box opened")
+            message = _(
+                "%(closed_box)s was closed. %(new_box)s was opened for %(location)s, "
+                "and parcel %(parcel)s was added."
+            ) % {
+                "closed_box": closed_box.name,
+                "new_box": current_box.name,
+                "location": parcel.collection_point_id.display_name,
+                "parcel": parcel.parcel_reference,
+            }
+            notification_type = "warning"
+        else:
+            title = _("Parcel added")
+            message = _(
+                "%(parcel)s was added to %(box)s for %(location)s."
+            ) % {
+                "parcel": parcel.parcel_reference,
+                "box": current_box.name,
+                "location": parcel.collection_point_id.display_name,
+            }
+            notification_type = "success"
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": title,
+                "message": message,
+                "type": notification_type,
+                "sticky": bool(closed_box),
+                "next": {
+                    "type": "ir.actions.act_window",
+                    "name": _("Box"),
+                    "res_model": "cdu.box",
+                    "res_id": current_box.id,
+                    "views": [(False, "form")],
+                    "view_mode": "form",
+                    "target": "current",
+                },
             },
         }
 
@@ -747,8 +872,4 @@ class CduBoxLine(models.Model):
             if box.collection_point_id and parcel.collection_point_id != box.collection_point_id:
                 raise UserError(
                     _("Only parcels for the selected collection point can be added to this box.")
-                )
-            if box.next_drug_pickup_date and parcel.next_drug_pickup_date != box.next_drug_pickup_date:
-                raise UserError(
-                    _("Only parcels for the selected next drug pickup date can be added to this box.")
                 )

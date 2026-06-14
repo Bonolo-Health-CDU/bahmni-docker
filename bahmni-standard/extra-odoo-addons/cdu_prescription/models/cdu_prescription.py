@@ -93,6 +93,9 @@ class CduPrescription(models.Model):
         store=True,
         string="Total Dispensing Days"
     )
+    remaining_days_supply = fields.Integer(
+        string="Remaining Days"
+    )
     state = fields.Selection(
         [
             ("awaiting_verification", "Awaiting verification"),
