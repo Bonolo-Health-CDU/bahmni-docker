@@ -21,6 +21,7 @@
         "security/ir.model.access.csv",
         "data/cdu_sequence.xml",
         "data/cdu_onedrive_cron.xml",
+        "data/cdu_collection_point_sync_cron.xml",
         "data/cdu_default_users.xml",
         "views/cdu_batch_views.xml",
         "views/cdu_collection_point_views.xml",

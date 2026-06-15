@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import re
 import uuid
 from datetime import timedelta, timezone
@@ -7,6 +8,9 @@ from urllib import error, request
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
+
+
+_logger = logging.getLogger(__name__)
 
 
 class CduCollectGoService(models.AbstractModel):
@@ -199,6 +203,57 @@ class CduCollectGoService(models.AbstractModel):
             "log": log,
             "error_message": error_message,
         }
+
+    def cron_poll_message_processing_status(self):
+        params = self.env["ir.config_parameter"].sudo()
+        if params.get_param(
+            "cdu.collect_go.message_poll_enabled", "True"
+        ) == "False":
+            return False
+
+        try:
+            batch_size = max(
+                int(
+                    params.get_param(
+                        "cdu.collect_go.message_poll_batch_size"
+                    )
+                    or 100
+                ),
+                1,
+            )
+        except ValueError:
+            batch_size = 100
+
+        boxes = self.env["cdu.box"].sudo().search(
+            [
+                ("collect_go_status", "=", "submitted"),
+                ("collect_go_reference_guid", "!=", False),
+            ],
+            order="collect_go_submitted_at asc, id asc",
+            limit=batch_size,
+        )
+        results = {
+            "processed": 0,
+            "failed": 0,
+            "not_ready": 0,
+            "error": 0,
+        }
+        for box in boxes:
+            try:
+                with self.env.cr.savepoint():
+                    result = self.poll_box_message(
+                        box,
+                        raise_on_error=False,
+                    )
+                state = result.get("state", "error")
+                results[state] = results.get(state, 0) + 1
+            except Exception:
+                results["error"] += 1
+                _logger.exception(
+                    "Could not poll Collect-and-Go message status for box %s",
+                    box.display_name,
+                )
+        return results
 
     def cron_poll_parcel_status_updates(self):
         params = self.env["ir.config_parameter"].sudo()

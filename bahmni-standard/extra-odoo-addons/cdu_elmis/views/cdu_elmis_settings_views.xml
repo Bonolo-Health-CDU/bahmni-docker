@@ -71,6 +71,9 @@
                         <field name="cdu_collect_go_poll_attempts"/>
                         <field name="cdu_collect_go_poll_interval_seconds"/>
                         <field name="cdu_collect_go_max_retry_count"/>
+                        <field name="cdu_collect_go_message_poll_enabled"/>
+                        <field name="cdu_collect_go_message_poll_interval_minutes"/>
+                        <field name="cdu_collect_go_message_poll_batch_size"/>
                         <field name="cdu_collect_go_status_poll_enabled"/>
                         <field name="cdu_collect_go_status_poll_interval_minutes"/>
                     </group>

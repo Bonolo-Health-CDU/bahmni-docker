@@ -1,12 +1,17 @@
 import json
+import logging
 import re
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib import error, request
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import config as odoo_config
+
+
+_logger = logging.getLogger(__name__)
 
 
 class CduCollectionPointSyncConfig(models.Model):
@@ -29,6 +34,24 @@ class CduCollectionPointSyncConfig(models.Model):
     request_method = fields.Char(default="GetLocation", required=True)
     poll_attempts = fields.Integer(default=10, required=True)
     poll_interval_seconds = fields.Integer(default=3, required=True)
+    sync_interval_hours = fields.Integer(
+        string="Automatic Sync Interval (Hours)",
+        default=24,
+        required=True,
+    )
+    sync_on_startup = fields.Boolean(
+        string="Sync on Application Startup",
+        default=True,
+        help=(
+            "Queue a collection point refresh whenever the Odoo application "
+            "starts. The API call runs asynchronously through the scheduler."
+        ),
+    )
+    startup_sync_pending = fields.Boolean(
+        default=False,
+        copy=False,
+        readonly=True,
+    )
     resolve_cdu_location = fields.Boolean(
         string="Resolve CDU Location ID",
         default=True,
@@ -52,6 +75,11 @@ class CduCollectionPointSyncConfig(models.Model):
     _sql_constraints = [
         ("positive_poll_attempts", "CHECK(poll_attempts > 0)", "Poll attempts must be greater than zero."),
         ("positive_poll_interval", "CHECK(poll_interval_seconds > 0)", "Poll interval must be greater than zero."),
+        (
+            "positive_sync_interval",
+            "CHECK(sync_interval_hours > 0)",
+            "Automatic sync interval must be greater than zero.",
+        ),
     ]
 
     @api.constrains("enabled", "active")
@@ -69,9 +97,87 @@ class CduCollectionPointSyncConfig(models.Model):
 
     def action_sync_now(self):
         for config in self:
-            config._sync_locations()
+            config._sync_locations(trigger_mode="manual")
 
-    def _sync_locations(self):
+    def _register_hook(self):
+        result = super()._register_hook()
+        if odoo_config.get("no_http") or odoo_config.get("stop_after_init"):
+            return result
+
+        self.env.cr.execute(
+            """
+            SELECT EXISTS (
+                SELECT table_name
+                  FROM information_schema.columns
+                 WHERE table_name = 'cdu_collection_point_sync_config'
+                   AND column_name IN (
+                       'sync_on_startup',
+                       'startup_sync_pending'
+                   )
+                 GROUP BY table_name
+                HAVING COUNT(*) = 2
+            )
+            """
+        )
+        if not self.env.cr.fetchone()[0]:
+            return result
+
+        startup_config = self.sudo().search(
+            [
+                ("enabled", "=", True),
+                ("active", "=", True),
+                ("sync_on_startup", "=", True),
+            ],
+            limit=1,
+        )
+        if not startup_config:
+            return result
+
+        startup_config.sudo().write({"startup_sync_pending": True})
+        cron = self.env.ref(
+            "cdu_prescription.ir_cron_cdu_collection_point_sync",
+            raise_if_not_found=False,
+        )
+        if cron and cron.active:
+            cron.sudo().write({"nextcall": fields.Datetime.now()})
+        return result
+
+    @api.model
+    def cron_sync_enabled_configs(self):
+        configs = self.search(
+            [
+                ("enabled", "=", True),
+                ("active", "=", True),
+            ]
+        )
+        for config in configs:
+            if config.startup_sync_pending and config.sync_on_startup:
+                config._sync_locations(
+                    trigger_mode="startup",
+                    raise_on_error=False,
+                )
+                config.sudo().write({"startup_sync_pending": False})
+            elif config._is_sync_due():
+                config._sync_locations(
+                    trigger_mode="scheduled",
+                    raise_on_error=False,
+                )
+        return True
+
+    def _is_sync_due(self):
+        self.ensure_one()
+        last_attempt_at = (
+            self.last_sync_log_id.requested_at
+            if self.last_sync_log_id
+            else self.last_sync_at
+        )
+        if not last_attempt_at:
+            return True
+        last_attempt = fields.Datetime.to_datetime(last_attempt_at)
+        now = fields.Datetime.to_datetime(fields.Datetime.now())
+        return now >= last_attempt + timedelta(hours=self.sync_interval_hours)
+
+    def _sync_locations(self, trigger_mode="manual", raise_on_error=True):
         self.ensure_one()
         reference = str(uuid.uuid4())
         request_payload = {
@@ -85,6 +191,7 @@ class CduCollectionPointSyncConfig(models.Model):
             "config_id": self.id,
             "reference_guid": reference,
             "requested_at": fields.Datetime.now(),
+            "trigger_mode": trigger_mode,
             "state": "requested",
             "request_payload": json.dumps(request_payload, indent=2, sort_keys=True),
         })
@@ -148,7 +255,13 @@ class CduCollectionPointSyncConfig(models.Model):
                 "last_sync_result": message,
                 "last_sync_log_id": log.id,
             })
-            raise
+            if raise_on_error:
+                raise
+            _logger.exception(
+                "Scheduled Collect-and-Go collection point sync failed for %s",
+                self.display_name,
+            )
+            return False
         return True
 
     def _poll_for_message(self, reference):
@@ -158,11 +271,33 @@ class CduCollectionPointSyncConfig(models.Model):
         for attempt in range(self.poll_attempts):
             payload = self._http_json_request("GET", url)
             last_payload = payload
+            self._raise_for_bridge_error(payload)
             if self._response_contains_message(payload):
                 return payload
             if attempt < self.poll_attempts - 1:
                 time.sleep(self.poll_interval_seconds)
         raise UserError(_("No response message was available for reference %s after %s attempts.") % (reference, self.poll_attempts))
+
+    def _raise_for_bridge_error(self, payload):
+        expanded = self._expand_json_strings(payload)
+        if not isinstance(expanded, dict):
+            return
+        status_code = expanded.get("statusCode")
+        try:
+            failed = int(status_code) >= 400
+        except (TypeError, ValueError):
+            failed = False
+        if failed:
+            raise UserError(
+                _(
+                    "Collect-and-Go message processing failed: %s"
+                )
+                % (
+                    expanded.get("message")
+                    or expanded.get("error")
+                    or status_code
+                )
+            )
 
     def _response_contains_message(self, payload):
         expanded = self._expand_json_strings(payload)
@@ -439,6 +574,16 @@ class CduCollectionPointSyncLog(models.Model):
     config_id = fields.Many2one("cdu.collection.point.sync.config", required=True, ondelete="cascade")
     reference_guid = fields.Char(required=True, copy=False, index=True)
     requested_at = fields.Datetime(required=True)
+    trigger_mode = fields.Selection(
+        [
+            ("manual", "Manual"),
+            ("scheduled", "Scheduled"),
+            ("startup", "Startup"),
+        ],
+        default="manual",
+        required=True,
+        readonly=True,
+    )
     request_acknowledged_at = fields.Datetime(readonly=True)
     responded_at = fields.Datetime(readonly=True)
     state = fields.Selection(

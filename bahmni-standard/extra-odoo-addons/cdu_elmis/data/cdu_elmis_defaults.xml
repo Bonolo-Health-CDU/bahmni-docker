@@ -97,6 +97,21 @@
         <field name="value">30</field>
     </record>
 
+    <record id="param_cdu_collect_go_message_poll_enabled" model="ir.config_parameter">
+        <field name="key">cdu.collect_go.message_poll_enabled</field>
+        <field name="value">True</field>
+    </record>
+
+    <record id="param_cdu_collect_go_message_poll_interval_minutes" model="ir.config_parameter">
+        <field name="key">cdu.collect_go.message_poll_interval_minutes</field>
+        <field name="value">1</field>
+    </record>
+
+    <record id="param_cdu_collect_go_message_poll_batch_size" model="ir.config_parameter">
+        <field name="key">cdu.collect_go.message_poll_batch_size</field>
+        <field name="value">100</field>
+    </record>
+
     <record id="param_cdu_collect_go_status_poll_enabled" model="ir.config_parameter">
         <field name="key">cdu.collect_go.status_poll_enabled</field>
         <field name="value">True</field>

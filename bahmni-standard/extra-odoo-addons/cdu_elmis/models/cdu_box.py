@@ -376,6 +376,12 @@ class CduBox(models.Model):
         }
 
     @api.model
+    def cron_poll_collect_go_message_status(self):
+        return self.env[
+            "cdu.collect.go.service"
+        ].cron_poll_message_processing_status()
+
+    @api.model
     def cron_poll_collect_go_parcel_status(self):
         return self.env["cdu.collect.go.service"].cron_poll_parcel_status_updates()
 
