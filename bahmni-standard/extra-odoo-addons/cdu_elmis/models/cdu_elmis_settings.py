@@ -55,12 +55,12 @@ class ResConfigSettings(models.TransientModel):
     cdu_elmis_picking_debit_reason_name = fields.Char(
         string="Picking Store Debit Reason",
         config_parameter="cdu.elmis.picking_debit_reason_name",
-        default="Transfer Out",
+        default="Internal Transfer Out",
     )
     cdu_elmis_picking_credit_reason_name = fields.Char(
         string="Picking Production Credit Reason",
         config_parameter="cdu.elmis.picking_credit_reason_name",
-        default="Transfer In",
+        default="Internal Transfer In",
     )
     cdu_elmis_consumption_reason_name = fields.Char(
         string="Consumption Reason",
@@ -70,12 +70,12 @@ class ResConfigSettings(models.TransientModel):
     cdu_elmis_residual_debit_reason_name = fields.Char(
         string="Residual Production Debit Reason",
         config_parameter="cdu.elmis.residual_debit_reason_name",
-        default="Transfer Out",
+        default="Internal Transfer Out",
     )
     cdu_elmis_residual_credit_reason_name = fields.Char(
         string="Residual Store Credit Reason",
         config_parameter="cdu.elmis.residual_credit_reason_name",
-        default="Facility Return",
+        default="Internal Transfer In",
     )
     cdu_elmis_picking_debit_reason_id = fields.Char(
         string="Picking Store Debit Reason UUID",

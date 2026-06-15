@@ -2,12 +2,12 @@
 <odoo noupdate="1">
     <record id="param_cdu_elmis_picking_debit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.picking_debit_reason_name</field>
-        <field name="value">Transfer Out</field>
+        <field name="value">Internal Transfer Out</field>
     </record>
 
     <record id="param_cdu_elmis_picking_credit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.picking_credit_reason_name</field>
-        <field name="value">Transfer In</field>
+        <field name="value">Internal Transfer In</field>
     </record>
 
     <record id="param_cdu_elmis_consumption_reason_name" model="ir.config_parameter">
@@ -17,12 +17,12 @@
 
     <record id="param_cdu_elmis_residual_debit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.residual_debit_reason_name</field>
-        <field name="value">Transfer Out</field>
+        <field name="value">Internal Transfer Out</field>
     </record>
 
     <record id="param_cdu_elmis_residual_credit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.residual_credit_reason_name</field>
-        <field name="value">Facility Return</field>
+        <field name="value">Internal Transfer In</field>
     </record>
 
     <record id="param_cdu_elmis_stock_cache_ttl_seconds" model="ir.config_parameter">
