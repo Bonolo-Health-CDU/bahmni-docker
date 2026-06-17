@@ -15,69 +15,273 @@
     <template id="report_cdu_elmis_picking_list">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="batch">
-                <t t-call="web.external_layout">
+                <t t-call="web.basic_layout">
                     <div class="page">
-                        <h2>CDU Picking List</h2>
-                        <table class="table table-sm o_main_table" style="width: 100%; margin-bottom: 16px;">
+                        <style>
+                            .page {
+                                color: #111;
+                            }
+                            .cdu-report-heading {
+                                display: table;
+                                width: 100%;
+                                margin-bottom: 10px;
+                            }
+                            .cdu-logo-cell {
+                                display: table-cell;
+                                width: 76px;
+                                vertical-align: top;
+                            }
+                            .cdu-logo {
+                                max-width: 58px;
+                                max-height: 60px;
+                            }
+                            .cdu-title-cell {
+                                display: table-cell;
+                                vertical-align: middle;
+                                text-align: center;
+                            }
+                            .cdu-qr-cell {
+                                display: table-cell;
+                                width: 76px;
+                                text-align: right;
+                                vertical-align: top;
+                            }
+                            .cdu-qr-code {
+                                width: 76px;
+                                height: 76px;
+                            }
+                            .cdu-qr-fallback {
+                                width: 76px;
+                                min-height: 24px;
+                                border: 1px solid #777;
+                                padding: 4px;
+                                font-size: 7px;
+                                line-height: 1.2;
+                                text-align: center;
+                                word-wrap: break-word;
+                            }
+                            .cdu-qr-caption {
+                                width: 76px;
+                                font-size: 6px;
+                                line-height: 1.1;
+                                text-align: center;
+                                word-wrap: break-word;
+                            }
+                            .cdu-picking-title {
+                                margin: 0;
+                                font-size: 20px;
+                                font-weight: 700;
+                                letter-spacing: 0;
+                                text-transform: uppercase;
+                            }
+                            .cdu-picking-header th {
+                                background: #f2f4f7;
+                                font-weight: 700;
+                                white-space: nowrap;
+                            }
+                            .cdu-section-title {
+                                margin: 12px 0 6px 0;
+                                padding: 4px 6px;
+                                border: 1px solid #777;
+                                background: #f2f2f2;
+                                font-size: 13px;
+                                font-weight: 700;
+                                text-transform: uppercase;
+                            }
+                            .cdu-picking-table {
+                                width: 100%;
+                                table-layout: fixed;
+                                font-size: 9px;
+                                line-height: 1.25;
+                                margin-bottom: 10px;
+                            }
+                            .cdu-picking-table th {
+                                background: #f3f3f3;
+                                border: 1px solid #777;
+                                padding: 4px 3px;
+                                font-weight: 700;
+                                vertical-align: middle;
+                            }
+                            .cdu-picking-table td {
+                                border: 1px solid #999;
+                                padding: 4px 3px;
+                                vertical-align: top;
+                                word-wrap: break-word;
+                            }
+                            .cdu-manual-box {
+                                display: block;
+                                min-height: 20px;
+                                border-bottom: 1px solid #222;
+                            }
+                            .cdu-checkbox {
+                                display: inline-block;
+                                width: 12px;
+                                height: 12px;
+                                border: 1px solid #222;
+                            }
+                            .cdu-signature-line {
+                                padding-top: 18px;
+                                font-size: 11px;
+                            }
+                            .cdu-note {
+                                margin-top: 12px;
+                                font-size: 10px;
+                            }
+                            .cdu-note-title {
+                                font-weight: 700;
+                            }
+                        </style>
+
+                        <div class="cdu-report-heading">
+                            <div class="cdu-logo-cell">
+                                <img
+                                    class="cdu-logo"
+                                    t-att-src="'/cdu_elmis/static/src/img/moh_lesotho_logo.png'"
+                                    alt="Ministry of Health Lesotho"
+                                />
+                            </div>
+                            <div class="cdu-title-cell">
+                                <h2 class="cdu-picking-title">CDU Picking List</h2>
+                            </div>
+                            <div class="cdu-qr-cell">
+                                <img
+                                    t-if="batch.qr_code"
+                                    class="cdu-qr-code"
+                                    t-att-src="image_data_uri(batch.qr_code)"
+                                    alt="Batch QR Code"
+                                />
+                                <div t-if="batch.qr_code" class="cdu-qr-caption">
+                                    <span t-field="batch.name"/>
+                                </div>
+                                <div t-if="not batch.qr_code" class="cdu-qr-fallback">
+                                    <strong>Batch</strong><br/>
+                                    <span t-field="batch.name"/>
+                                </div>
+                            </div>
+                        </div>
+                        <table class="table table-sm o_main_table cdu-picking-header" style="width: 100%; margin-bottom: 14px; font-size: 11px;">
                             <tbody>
                                 <tr>
-                                    <th style="width: 18%;">Batch</th>
+                                    <th style="width: 18%;">Batch No:</th>
                                     <td style="width: 32%;"><span t-field="batch.name"/></td>
-                                    <th style="width: 18%;">Status</th>
+                                    <th style="width: 18%;">Status:</th>
                                     <td style="width: 32%;"><span t-field="batch.state"/></td>
                                 </tr>
                                 <tr>
-                                    <th>Pickup Date From</th>
-                                    <td><span t-field="batch.filter_next_drug_pickup_date_from"/></td>
-                                    <th>Pickup Date To</th>
-                                    <td><span t-field="batch.filter_next_drug_pickup_date_to"/></td>
+                                    <th>Pickup Period:</th>
+                                    <td>
+                                        <span t-field="batch.filter_next_drug_pickup_date_from"/>
+                                        <span> - </span>
+                                        <span t-field="batch.filter_next_drug_pickup_date_to"/>
+                                    </td>
+                                    <th>Total Prescriptions:</th>
+                                    <td><span t-field="batch.prescription_count"/></td>
                                 </tr>
                                 <tr>
-                                    <th>Collection Location</th>
+                                    <th>Collection Location:</th>
                                     <td><span t-field="batch.filter_collection_point_id"/></td>
-                                    <th>E-locker District</th>
+                                    <th>E-locker District:</th>
                                     <td><span t-field="batch.filter_e_locker_district"/></td>
                                 </tr>
                                 <tr>
-                                    <th>Prescriptions</th>
-                                    <td><span t-field="batch.prescription_count"/></td>
-                                    <th>Store Stock Refreshed</th>
+                                    <th>Store Stock Refreshed:</th>
                                     <td><span t-field="batch.store_stock_refreshed_at"/></td>
+                                    <th></th>
+                                    <td></td>
                                 </tr>
                             </tbody>
                         </table>
 
-                        <h3>Items to Pick</h3>
-                        <table class="table table-sm o_main_table" style="width: 100%;">
+                        <t t-set="stock_lines" t-value="batch.elmis_picking_fulfilment_line_ids.sorted(lambda line: ((line.selected_orderable_name or ''), (line.selected_lot or ''), line.id))"/>
+                        <div class="cdu-section-title">Stock To Pick</div>
+                        <table class="table table-sm o_main_table cdu-picking-table">
                             <thead>
                                 <tr>
-                                    <th>#</th>
-                                    <th>eRegister Drug / Regimen</th>
-                                    <th class="text-end">Rx Count</th>
-                                    <th class="text-end">Required Qty</th>
-                                    <th>Fulfil With eLMIS Product</th>
-                                    <th>Lot</th>
-                                    <th>Expiry</th>
-                                    <th class="text-end">Available SOH</th>
-                                    <th class="text-end">Picked Qty</th>
+                                    <th style="width: 4%;">#</th>
+                                    <th style="width: 30%;">Product To Pick</th>
+                                    <th style="width: 8%;" class="text-end">Pack Size</th>
+                                    <th style="width: 12%;">Lot</th>
+                                    <th style="width: 10%;">Expiry</th>
+                                    <th style="width: 9%;" class="text-end">Available SOH</th>
+                                    <th style="width: 9%;" class="text-end">Required Units</th>
+                                    <th style="width: 9%;" class="text-end">Packs/Bottles To Pick</th>
+                                    <th style="width: 6%;">Picked Qty</th>
+                                    <th style="width: 3%;">Tick</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr t-foreach="batch.elmis_picking_fulfilment_line_ids" t-as="line">
+                                <tr t-foreach="stock_lines" t-as="line">
                                     <td><span t-esc="line_index + 1"/></td>
-                                    <td><span t-field="line.openmrs_drug_name"/></td>
-                                    <td class="text-end"><span t-field="line.picking_line_id.prescription_count"/></td>
-                                    <td class="text-end"><span t-field="line.required_quantity"/></td>
                                     <td>
                                         <span t-if="line.selected_orderable_name" t-field="line.selected_orderable_name"/>
                                         <span t-if="not line.selected_orderable_name" class="text-muted">Not selected</span>
                                     </td>
+                                    <td class="text-end">
+                                        <span t-if="line.pack_size" t-esc="'%d' % int(round(line.pack_size))"/>
+                                    </td>
                                     <td><span t-field="line.selected_lot"/></td>
                                     <td><span t-field="line.selected_lot_expiry"/></td>
-                                    <td class="text-end"><span t-field="line.selected_stock_on_hand"/></td>
-                                    <td class="text-end"><span t-field="line.quantity_picked"/></td>
+                                    <td class="text-end">
+                                        <span t-esc="'%d' % int(round(line.selected_stock_on_hand or 0))"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.required_units" t-esc="'%d' % int(round(line.required_units))"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.packs_to_pick or line.required_quantity" t-esc="'%d' % int(round(line.packs_to_pick or line.required_quantity))"/>
+                                    </td>
+                                    <td><span class="cdu-manual-box"></span></td>
+                                    <td class="text-center"><span class="cdu-checkbox"></span></td>
                                 </tr>
-                                <tr t-if="not batch.elmis_picking_fulfilment_line_ids">
+                                <tr t-if="not stock_lines">
+                                    <td colspan="10" class="text-center text-muted">
+                                        No eLMIS fulfilment lines have been generated for this batch.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <t t-set="allocation_lines" t-value="batch.elmis_picking_fulfilment_line_ids.sorted(lambda line: ((line.openmrs_drug_name or ''), line.id))"/>
+                        <div class="cdu-section-title">Prescription Allocation</div>
+                        <table class="table table-sm o_main_table cdu-picking-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 4%;">#</th>
+                                    <th style="width: 10%;">Rx No</th>
+                                    <th style="width: 33%;">Regimen / Prescription</th>
+                                    <th style="width: 8%;" class="text-end">Rx Count</th>
+                                    <th style="width: 10%;" class="text-end">Estimated Available Repeats</th>
+                                    <th style="width: 9%;" class="text-end">Repeats To Dispense</th>
+                                    <th style="width: 8%;" class="text-end">Repeat Cycle</th>
+                                    <th style="width: 8%;" class="text-end">Coverage Days</th>
+                                    <th style="width: 10%;" class="text-end">Required Units</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="allocation_lines" t-as="line">
+                                    <td><span t-esc="line_index + 1"/></td>
+                                    <td>
+                                        <span t-if="line.picking_line_id.prescription_id" t-field="line.picking_line_id.prescription_id.name"/>
+                                    </td>
+                                    <td><span t-field="line.openmrs_drug_name"/></td>
+                                    <td class="text-end"><span t-if="line.prescription_count" t-esc="'%d' % int(round(line.prescription_count))"/></td>
+                                    <td class="text-end">
+                                        <span t-if="line.estimated_available_repeats" t-esc="'%d' % int(round(float(line.estimated_available_repeats)))"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.repeats_to_dispense" t-esc="'%d' % int(round(float(line.repeats_to_dispense)))"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="'repeat_cycle' in line._fields and line.repeat_cycle" t-esc="line.repeat_cycle"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.coverage_days" t-esc="'%d' % int(round(float(line.coverage_days)))"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <span t-if="line.required_units" t-esc="'%d' % int(round(line.required_units))"/>
+                                    </td>
+                                </tr>
+                                <tr t-if="not allocation_lines">
                                     <td colspan="9" class="text-center text-muted">
                                         No eLMIS fulfilment lines have been generated for this batch.
                                     </td>
@@ -85,16 +289,26 @@
                             </tbody>
                         </table>
 
-                        <div style="margin-top: 36px;">
-                            <table class="table table-sm" style="width: 100%;">
+                        <div style="margin-top: 28px;">
+                            <table class="table table-sm" style="width: 100%; font-size: 11px;">
                                 <tbody>
                                     <tr>
-                                        <td style="width: 33%; padding-top: 28px;">Picked By: ____________________</td>
-                                        <td style="width: 33%; padding-top: 28px;">Checked By: ____________________</td>
-                                        <td style="width: 33%; padding-top: 28px;">Date: ____________________</td>
+                                        <td class="cdu-signature-line" style="width: 33%;">Picked By: ______________________</td>
+                                        <td class="cdu-signature-line" style="width: 33%;">Checked By: _____________________</td>
+                                        <td class="cdu-signature-line" style="width: 34%;">Date: ___________________________</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="3" class="cdu-signature-line">
+                                            Comments / Exceptions: __________________________________________
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="cdu-note">
+                            <div class="cdu-note-title">Note:</div>
+                            <div>Quantities are calculated from repeats where available.</div>
+                            <div>CDU does not break bottles.</div>
                         </div>
                     </div>
                 </t>

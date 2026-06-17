@@ -37,7 +37,7 @@
                             <h3>Pickup Dates</h3>
                             <div class="o_cdu_batch_card_fields">
                                 <label for="filter_next_drug_pickup_date_from"/>
-                                <field name="filter_next_drug_pickup_date_from" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                                <field name="filter_next_drug_pickup_date_from" nolabel="1" required="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                                 <label for="filter_next_drug_pickup_date_to"/>
                                 <field name="filter_next_drug_pickup_date_to" nolabel="1" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
                             </div>
@@ -58,23 +58,56 @@
                             <span>prescriptions selected</span>
                         </span>
                     </div>
+                    <div class="o_cdu_repeat_control_panel">
+                        <div class="o_cdu_repeat_control_title">REGIMEN REPEAT DAYS</div>
+                        <field name="repeat_apply_regimen_domain_ids" invisible="1"/>
+                        <div class="o_cdu_repeat_control_fields">
+                            <field name="repeat_apply_line_ids"
+                                   nolabel="1"
+                                   class="o_cdu_regimen_repeat_table"
+                                   context="{'display_regimen_prescribed_raw': True}">
+                                <tree editable="bottom" create="false">
+                                    <field name="regimen_prescription_id"
+                                           string="Regimen"
+                                           domain="[('id', 'in', parent.repeat_apply_regimen_domain_ids)]"
+                                           context="{'display_regimen_prescribed_raw': True}"
+                                           class="o_cdu_regimen_repeat_regimen_cell"
+                                           placeholder="--Select Regimen--"
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="days_to_serve"
+                                           string="Repeat Days To Serve"
+                                           class="o_cdu_regimen_repeat_days_cell"/>
+                                </tree>
+                            </field>
+                            <button name="action_add_regimen_repeat_line"
+                                    string="+ Add Regimen"
+                                    type="object"
+                                    class="btn-secondary o_cdu_repeat_add_button"/>
+                            <button name="action_apply_regimen_repeat_days"
+                                    string="Apply"
+                                    type="object"
+                                    class="btn-primary o_cdu_repeat_apply_button"/>
+                        </div>
+                    </div>
                     <notebook>
                         <page string="Selected Prescriptions">
                             <div class="alert alert-info" role="alert" attrs="{'invisible': [('state', '!=', 'draft')]}">
                                 All prescriptions matching the filters are selected by default. Remove any prescription that should not be included before confirming the batch.
                             </div>
                             <field name="prescription_ids" attrs="{'readonly': [('state', '!=', 'draft')]}">
-                                <tree create="false" delete="true">
-                                    <field name="name"/>
-                                    <field name="patient_identifier" optional="hide"/>
-                                    <field name="patient_first_name"/>
-                                    <field name="facility_name"/>
-                                    <field name="next_drug_pickup_date"/>
-                                    <field name="regimen_prescribed_raw"/>
-                                    <field name="e_locker_district"/>
-                                    <field name="collection_point_id"/>
-                                    <field name="hiv_program_id" optional="hide"/>
-                                    <field name="state"/>
+                                <tree create="false" delete="true" editable="bottom">
+                                    <field name="name" readonly="1"/>
+                                    <field name="patient_identifier" optional="hide" readonly="1"/>
+                                    <field name="patient_first_name" readonly="1"/>
+                                    <field name="facility_name" readonly="1"/>
+                                    <field name="next_drug_pickup_date" readonly="1"/>
+                                    <field name="cdu_days_supply" string="CDU Days" readonly="1"/>
+                                    <field name="repeat_days" string="Repeats in Days" class="o_cdu_repeat_days_input_cell"/>
+                                    <field name="regimen_prescribed_raw" readonly="1"/>
+                                    <field name="e_locker_district" readonly="1"/>
+                                    <field name="collection_point_id" readonly="1"/>
+                                    <field name="hiv_program_id" optional="hide" readonly="1"/>
+                                    <field name="state" readonly="1"/>
                                 </tree>
                             </field>
                         </page>
@@ -114,53 +147,32 @@
 
                             <field
                                 name="patient_picking_line_ids"
-                                readonly="1"
                             >
 
-                                <tree create="0" delete="0">
+                                <tree editable="bottom" create="0" delete="0">
 
                                     <!-- PATIENT -->
-                                    <field name="patient_id"/>
+                                    <field name="patient_id" string="Patient"/>
 
-                                    <field name="prescription_id"/>
+                                    <field name="drug_name" string="Product/Drug" readonly="1"/>
 
-                                    <field name="product_id"/>
+                                    <field name="daily_dose" string="Daily Dose" readonly="1"/>
 
+                                    <field name="facility_days_supply" string="Facility Days Supply" readonly="1"/>
 
-                                    <!-- DAYS SUPPLY -->
-                                    <field name="facility_days_supply"/>
+                                    <field name="cdu_days" string="CDU Days" readonly="1"/>
 
-                                    <field name="cdu_days"/>
+                                    <field name="regimen_repeat_days" string="Regimen Repeat Days" readonly="1"/>
 
-                                    <field name="total_days_supply"/>
+                                    <field name="prescription_repeat_days" string="Prescription Repeat Days"/>
 
-
-                                    <!-- DOSING -->
-                                    <field name="daily_dose"/>
-
-
-                                    <!-- UNITS -->
-                                    <field name="tablets_required"/>
-
-
-                                    <!-- BOTTLES -->
-                                    <field name="facility_bottles_required"/>
-
-                                    <field name="cdu_bottles_required"/>
-
-                                    <field name="total_bottles_required"/>
-
-
-                                    <!-- CDU OPERATIONAL -->
-                                    <field name="bottles_required"/>
+                                    <field name="effective_repeat_days" string="Effective Repeat Days" readonly="1"/>
 
                                 </tree>
 
                             </field>
 
                         </page>
-
-
 
                     </notebook>
                 </sheet>

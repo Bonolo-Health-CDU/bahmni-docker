@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_elmis_picking_wizard_form" model="ir.ui.view">
+        <field name="name">cdu.elmis.picking.wizard.form</field>
+        <field name="model">cdu.elmis.picking.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Picking List" class="o_cdu_elmis_picking_wizard">
+                <sheet>
+                    <field name="batch_id" invisible="1"/>
+                    <field name="batch_state" invisible="1"/>
+                    <field name="picking_ready" invisible="1"/>
+                    <div class="oe_title">
+                        <h1>Generate Picking List</h1>
+                        <div>
+                            <field name="subtitle" nolabel="1" readonly="1"/>
+                        </div>
+                    </div>
+
+                    <div class="o_cdu_elmis_wizard_steps">
+                        <span class="o_cdu_elmis_step o_cdu_elmis_step_done">Fetch stock</span>
+                        <span class="o_cdu_elmis_step o_cdu_elmis_step_current">Select stock</span>
+                        <span class="o_cdu_elmis_step">Generate</span>
+                    </div>
+
+                    <separator string="eRegister Requirements - from EMR, read only"/>
+                    <field name="elmis_picking_line_ids" readonly="1" nolabel="1">
+                        <tree create="0" delete="0" default_order="openmrs_drug_name asc">
+                            <field name="openmrs_drug_name" string="Regimen"/>
+                            <field name="prescription_count" string="Prescriptions"/>
+                            <field name="required_units" string="Required (tabs)"/>
+                            <field name="quantity_to_pick" string="Required (packs)"/>
+                            <field name="remaining_packs_to_pick" string="Remaining"/>
+                        </tree>
+                    </field>
+
+                    <separator string="Fulfil With eLMIS Stock - add multiple lots if needed"/>
+                    <field name="elmis_picking_fulfilment_line_ids"
+                           nolabel="1"
+                           context="{'default_batch_id': batch_id}"
+                           attrs="{'readonly': [('batch_state', 'in', ('picking_generated', 'printed', 'done'))]}">
+                        <tree editable="bottom"
+                              default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
+                            <field name="batch_id" invisible="1"/>
+                            <field name="picking_line_id"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   required="1"/>
+                            <field name="openmrs_drug_name" readonly="1" optional="hide"/>
+                            <field name="required_quantity" readonly="1" optional="hide"/>
+                            <field name="selected_stock_option_id"
+                                   string="Fulfil With"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="selected_orderable_name" invisible="1" force_save="1"/>
+                            <field name="selected_lot" string="Batch No." readonly="1" force_save="1"/>
+                            <field name="selected_lot_expiry" string="Expiry" readonly="1" force_save="1"/>
+                            <field name="selected_stock_on_hand" string="Avail. SOH" readonly="1" force_save="1"/>
+                            <field name="quantity_picked" string="Picked Qty"/>
+                            <field name="selected_orderable_code" invisible="1" force_save="1"/>
+                            <field name="selected_orderable_id" invisible="1" force_save="1"/>
+                            <field name="selected_lot_id" invisible="1" force_save="1"/>
+                        </tree>
+                    </field>
+
+                    <div class="alert alert-warning o_cdu_elmis_picking_client_warning d-none"
+                         role="alert"/>
+                </sheet>
+                <footer>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                    <button name="action_confirm"
+                            string="Generate Picking List"
+                            type="object"
+                            class="btn-primary o_cdu_generate_picking_button"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

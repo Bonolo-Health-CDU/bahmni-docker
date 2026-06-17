@@ -18,19 +18,6 @@
                         class="btn-secondary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
-                <button name="action_print_elmis_picking_list"
-                        string="Print Picking List"
-                        type="object"
-                        class="btn-primary"
-                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                        attrs="{'invisible': [('state', 'not in', ('picking_generated', 'printed'))]}"/>
-                <button name="action_confirm_elmis_picking"
-                        string="Confirm eLMIS Picking"
-                        type="object"
-                        class="btn-primary"
-                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                        confirm="This will submit stock movement events to eLMIS: debit CDU Store, then credit CDU Production Floor. Continue?"
-                        attrs="{'invisible': ['|', ('state', 'not in', ('picking_generated', 'printed')), ('picking_confirmed_at', '!=', False)]}"/>
                 <button name="action_calculate_residual_stock"
                         string="Calculate Residual Stock"
                         type="object"
@@ -85,7 +72,12 @@
             </xpath>
             <xpath expr="//div[contains(@class, 'o_cdu_batch_table_context')]" position="after">
                 <div class="o_cdu_batch_readiness_message" attrs="{'invisible': [('picking_ready', '=', True)]}">
-                    <field name="picking_readiness_message" readonly="1" nolabel="1"/>
+                    <span>Picking selections are incomplete.</span>
+                    <button name="action_open_elmis_picking_wizard"
+                            string="Open stock selection"
+                            type="object"
+                            class="btn-link p-0"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
                 </div>
             </xpath>
             <xpath expr="//page[field[@name='picking_line_ids']]" position="replace">
@@ -106,24 +98,112 @@
             <xpath expr="//page[field[@name='patient_picking_line_ids']]" position="replace">
                 <page string="Patient Picking Lines"
                       groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
-                    <field name="patient_picking_line_ids" readonly="1">
-                        <tree>
-                            <field name="patient_id"/>
-                            <field name="product_id" optional="hide"/>
-                            <field name="drug_name" string="Product/Drug"/>
-                            <field name="daily_dose"/>
-                            <field name="facility_days_supply" optional="show"/>
-                            <field name="cdu_days" string="CDU Days" optional="show"/>
-                            <field name="total_days_supply" optional="show"/>
-                            <field name="tablets_required" string="Total Units"/>
-                            <field name="facility_bottles_required" optional="hide"/>
-                            <field name="cdu_bottles_required" string="CDU Bottles"/>
-                            <field name="total_bottles_required" optional="hide"/>
-                            <field name="bottles_required" string="Dispense Qty" 
-                                   help="Operational quantity used for picking." 
-                                   decoration-bf="1"/>
-                        </tree>
-                    </field>
+                    <div class="o_cdu_patient_pick_table">
+                        <div class="o_cdu_patient_pick_header">
+                            <span>Patient</span>
+                            <span>Medication</span>
+                            <span>Daily dose</span>
+                            <span>Days to dispense</span>
+                            <span>To pick</span>
+                            <span>Next pickup</span>
+                            <span/>
+                        </div>
+                        <field name="patient_picking_line_ids"
+                               mode="kanban"
+                               readonly="1"
+                               class="o_cdu_patient_pick_lines">
+                            <kanban create="0" delete="0" edit="0" class="o_cdu_patient_pick_kanban">
+                                <field name="patient_id"/>
+                                <field name="medication_display"/>
+                                <field name="regimen_code_display"/>
+                                <field name="daily_dose_display"/>
+                                <field name="days_to_dispense_display"/>
+                                <field name="to_pick_pack_display"/>
+                                <field name="to_pick_units_display"/>
+                                <field name="calculated_next_pickup_date"/>
+                                <field name="next_pickup_supply_display"/>
+                                <field name="picking_variance_label"/>
+                                <field name="picking_variance_class"/>
+                                <field name="prescribed_days_display"/>
+                                <field name="facility_cap_display"/>
+                                <field name="cdu_cycle_display"/>
+                                <field name="regimen_override_display"/>
+                                <field name="required_units_display"/>
+                                <field name="picked_units_display"/>
+                                <field name="back_order_display"/>
+                                <templates>
+                                    <t t-name="kanban-box">
+                                        <details class="o_cdu_patient_pick_record">
+                                            <summary class="o_cdu_patient_pick_summary">
+                                                <span class="o_cdu_patient_pick_cell o_cdu_patient_pick_patient">
+                                                    <field name="patient_id"/>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell o_cdu_patient_pick_medication">
+                                                    <strong><field name="medication_display"/></strong>
+                                                    <small><field name="regimen_code_display"/></small>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <field name="daily_dose_display"/>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <strong><field name="days_to_dispense_display"/></strong>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <strong><field name="to_pick_pack_display"/></strong>
+                                                    <small><field name="to_pick_units_display"/></small>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_cell">
+                                                    <strong>
+                                                        <t t-if="record.calculated_next_pickup_date.raw_value">
+                                                            <field name="calculated_next_pickup_date"/>
+                                                        </t>
+                                                        <t t-else="">-</t>
+                                                    </strong>
+                                                    <small><field name="next_pickup_supply_display"/></small>
+                                                    <t t-if="record.picking_variance_label.raw_value">
+                                                        <em t-att-class="'o_cdu_patient_pick_badge ' + (record.picking_variance_class.raw_value || '')">
+                                                            <field name="picking_variance_label"/>
+                                                        </em>
+                                                    </t>
+                                                </span>
+                                                <span class="o_cdu_patient_pick_toggle" aria-hidden="true"/>
+                                            </summary>
+                                            <div class="o_cdu_patient_pick_detail">
+                                                <div>
+                                                    <span>Prescribed</span>
+                                                    <strong><field name="prescribed_days_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Facility cap</span>
+                                                    <strong><field name="facility_cap_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>CDU cycle</span>
+                                                    <strong><field name="cdu_cycle_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Regimen override</span>
+                                                    <strong><field name="regimen_override_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Required</span>
+                                                    <strong><field name="required_units_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Picked</span>
+                                                    <strong><field name="picked_units_display"/></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Back order</span>
+                                                    <strong><field name="back_order_display"/></strong>
+                                                </div>
+                                            </div>
+                                        </details>
+                                    </t>
+                                </templates>
+                            </kanban>
+                        </field>
+                    </div>
                 </page>
             </xpath>
             <xpath expr="//notebook" position="inside">
@@ -151,6 +231,12 @@
                     </field>
                 </page>
                 <page string="eLMIS Picking Selections">
+                    <button name="action_open_elmis_picking_wizard"
+                            string="Revise Selection"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'picking_generated')]}"/>
                     <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
                         Each eRegister drug/regimen below is generated from the prescriptions in this batch.
                         Add one or more eLMIS fulfilment rows for each regimen when multiple eLMIS products
@@ -164,11 +250,16 @@
                             <field name="openmrs_drug_name" readonly="1"/>
                             <field name="openmrs_drug_uuid" readonly="1" optional="hide"/>
                             <field name="prescription_count" readonly="1"/>
+                            <field name="required_units" readonly="1" optional="show"/>
+                            <field name="available_quantity" readonly="1" optional="hide"/>
+                            <field name="picked_quantity" readonly="1" optional="show"/>
+                            <field name="remaining_quantity" readonly="1" optional="show"/>
                             <field name="quantity_to_pick" readonly="1"/>
                         </tree>
                     </field>
                     <div class="o_cdu_elmis_section_title">Fulfil with eLMIS stock</div>
-                    <field name="elmis_picking_fulfilment_line_ids">
+                    <field name="elmis_picking_fulfilment_line_ids"
+                           attrs="{'readonly': [('state', 'in', ('picking_generated', 'printed', 'done'))]}">
                         <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
                             <field name="batch_id" invisible="1"/>
                             <field name="picking_line_id"

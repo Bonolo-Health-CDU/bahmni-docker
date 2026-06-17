@@ -6,59 +6,66 @@
     </record>
 
     <menuitem
+        id="menu_cdu_dispatch_operations"
+        name="Dispatch"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        sequence="30"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_dispensing_records"
         name="Dispensing Records"
-        parent="cdu_prescription.menu_cdu_prescription_operations"
+        parent="cdu_prescription.menu_cdu_records"
         action="action_cdu_dispense"
-        sequence="56"
+        sequence="10"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_awaiting_bagging_qa"
         name="Bagging / QA Work Queue"
-        parent="cdu_prescription.menu_cdu_prescription_operations"
+        parent="cdu_prescription.menu_cdu_production_operations"
         action="action_cdu_bagging_qa_work_queue"
-        sequence="57"
+        sequence="20"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_bagging_qa_records"
         name="Bagging / QA Records"
-        parent="cdu_prescription.menu_cdu_prescription_operations"
+        parent="cdu_prescription.menu_cdu_records"
         action="action_cdu_bagging_qa"
-        sequence="58"
+        sequence="20"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_boxing_work_queue"
         name="Boxing Work Queue"
-        parent="cdu_prescription.menu_cdu_prescription_operations"
+        parent="cdu_prescription.menu_cdu_production_operations"
         action="action_cdu_boxing_work_queue"
-        sequence="59"
+        sequence="30"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_boxes"
         name="Boxes"
-        parent="cdu_prescription.menu_cdu_prescription_operations"
+        parent="cdu_prescription.menu_cdu_records"
         action="action_cdu_box"
-        sequence="60"
+        sequence="30"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_awaiting_dispatch"
         name="Awaiting Dispatch"
-        parent="cdu_prescription.menu_cdu_prescription_operations"
+        parent="cdu_prescription.menu_cdu_prescription_review"
         action="action_cdu_awaiting_dispatch"
-        sequence="61"
+        sequence="50"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_dispatch_work_queue"
         name="Dispatch Work Queue"
-        parent="cdu_prescription.menu_cdu_prescription_operations"
+        parent="menu_cdu_dispatch_operations"
         action="action_cdu_dispatch_work_queue"
-        sequence="62"
+        sequence="10"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem

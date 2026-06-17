@@ -1,4 +1,9 @@
+import base64
+import json
 import math
+import re
+from datetime import timedelta
+from io import BytesIO
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -56,32 +61,41 @@ class CduBatch(models.Model):
         "batch_id",
         string="Residual Stock Return Lines",
     )
+    qr_code = fields.Binary(
+        string="Picking List QR Code",
+        compute="_compute_qr_code",
+    )
 
     def action_confirm_batch(self):
         return super().action_confirm_batch()
 
     def action_generate_picking_list(self):
         self._ensure_batch_workflow_access()
+        self.ensure_one()
         service = self.env["cdu.elmis.stock.service"]
         if not service.has_valid_current_user_elmis_token():
             return service.action_open_elmis_auth_wizard(batch=self[:1])
-        for batch in self:
-            if not batch.prescription_ids:
-                continue
-            batch._generate_elmis_picking_lines()
-            batch._refresh_store_stock_options()
-        self.write({"state": "picking_generated"})
+        return self.action_open_elmis_picking_wizard(refresh_stock=True)
+
+    def action_open_elmis_picking_wizard(self, refresh_stock=False):
+        self._ensure_batch_workflow_access()
+        self.ensure_one()
+        if not self.prescription_ids:
+            raise UserError(_("Add prescriptions to this batch before generating a picking list."))
+        if not self.elmis_picking_line_ids:
+            self._generate_elmis_picking_lines()
+        if refresh_stock:
+            self._refresh_store_stock_options()
+        wizard = self.env["cdu.elmis.picking.wizard"].create({"batch_id": self.id})
         return {
-            "type": "ir.actions.client",
-            "tag": "display_notification",
-            "params": {
-                "title": _("Picking list generated"),
-                "message": _(
-                    "eRegister drug lines and available CDU Store stock were prepared."
-                ),
-                "type": "success",
-                "sticky": False,
-                "next": {"type": "ir.actions.client", "tag": "reload"},
+            "type": "ir.actions.act_window",
+            "name": _("Generate Picking List"),
+            "res_model": "cdu.elmis.picking.wizard",
+            "res_id": wizard.id,
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_batch_id": self.id,
             },
         }
 
@@ -109,9 +123,73 @@ class CduBatch(models.Model):
             batch=self[:1]
         )
 
+    @api.depends(
+        "name",
+        "filter_next_drug_pickup_date_from",
+        "filter_next_drug_pickup_date_to",
+        "filter_collection_point_id",
+        "prescription_count",
+    )
+    def _compute_qr_code(self):
+        for batch in self:
+            batch.qr_code = False
+            payload = batch._get_picking_list_qr_payload()
+            if not payload:
+                continue
+            batch.qr_code = batch._generate_qr_code(payload)
+
+    def _get_picking_list_qr_payload(self):
+        self.ensure_one()
+        payload = {
+            "batch": self.name or "",
+            "pickup_from": (
+                fields.Date.to_string(self.filter_next_drug_pickup_date_from)
+                if self.filter_next_drug_pickup_date_from
+                else ""
+            ),
+            "pickup_to": (
+                fields.Date.to_string(self.filter_next_drug_pickup_date_to)
+                if self.filter_next_drug_pickup_date_to
+                else ""
+            ),
+            "collection_location": self.filter_collection_point_id.display_name or "",
+            "prescriptions": self.prescription_count or 0,
+        }
+        return json.dumps(payload, separators=(",", ":"))
+
+    def _generate_qr_code(self, payload):
+        try:
+            import qrcode
+
+            qr = qrcode.QRCode(
+                version=None,
+                error_correction=qrcode.constants.ERROR_CORRECT_M,
+                box_size=4,
+                border=2,
+            )
+            qr.add_data(payload)
+            qr.make(fit=True)
+            image = qr.make_image(fill_color="black", back_color="white")
+            stream = BytesIO()
+            image.save(stream, format="PNG")
+            return base64.b64encode(stream.getvalue())
+        except Exception:
+            try:
+                image = self.env["ir.actions.report"].barcode(
+                    "QR",
+                    payload,
+                    width=80,
+                    height=80,
+                    humanreadable=0,
+                    quiet=1,
+                )
+                return base64.b64encode(image)
+            except Exception:
+                return False
+
     def _generate_elmis_picking_lines(self):
         for batch in self:
-            _patient_line_vals, summary_vals = batch._prepare_picking_line_values()
+            patient_line_vals, summary_vals = batch._prepare_picking_line_values()
 
             elmis_line_vals = []
             
@@ -129,10 +207,18 @@ class CduBatch(models.Model):
                     "prescription_count": item["prescription_count"],
                 })
             
-            # Use write with command tuples to ensure elmis_picking_line_ids is refreshed in UI
+            # Use write with command tuples to ensure generated lines are refreshed in UI.
             batch.write({
+                "patient_picking_line_ids": [(5, 0, 0)] + [
+                    (0, 0, values) for values in patient_line_vals
+                ],
+                "picking_line_ids": [(5, 0, 0)] + [
+                    (0, 0, values) for values in summary_vals
+                ],
                 "elmis_picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in elmis_line_vals]
             })
+            batch.flush_recordset(["patient_picking_line_ids", "picking_line_ids"])
+            batch._link_elmis_lines_to_summary_lines()
             batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
 
     def _generate_unmapped_elmis_picking_lines(self, mapped_prescription_ids):
@@ -154,8 +240,12 @@ class CduBatch(models.Model):
             
             # Estimate requirement for unmapped drugs: 
             # Assume 1 unit/day and 30 units/pack as a safer fallback than +1
-            cdu_days = prescription.cdu_days_supply or 0
-            estimated_bottles = math.ceil(cdu_days / 30) if cdu_days > 0 else 1
+            effective_days = (
+                prescription.repeat_days
+                or prescription.cdu_days_supply
+                or 0
+            )
+            estimated_bottles = math.ceil(effective_days / 30) if effective_days > 0 else 1
             
             fallback_summary[key]["prescription_count"] += 1
             fallback_summary[key]["quantity_to_pick"] += estimated_bottles
@@ -236,9 +326,19 @@ class CduBatch(models.Model):
             if batch.picking_confirmed_at:
                 raise UserError(_("Picking has already been confirmed for %s.") % batch.name)
             batch._ensure_picking_ready()
-            batch._generate_picking_lines()
-            batch.invalidate_recordset(["picking_line_ids", "patient_picking_line_ids"])
+            if not batch.picking_line_ids or not batch.patient_picking_line_ids:
+                batch._generate_elmis_picking_lines()
+                batch.invalidate_recordset(
+                    [
+                        "picking_line_ids",
+                        "patient_picking_line_ids",
+                        "elmis_picking_line_ids",
+                        "elmis_picking_fulfilment_line_ids",
+                    ]
+                )
             batch._link_elmis_lines_to_summary_lines()
+            batch.elmis_picking_fulfilment_line_ids._sync_selected_stock_option()
+            batch._apply_repeat_fulfilment_results()
             batch.stock_event_status = "pending"
             store_items = batch._build_picking_stock_event_items(store_debit_reason)
             production_items = batch._build_picking_stock_event_items(
@@ -265,24 +365,11 @@ class CduBatch(models.Model):
                 batch.stock_event_status = "failed"
                 raise
 
-            for line in batch.elmis_picking_line_ids:
-                if line.summary_line_id:
-                    # Reflect the actual picked quantity in the generated Picking Summary.
-                    picked_qty = line.total_quantity_picked
-                    line.summary_line_id.total_bottles = picked_qty
-                    line.summary_line_id.total_tablets = (
-                        (line.summary_line_id.pack_size or 0) * picked_qty
-                    )
-
-                    # Synchronize the actual eLMIS products picked from fulfilment lines (aggregating if multiple)
-                    names = line.fulfilment_line_ids.filtered("selected_orderable_name").mapped("selected_orderable_name")
-                    if names:
-                        line.summary_line_id.elmis_product_name = ", ".join(sorted(set(names)))
-                    else:
-                        line.summary_line_id.elmis_product_name = line.selected_orderable_name
+            batch._sync_picking_summary_from_elmis_lines()
 
             batch.write(
                 {
+                    "state": "picking_generated",
                     "stock_event_status": "sent",
                     "picking_confirmed_at": fields.Datetime.now(),
                 }
@@ -307,6 +394,187 @@ class CduBatch(models.Model):
             },
         }
 
+    def _sync_picking_summary_from_elmis_lines(self):
+        for batch in self:
+            for line in batch.elmis_picking_line_ids:
+                if not line.summary_line_id:
+                    continue
+                pack_size = (
+                    batch._get_selected_elmis_pack_size(line)
+                    or line.summary_line_id.pack_size
+                    or line.pack_size
+                    or 30
+                )
+                matching_patient_lines = line._get_matching_patient_picking_lines()
+                required_units = (
+                    sum(matching_patient_lines.mapped("required_units"))
+                    or line.summary_line_id.total_tablets
+                    or 0.0
+                )
+                line.summary_line_id.write(
+                    {
+                        "pack_size": pack_size,
+                        "total_tablets": required_units,
+                        "total_bottles": (
+                            math.ceil(required_units / pack_size)
+                            if required_units > 0
+                            else 0
+                        ),
+                    }
+                )
+
+                names = line.fulfilment_line_ids.filtered("selected_orderable_name").mapped(
+                    "selected_orderable_name"
+                )
+                line.summary_line_id.elmis_product_name = (
+                    ", ".join(sorted(set(names)))
+                    if names
+                    else line.selected_orderable_name
+                )
+
+    def _sync_picking_quantities_from_elmis_pack_sizes(self):
+        for batch in self:
+            for line in batch.elmis_picking_line_ids:
+                if not line.summary_line_id:
+                    continue
+                pack_size = batch._get_selected_elmis_pack_size(line)
+                if not pack_size:
+                    continue
+
+                matching_patient_lines = line._get_matching_patient_picking_lines()
+                required_units = (
+                    sum(matching_patient_lines.mapped("required_units"))
+                    or line.summary_line_id.total_tablets
+                    or 0.0
+                )
+                packs_to_pick = (
+                    math.ceil(required_units / pack_size)
+                    if required_units > 0
+                    else 0
+                )
+
+                line.summary_line_id.write(
+                    {
+                        "pack_size": pack_size,
+                        "total_tablets": required_units,
+                        "total_bottles": packs_to_pick,
+                    }
+                )
+                line.quantity_to_pick = packs_to_pick or line.quantity_to_pick or 1
+                for fulfilment_line in line.fulfilment_line_ids:
+                    if (
+                        not fulfilment_line.quantity_picked
+                        or fulfilment_line.quantity_picked > packs_to_pick
+                    ):
+                        fulfilment_line.quantity_picked = min(
+                            line.quantity_to_pick,
+                            fulfilment_line.selected_stock_on_hand or line.quantity_to_pick,
+                        )
+
+    def _get_selected_elmis_pack_size(self, picking_line):
+        self.ensure_one()
+        pack_sizes = [
+            pack_size
+            for pack_size in picking_line.fulfilment_line_ids.mapped(
+                "selected_stock_option_id.pack_size"
+            )
+            if pack_size
+        ]
+        if not pack_sizes and picking_line.selected_stock_option_id.pack_size:
+            pack_sizes = [picking_line.selected_stock_option_id.pack_size]
+        if not pack_sizes:
+            options = (
+                picking_line.fulfilment_line_ids.mapped("selected_stock_option_id")
+                or picking_line.selected_stock_option_id
+            )
+            for option in options:
+                pack_size = self._extract_elmis_pack_size(
+                    {},
+                    option.orderable_name if option else None,
+                )
+                if pack_size:
+                    pack_sizes.append(pack_size)
+                    break
+        return pack_sizes[0] if pack_sizes else 0
+
+    def _apply_repeat_fulfilment_results(self):
+        for batch in self:
+            for patient_line in batch.patient_picking_line_ids:
+                patient_line.write(
+                    {
+                        "served_days": 0,
+                        "remaining_days": patient_line.back_order_days,
+                        "available_quantity": 0,
+                        "picked_quantity": 0,
+                        "picked_units": 0,
+                        "actual_supplied_days": 0,
+                        "back_order_days": patient_line.cdu_days,
+                        "recalculated_next_drug_pickup_date": False,
+                        "calculated_next_pickup_date": False,
+                    }
+                )
+
+            for line in batch.elmis_picking_line_ids:
+                patient_lines = line._get_matching_patient_picking_lines()
+                if not patient_lines:
+                    continue
+                pack_size = line.summary_line_id.pack_size or line.pack_size or 30
+                available_units = sum(
+                    line.fulfilment_line_ids.mapped("selected_stock_on_hand")
+                ) * pack_size
+                remaining_units = sum(
+                    line.fulfilment_line_ids.mapped("quantity_picked")
+                ) * pack_size
+
+                for patient_line in patient_lines.sorted("id"):
+                    daily_dose = patient_line.daily_dose or 0
+                    effective_repeat_days = patient_line.effective_repeat_days or patient_line.repeat_days or 0
+                    required_quantity = daily_dose * effective_repeat_days
+                    line_available_quantity = min(required_quantity, available_units)
+                    bottle_quantity = (
+                        (patient_line.cdu_bottles_required or 0)
+                        * (patient_line.pack_size or pack_size or 30)
+                    )
+                    picked_bottle_quantity = min(bottle_quantity, remaining_units)
+                    actual_supplied_days = picked_bottle_quantity / daily_dose if daily_dose else 0
+                    served_days = int(actual_supplied_days)
+                    back_order_days = max((patient_line.cdu_days or 0) - actual_supplied_days, 0)
+                    recalculated_date = False
+                    if patient_line.prescription_id.next_drug_pickup_date:
+                        recalculated_date = (
+                            patient_line.prescription_id.next_drug_pickup_date
+                            + timedelta(days=int(actual_supplied_days))
+                        )
+
+                    patient_line.write(
+                        {
+                            "required_quantity": required_quantity,
+                            "available_quantity": line_available_quantity,
+                            "picked_quantity": picked_bottle_quantity,
+                            "picked_units": picked_bottle_quantity,
+                            "actual_supplied_days": actual_supplied_days,
+                            "back_order_days": back_order_days,
+                            "served_days": served_days,
+                            "remaining_days": int(back_order_days),
+                            "recalculated_next_drug_pickup_date": recalculated_date,
+                            "calculated_next_pickup_date": recalculated_date,
+                        }
+                    )
+                    available_units = max(available_units - required_quantity, 0)
+                    remaining_units = max(remaining_units - picked_bottle_quantity, 0)
+
+            for prescription in batch.prescription_ids:
+                lines = batch.patient_picking_line_ids.filtered(
+                    lambda line: line.prescription_id == prescription
+                )
+                if not lines:
+                    continue
+                served_days = min(lines.mapped("actual_supplied_days") or [0])
+                if prescription.next_drug_pickup_date:
+                    prescription.next_drug_pickup_date = (
+                        prescription.next_drug_pickup_date + timedelta(days=int(served_days))
+                    )
+
     def _link_elmis_lines_to_summary_lines(self):
         for batch in self:
             summary_lines_by_name = {
@@ -322,11 +590,20 @@ class CduBatch(models.Model):
     def _build_picking_stock_event_items(self, reason_name):
         self.ensure_one()
         grouped = {}
-        for line in self.elmis_picking_fulfilment_line_ids:
+        fulfilment_lines = self.env["cdu.picking.fulfilment.line"].search(
+            [("batch_id", "=", self.id)]
+        )
+        fulfilment_lines._sync_selected_stock_option()
+
+        for line in fulfilment_lines:
+            if not line.selected_stock_option_id or line.quantity_picked <= 0:
+                continue
             key = (
                 line.selected_orderable_id or line.selected_orderable_code,
                 line.selected_lot_id or line.selected_lot or "",
             )
+            if not key[0]:
+                continue
             if key not in grouped:
                 grouped[key] = {
                     "orderable": line.selected_orderable_code,
@@ -570,11 +847,22 @@ class CduBatch(models.Model):
                     _("%s: add at least one eLMIS fulfilment line.")
                     % (picking_line.openmrs_drug_name or _("Picking line"))
                 )
+                continue
+            required_qty = picking_line.quantity_to_pick or 0.0
+            picked_qty = picking_line.total_quantity_picked or 0.0
+            if picked_qty > required_qty + 0.0001:
+                errors.append(
+                    _("%s: picked quantity exceeds required packs by %.2f.")
+                    % (
+                        picking_line.openmrs_drug_name or _("Picking line"),
+                        picked_qty - required_qty,
+                    )
+                )
 
         for index, line in enumerate(self.elmis_picking_fulfilment_line_ids, start=1):
             label = line.openmrs_drug_name or _("Fulfilment line %s") % index
             if not line.selected_stock_option_id:
-                errors.append(_("%s: select an eLMIS stock option in Fulfil With.") % label)
+                errors.append(_("%s: choose an eLMIS stock option before generating the picking list.") % label)
             if line.quantity_picked <= 0:
                 errors.append(_("%s: picked quantity must be greater than zero.") % label)
             if (
@@ -666,10 +954,15 @@ class CduBatch(models.Model):
                 or summary.get("orderableDisplayName")
                 or orderable
             )
+            pack_size = self._extract_elmis_pack_size(summary, orderable_name)
             for card in summary.get("stockCards") or []:
                 stock_on_hand = card.get("stockOnHand") or 0
                 if stock_on_hand <= 0:
                     continue
+                card_pack_size = (
+                    self._extract_elmis_pack_size(card, orderable_name)
+                    or pack_size
+                )
                 option_values.append(
                     {
                         "batch_id": self.id,
@@ -677,6 +970,7 @@ class CduBatch(models.Model):
                         "program_code": summary.get("program") or program_code,
                         "orderable_code": orderable,
                         "orderable_name": orderable_name,
+                        "pack_size": card_pack_size,
                         "lot": card.get("lot"),
                         "stock_on_hand": stock_on_hand,
                         "expiration_date": fields.Date.to_date(card.get("expirationDate")),
@@ -704,6 +998,7 @@ class CduBatch(models.Model):
             orderable_id = orderable.get("id")
             lot_id = lot.get("id")
             orderable_name = entry.get("orderableName") or orderable_id
+            pack_size = self._extract_elmis_pack_size(entry, orderable_name)
             option_values.append(
                 {
                     "batch_id": self.id,
@@ -712,6 +1007,7 @@ class CduBatch(models.Model):
                     "orderable_code": orderable_id,
                     "orderable_id": orderable_id,
                     "orderable_name": orderable_name,
+                    "pack_size": pack_size,
                     "lot": entry.get("lotCode"),
                     "lot_id": lot_id,
                     "stock_on_hand": stock_on_hand,
@@ -722,6 +1018,41 @@ class CduBatch(models.Model):
                 }
             )
         return option_values
+
+    def _extract_elmis_pack_size(self, payload, product_name=None):
+        direct_keys = (
+            "packSize",
+            "pack_size",
+            "netContent",
+            "net_content",
+            "dispensingUnitsPerPack",
+            "unitsPerPack",
+        )
+        for key in direct_keys:
+            value = self._coerce_pack_size(payload.get(key)) if isinstance(payload, dict) else 0
+            if value:
+                return value
+
+        if isinstance(payload, dict):
+            for key in ("orderable", "commodityType", "tradeItem"):
+                nested = payload.get(key)
+                if isinstance(nested, dict):
+                    value = self._extract_elmis_pack_size(nested)
+                    if value:
+                        return value
+
+        if product_name:
+            match = re.search(r"(\d+)\s*$", product_name.strip())
+            if match:
+                return int(match.group(1))
+        return 0
+
+    def _coerce_pack_size(self, value):
+        try:
+            pack_size = int(float(value or 0))
+        except (TypeError, ValueError):
+            return 0
+        return pack_size if pack_size > 0 else 0
 
     def _extract_stock_summaries(self, payload):
         if isinstance(payload, list):

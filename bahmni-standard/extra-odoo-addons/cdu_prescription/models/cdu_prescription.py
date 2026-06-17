@@ -88,6 +88,11 @@ class CduPrescription(models.Model):
         store=True,
         string="CDU Dispensing Days"
     )
+    repeat_days = fields.Integer(
+        string="Repeats in Days",
+        tracking=True,
+        help="Number of CDU repeat days requested for this prescription.",
+    )
     total_days_supply = fields.Integer(
         compute="_compute_prescription_durations",
         store=True,
@@ -122,6 +127,20 @@ class CduPrescription(models.Model):
         ("unique_source_key", "unique(source_key)", "This eRegister prescription has already been ingested."),
     ]
 
+
+    def name_get(self):
+        if self.env.context.get("display_regimen_prescribed_raw"):
+            return [
+                (
+                    prescription.id,
+                    prescription.regimen_prescribed_raw
+                    or prescription.name
+                    or _("No regimen"),
+                )
+                for prescription in self
+            ]
+        return super().name_get()
+
     @api.model
     def create(self, vals):
 
@@ -142,6 +161,7 @@ class CduPrescription(models.Model):
                 vals["regimen_id"] = regimen.id
 
         prescription = super().create(vals)
+        prescription._sync_repeat_days_from_cdu_days()
         prescription._check_required_next_drug_pickup_date()
 
         return prescription
@@ -159,6 +179,14 @@ class CduPrescription(models.Model):
             regimen = self._find_matching_regimen(vals.get("regimen_prescribed_raw"))
             vals["regimen_id"] = (regimen.id if regimen else False )
         result = super().write(vals)
+
+        duration_fields = {
+            "prescription_date",
+            "next_drug_pickup_date",
+            "next_clinical_visit_date",
+        }
+        if duration_fields.intersection(vals) and "repeat_days" not in vals:
+            self._sync_repeat_days_from_cdu_days()
 
         if "next_drug_pickup_date" in vals:
             self._check_required_next_drug_pickup_date()
@@ -246,6 +274,35 @@ class CduPrescription(models.Model):
     def _onchange_patient_id(self):
         if self.patient_id:
             self.update(self._patient_snapshot_values(self.patient_id.id))
+
+    @api.onchange("next_drug_pickup_date", "next_clinical_visit_date")
+    def _onchange_repeat_days_dates(self):
+        return
+
+    @api.onchange("repeat_days")
+    def _onchange_repeat_days(self):
+        for prescription in self:
+            if prescription.repeat_days and prescription.repeat_days < 0:
+                prescription.repeat_days = 0
+
+    @api.constrains("repeat_days")
+    def _check_repeat_days(self):
+        for prescription in self:
+            if prescription.repeat_days < 0:
+                raise ValidationError(_("Repeats in Days cannot be negative."))
+
+    @api.model
+    def _calculate_repeat_days_from_values(self, values):
+        next_pickup = fields.Date.to_date(values.get("next_drug_pickup_date"))
+        next_clinical = fields.Date.to_date(values.get("next_clinical_visit_date"))
+        if not next_pickup or not next_clinical:
+            return 0
+        return max(0, (next_clinical - next_pickup).days)
+
+    def _sync_repeat_days_from_cdu_days(self):
+        for prescription in self:
+            if prescription.repeat_days <= 0 and prescription.cdu_days_supply > 0:
+                prescription.repeat_days = prescription.cdu_days_supply
 
     def _ensure_cdu_groups(self, *xml_ids):
         if self.env.user.has_group("cdu_prescription.group_cdu_admin"):

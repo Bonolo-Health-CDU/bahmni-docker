@@ -7,56 +7,91 @@
         groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
-        id="menu_cdu_prescription_operations"
-        name="Operations"
+        id="menu_cdu_prescription_workspace"
+        name="Prescriptions"
         parent="menu_cdu_root"
         sequence="10"
         groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_prescription_operations"
+        name="Operations"
+        parent="menu_cdu_root"
+        sequence="20"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_prescription_intake"
+        name="Intake"
+        parent="menu_cdu_prescription_workspace"
+        sequence="10"
+        groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_prescription_review"
+        name="Status Views"
+        parent="menu_cdu_prescription_workspace"
+        sequence="20"
+        groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_production_operations"
+        name="Production Floor"
+        parent="menu_cdu_prescription_operations"
+        sequence="20"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_records"
+        name="Records"
+        parent="menu_cdu_root"
+        sequence="30"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_report_imports"
         name="Report Imports"
-        parent="menu_cdu_prescription_operations"
+        parent="menu_cdu_prescription_intake"
         action="action_cdu_report_run"
-        sequence="5"
+        sequence="10"
         groups="cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_prescriptions"
-        name="Prescriptions"
-        parent="menu_cdu_prescription_operations"
+        name="All Prescriptions"
+        parent="menu_cdu_prescription_intake"
         action="action_cdu_prescription"
-        sequence="10"
+        sequence="20"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_patients"
         name="Patients"
-        parent="menu_cdu_prescription_operations"
+        parent="menu_cdu_prescription_intake"
         action="action_cdu_patient"
-        sequence="15"
+        sequence="30"
         groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_awaiting_verification"
         name="Awaiting Verification"
-        parent="menu_cdu_prescription_operations"
+        parent="menu_cdu_prescription_review"
         action="action_cdu_prescription_awaiting_verification"
-        sequence="20"
+        sequence="10"
         groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_rejected_to_call_center"
         name="Rejected to Call Center"
-        parent="menu_cdu_prescription_operations"
+        parent="menu_cdu_prescription_review"
         action="action_cdu_prescription_rejected_to_call_center"
-        sequence="25"
+        sequence="20"
         groups="cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_awaiting_validation"
         name="Awaiting Validation"
-        parent="menu_cdu_prescription_operations"
+        parent="menu_cdu_prescription_review"
         action="action_cdu_prescription_awaiting_validation"
         sequence="30"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
@@ -64,7 +99,7 @@
     <menuitem
         id="menu_cdu_awaiting_batching"
         name="Awaiting Batching"
-        parent="menu_cdu_prescription_operations"
+        parent="menu_cdu_prescription_review"
         action="action_cdu_prescription_awaiting_batching"
         sequence="40"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
@@ -74,15 +109,15 @@
         name="Workload Batches"
         parent="menu_cdu_prescription_operations"
         action="action_cdu_batch"
-        sequence="50"
+        sequence="10"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
         id="menu_cdu_awaiting_dispensing"
         name="Awaiting Dispensing"
-        parent="menu_cdu_prescription_operations"
+        parent="menu_cdu_production_operations"
         action="action_cdu_prescription_awaiting_dispensing"
-        sequence="55"
+        sequence="10"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem

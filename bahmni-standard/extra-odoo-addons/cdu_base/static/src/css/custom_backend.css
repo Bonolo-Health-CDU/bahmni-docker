@@ -36,11 +36,14 @@
 }
 
 .o_FormRenderer_chatterContainer,
+.o-mail-Form-chatter,
 .oe_chatter {
     position: relative;
 }
 
-body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer {
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer,
+body.cdu-chatter-collapsed .o-mail-Form-chatter,
+body.cdu-chatter-collapsed .oe_chatter {
     flex: 0 0 46px !important;
     max-width: 46px !important;
     min-width: 46px !important;
@@ -48,11 +51,15 @@ body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer {
     width: 46px !important;
 }
 
-body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer > :not(.cdu-chatter-toggle) {
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer > :not(.cdu-chatter-toggle),
+body.cdu-chatter-collapsed .o-mail-Form-chatter > :not(.cdu-chatter-toggle),
+body.cdu-chatter-collapsed .oe_chatter > :not(.cdu-chatter-toggle) {
     display: none !important;
 }
 
-body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle {
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle,
+body.cdu-chatter-collapsed .o-mail-Form-chatter .cdu-chatter-toggle,
+body.cdu-chatter-collapsed .oe_chatter .cdu-chatter-toggle {
     border-radius: 50%;
     height: 34px;
     min-width: 34px;
@@ -62,10 +69,14 @@ body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle 
     width: 34px;
 }
 
-body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle-label {
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle-label,
+body.cdu-chatter-collapsed .o-mail-Form-chatter .cdu-chatter-toggle-label,
+body.cdu-chatter-collapsed .oe_chatter .cdu-chatter-toggle-label {
     display: none;
 }
 
-body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle-icon {
+body.cdu-chatter-collapsed .o_FormRenderer_chatterContainer .cdu-chatter-toggle-icon,
+body.cdu-chatter-collapsed .o-mail-Form-chatter .cdu-chatter-toggle-icon,
+body.cdu-chatter-collapsed .oe_chatter .cdu-chatter-toggle-icon {
     transform: rotate(180deg);
 }

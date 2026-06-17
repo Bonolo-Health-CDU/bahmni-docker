@@ -36,11 +36,40 @@
                     <button name="action_return_to_validation" string="Back to Awaiting Validation" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_data_clerk" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
-                    <button name="action_remap_regimens" string="Remap Regimen" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
-                    <button name="action_cancel" string="Cancel" type="object" groups="cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching,awaiting_picking,awaiting_dispensing,awaiting_bagging_qa,awaiting_boxing,awaiting_dispatch,dispatched" attrs="{'invisible': [('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="rejected_to_call_center" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="rejected_to_facility" attrs="{'invisible': [('state', '!=', 'rejected_to_facility')]}"/>
+                    <button name="action_remap_regimens" string="Remap Regimen" type="object" class="btn-secondary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+                    <button name="action_cancel" string="Cancel" type="object" class="btn-secondary" groups="cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="awaiting_verification,awaiting_validation,awaiting_batching"
+                           attrs="{'invisible': [('state', 'not in', ('awaiting_verification', 'awaiting_validation', 'awaiting_batching'))]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="cancelled"
+                           attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="rejected_to_call_center"
+                           attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="rejected_to_facility"
+                           attrs="{'invisible': [('state', '!=', 'rejected_to_facility')]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="awaiting_batching,awaiting_picking,awaiting_dispensing"
+                           attrs="{'invisible': [('state', 'not in', ('awaiting_picking', 'awaiting_dispensing'))]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="awaiting_dispensing,awaiting_bagging_qa"
+                           attrs="{'invisible': [('state', '!=', 'awaiting_bagging_qa')]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="awaiting_bagging_qa,awaiting_boxing,awaiting_dispatch"
+                           attrs="{'invisible': [('state', 'not in', ('awaiting_boxing', 'awaiting_dispatch'))]}"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="awaiting_dispatch,dispatched"
+                           attrs="{'invisible': [('state', '!=', 'dispatched')]}"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
