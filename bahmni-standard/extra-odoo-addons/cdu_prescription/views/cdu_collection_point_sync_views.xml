@@ -9,6 +9,7 @@
                 <field name="enabled"/>
                 <field name="request_endpoint"/>
                 <field name="request_method"/>
+                <field name="sync_interval_hours"/>
                 <field name="last_sync_at"/>
             </tree>
         </field>
@@ -38,6 +39,8 @@
                             <field name="response_endpoint_template"/>
                             <field name="poll_attempts"/>
                             <field name="poll_interval_seconds"/>
+                            <field name="sync_interval_hours"/>
+                            <field name="sync_on_startup"/>
                         </group>
                     </group>
                     <group string="CDU Dispatch Location">
@@ -59,6 +62,7 @@
                             <field name="sync_log_ids" readonly="1">
                                 <tree decoration-danger="state == 'failed'">
                                     <field name="requested_at"/>
+                                    <field name="trigger_mode"/>
                                     <field name="reference_guid"/>
                                     <field name="fetched_count"/>
                                     <field name="created_count"/>
@@ -86,6 +90,7 @@
             <tree decoration-danger="state == 'failed'">
                 <field name="name"/>
                 <field name="requested_at"/>
+                <field name="trigger_mode"/>
                 <field name="reference_guid"/>
                 <field name="fetched_count"/>
                 <field name="created_count"/>
@@ -112,6 +117,7 @@
                         <group string="Request Tracking">
                             <field name="config_id" readonly="1"/>
                             <field name="reference_guid" readonly="1"/>
+                            <field name="trigger_mode" readonly="1"/>
                             <field name="requested_at" readonly="1"/>
                             <field name="request_acknowledged_at" readonly="1"/>
                             <field name="responded_at" readonly="1"/>

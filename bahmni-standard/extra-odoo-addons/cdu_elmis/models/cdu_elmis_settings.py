@@ -60,12 +60,12 @@ class ResConfigSettings(models.TransientModel):
     cdu_elmis_picking_debit_reason_name = fields.Char(
         string="Picking Store Debit Reason",
         config_parameter="cdu.elmis.picking_debit_reason_name",
-        default="Transfer Out",
+        default="Internal Transfer Out",
     )
     cdu_elmis_picking_credit_reason_name = fields.Char(
         string="Picking Production Credit Reason",
         config_parameter="cdu.elmis.picking_credit_reason_name",
-        default="Transfer In",
+        default="Internal Transfer In",
     )
     cdu_elmis_consumption_reason_name = fields.Char(
         string="Consumption Reason",
@@ -75,12 +75,12 @@ class ResConfigSettings(models.TransientModel):
     cdu_elmis_residual_debit_reason_name = fields.Char(
         string="Residual Production Debit Reason",
         config_parameter="cdu.elmis.residual_debit_reason_name",
-        default="Transfer Out",
+        default="Internal Transfer Out",
     )
     cdu_elmis_residual_credit_reason_name = fields.Char(
         string="Residual Store Credit Reason",
         config_parameter="cdu.elmis.residual_credit_reason_name",
-        default="Facility Return",
+        default="Internal Transfer In",
     )
     cdu_elmis_picking_debit_reason_id = fields.Char(
         string="Picking Store Debit Reason UUID",
@@ -151,10 +151,10 @@ class ResConfigSettings(models.TransientModel):
         string="Collect-and-Go CDU Location ID",
         config_parameter="cdu.collect_go.cdu_location_id",
     )
-    cdu_collect_go_dispatch_tracking_status_type = fields.Integer(
+    cdu_collect_go_dispatch_tracking_status_type = fields.Char(
         string="Dispatch Tracking Status Type",
         config_parameter="cdu.collect_go.dispatch_tracking_status_type",
-        default=0,
+        default="ReadyForDispatch",
     )
     cdu_collect_go_standard_parcel_type = fields.Integer(
         string="Standard Parcel Type",
@@ -186,13 +186,28 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="cdu.collect_go.max_retry_count",
         default=3,
     )
+    cdu_collect_go_message_poll_enabled = fields.Boolean(
+        string="Enable Message Processing Polling",
+        config_parameter="cdu.collect_go.message_poll_enabled",
+        default=True,
+    )
+    cdu_collect_go_message_poll_interval_minutes = fields.Integer(
+        string="Message Poll Interval (Minutes)",
+        config_parameter="cdu.collect_go.message_poll_interval_minutes",
+        default=1,
+    )
+    cdu_collect_go_message_poll_batch_size = fields.Integer(
+        string="Message Poll Batch Size",
+        config_parameter="cdu.collect_go.message_poll_batch_size",
+        default=100,
+    )
     cdu_collect_go_status_poll_enabled = fields.Boolean(
-        string="Enable Status Polling",
+        string="Enable Parcel Status Polling",
         config_parameter="cdu.collect_go.status_poll_enabled",
         default=True,
     )
     cdu_collect_go_status_poll_interval_minutes = fields.Integer(
-        string="Status Poll Interval (Minutes)",
+        string="Parcel Status Poll Interval (Minutes)",
         config_parameter="cdu.collect_go.status_poll_interval_minutes",
         default=15,
     )
@@ -204,23 +219,54 @@ class ResConfigSettings(models.TransientModel):
 
     def set_values(self):
         result = super().set_values()
-        self._sync_collect_go_status_poll_cron()
+        self._sync_collect_go_poll_crons()
         return result
 
-    def _sync_collect_go_status_poll_cron(self):
-        cron = self.env.ref("cdu_elmis.ir_cron_cdu_collect_go_status_poll", raise_if_not_found=False)
+    def _sync_collect_go_poll_crons(self):
+        params = self.env["ir.config_parameter"].sudo()
+        self._sync_collect_go_poll_cron(
+            "cdu_elmis.ir_cron_cdu_collect_go_message_poll",
+            params.get_param(
+                "cdu.collect_go.message_poll_enabled", "True"
+            )
+            == "True",
+            params.get_param(
+                "cdu.collect_go.message_poll_interval_minutes"
+            ),
+            1,
+        )
+        self._sync_collect_go_poll_cron(
+            "cdu_elmis.ir_cron_cdu_collect_go_status_poll",
+            params.get_param(
+                "cdu.collect_go.status_poll_enabled", "True"
+            )
+            == "True",
+            params.get_param(
+                "cdu.collect_go.status_poll_interval_minutes"
+            ),
+            15,
+        )
+
+    def _sync_collect_go_poll_cron(
+        self,
+        xml_id,
+        enabled,
+        raw_interval,
+        default_interval,
+    ):
+        cron = self.env.ref(xml_id, raise_if_not_found=False)
         if not cron:
             return
-        params = self.env["ir.config_parameter"].sudo()
-        enabled = params.get_param("cdu.collect_go.status_poll_enabled", "True") == "True"
         try:
-            interval = int(params.get_param("cdu.collect_go.status_poll_interval_minutes") or 15)
+            interval = int(raw_interval or default_interval)
         except ValueError:
-            interval = 15
-        cron.sudo().write({
-            "active": enabled,
-            "interval_number": max(interval, 1),
-        })
+            interval = default_interval
+        cron.sudo().write(
+            {
+                "active": enabled,
+                "interval_number": max(interval, 1),
+            }
+        )
 
     def action_resolve_elmis_reference_ids(self):
         self.ensure_one()

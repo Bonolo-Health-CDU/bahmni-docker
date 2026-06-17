@@ -2,12 +2,12 @@
 <odoo noupdate="1">
     <record id="param_cdu_elmis_picking_debit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.picking_debit_reason_name</field>
-        <field name="value">Transfer Out</field>
+        <field name="value">Internal Transfer Out</field>
     </record>
 
     <record id="param_cdu_elmis_picking_credit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.picking_credit_reason_name</field>
-        <field name="value">Transfer In</field>
+        <field name="value">Internal Transfer In</field>
     </record>
 
     <record id="param_cdu_elmis_consumption_reason_name" model="ir.config_parameter">
@@ -17,12 +17,12 @@
 
     <record id="param_cdu_elmis_residual_debit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.residual_debit_reason_name</field>
-        <field name="value">Transfer Out</field>
+        <field name="value">Internal Transfer Out</field>
     </record>
 
     <record id="param_cdu_elmis_residual_credit_reason_name" model="ir.config_parameter">
         <field name="key">cdu.elmis.residual_credit_reason_name</field>
-        <field name="value">Facility Return</field>
+        <field name="value">Internal Transfer In</field>
     </record>
 
     <record id="param_cdu_elmis_stock_cache_ttl_seconds" model="ir.config_parameter">
@@ -50,19 +50,26 @@
         <field name="value">changeme</field>
     </record>
 
-    <record id="param_cdu_collect_go_base_url" model="ir.config_parameter">
-        <field name="key">cdu.collect_go.base_url</field>
-        <field name="value">https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health</field>
-    </record>
+    <data noupdate="1">
+        <record id="param_cdu_collect_go_base_url" model="ir.config_parameter">
+            <field name="key">cdu.collect_go.base_url</field>
+            <field name="value">https://api.bonolohealth.gov.ls/api/Ministry%20of%20Health</field>
+        </record>
 
-    <record id="param_cdu_collect_go_cdu_location_id" model="ir.config_parameter">
-        <field name="key">cdu.collect_go.cdu_location_id</field>
-        <field name="value"></field>
-    </record>
+        <record id="param_cdu_collect_go_cdu_location_id" model="ir.config_parameter">
+            <field name="key">cdu.collect_go.cdu_location_id</field>
+            <field name="value">1</field>
+        </record>
+
+        <record id="param_cdu_collect_go_max_retry_count" model="ir.config_parameter">
+            <field name="key">cdu.collect_go.max_retry_count</field>
+            <field name="value">3</field>
+        </record>
+    </data>
 
     <record id="param_cdu_collect_go_dispatch_tracking_status_type" model="ir.config_parameter">
         <field name="key">cdu.collect_go.dispatch_tracking_status_type</field>
-        <field name="value">0</field>
+        <field name="value">ReadyForDispatch</field>
     </record>
 
     <record id="param_cdu_collect_go_standard_parcel_type" model="ir.config_parameter">
@@ -90,9 +97,19 @@
         <field name="value">30</field>
     </record>
 
-    <record id="param_cdu_collect_go_max_retry_count" model="ir.config_parameter">
-        <field name="key">cdu.collect_go.max_retry_count</field>
-        <field name="value">3</field>
+    <record id="param_cdu_collect_go_message_poll_enabled" model="ir.config_parameter">
+        <field name="key">cdu.collect_go.message_poll_enabled</field>
+        <field name="value">True</field>
+    </record>
+
+    <record id="param_cdu_collect_go_message_poll_interval_minutes" model="ir.config_parameter">
+        <field name="key">cdu.collect_go.message_poll_interval_minutes</field>
+        <field name="value">1</field>
+    </record>
+
+    <record id="param_cdu_collect_go_message_poll_batch_size" model="ir.config_parameter">
+        <field name="key">cdu.collect_go.message_poll_batch_size</field>
+        <field name="value">100</field>
     </record>
 
     <record id="param_cdu_collect_go_status_poll_enabled" model="ir.config_parameter">

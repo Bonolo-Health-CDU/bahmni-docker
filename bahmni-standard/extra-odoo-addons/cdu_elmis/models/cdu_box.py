@@ -452,7 +452,7 @@ class CduBox(models.Model):
             )
             if not awaiting_dispatch:
                 raise UserError(_("No prescriptions in this box are awaiting dispatch."))
-            self.env["cdu.collect.go.service"].submit_box_create_parcel(box)
+            self.env["cdu.collect.go.service"].submit_box_update_parcel(box)
             submitted_count += 1
         return {
             "type": "ir.actions.client",
@@ -460,7 +460,7 @@ class CduBox(models.Model):
             "params": {
                 "title": _("Submitted to Collect-and-Go"),
                 "message": _(
-                    "%(count)s box(es) were accepted by the Collect-and-Go bridge. "
+                    "%(count)s box update(s) were accepted by the Collect-and-Go bridge. "
                     "Click Check Collect-and-Go Response to confirm final processing."
                 )
                 % {"count": submitted_count},
@@ -474,7 +474,7 @@ class CduBox(models.Model):
         self._ensure_boxing_access()
         retried_count = 0
         for box in self:
-            self.env["cdu.collect.go.service"].retry_box_create_parcel(box)
+            self.env["cdu.collect.go.service"].retry_box_update_parcel(box)
             retried_count += 1
         return {
             "type": "ir.actions.client",
@@ -482,7 +482,7 @@ class CduBox(models.Model):
             "params": {
                 "title": _("Collect-and-Go retry submitted"),
                 "message": _(
-                    "%(count)s box(es) were re-submitted to Collect-and-Go. "
+                    "%(count)s box update(s) were re-submitted to Collect-and-Go. "
                     "Click Check Collect-and-Go Response to confirm final processing."
                 )
                 % {"count": retried_count},
@@ -557,6 +557,12 @@ class CduBox(models.Model):
                 "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
+
+    @api.model
+    def cron_poll_collect_go_message_status(self):
+        return self.env[
+            "cdu.collect.go.service"
+        ].cron_poll_message_processing_status()
 
     @api.model
     def cron_poll_collect_go_parcel_status(self):

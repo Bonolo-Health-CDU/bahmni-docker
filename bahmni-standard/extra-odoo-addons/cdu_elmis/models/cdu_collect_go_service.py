@@ -1,24 +1,33 @@
+import hashlib
 import json
+import logging
+import re
 import uuid
+from datetime import timedelta, timezone
 from urllib import error, request
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
+_logger = logging.getLogger(__name__)
+
+
 class CduCollectGoService(models.AbstractModel):
     _name = "cdu.collect.go.service"
     _description = "CDU Collect-and-Go Service"
 
-    def submit_box_create_parcel(self, box):
-        return self._submit_box_create_parcel(box)
+    def submit_box_update_parcel(self, box):
+        return self._submit_box_update_parcel(box)
 
-    def retry_box_create_parcel(self, box):
+    def retry_box_update_parcel(self, box):
         box.ensure_one()
         if box.collect_go_status != "failed":
             raise UserError(_("Only failed Collect-and-Go submissions can be retried."))
 
-        original_log = self._retry_root_log(box.collect_go_last_log_id)
+        original_log = self._retry_root_log(
+            self._submission_log_for_retry(box)
+        )
         if not original_log:
             raise UserError(_("This box does not have a failed Collect-and-Go log to retry."))
 
@@ -34,23 +43,24 @@ class CduCollectGoService(models.AbstractModel):
                 % {"max": max_retry_count}
             )
 
-        return self._submit_box_create_parcel(
+        return self._submit_box_update_parcel(
             box,
             retry_of=original_log,
             retry_count=retry_count,
         )
 
-    def _submit_box_create_parcel(self, box, retry_of=False, retry_count=0):
+    def _submit_box_update_parcel(self, box, retry_of=False, retry_count=0):
         box.ensure_one()
         self._validate_box_for_submission(box)
 
         reference = str(uuid.uuid4())
         endpoint = self._build_endpoint()
-        body = {"Parcels": [self._build_box_parcel(box)]}
+        now = self._collect_go_datetime()
+        body = {"Parcels": [self._build_box_parcel(box, now)]}
         payload = {
             "Reference": reference,
             "Type": 0,
-            "Method": "CreateParcel",
+            "Method": "UpdateParcel",
             "Body": json.dumps(body, separators=(",", ":")),
         }
 
@@ -73,7 +83,7 @@ class CduCollectGoService(models.AbstractModel):
             error_message = str(exc)
 
         log = self._log_call(
-            call_type="CREATE_PARCEL",
+            call_type="UPDATE_PARCEL",
             endpoint=endpoint,
             http_method="POST",
             request_payload=payload,
@@ -122,6 +132,7 @@ class CduCollectGoService(models.AbstractModel):
         endpoint = self._build_endpoint("getMessage/%s" % box.collect_go_reference_guid)
         status_code = False
         response_text = ""
+        bridge_status_code = False
         success = False
         error_message = False
         message_payload = {}
@@ -132,6 +143,7 @@ class CduCollectGoService(models.AbstractModel):
             response_text = response["body"]
             message_payload = self._safe_json_loads(response_text)
             message_type = message_payload.get("type")
+            bridge_status_code = message_payload.get("statusCode")
             success = status_code == 200 and message_type == 1
             if not success:
                 error_message = self._extract_message_error(message_payload, response_text)
@@ -144,6 +156,7 @@ class CduCollectGoService(models.AbstractModel):
             http_method="GET",
             response_body=response_text,
             http_status_code=status_code,
+            bridge_status_code=bridge_status_code,
             success=success,
             error_message=error_message,
             box=box,
@@ -158,7 +171,10 @@ class CduCollectGoService(models.AbstractModel):
                 "error_message": False,
             }
 
-        if message_payload.get("type") == 2:
+        bridge_failed = self._is_bridge_error(bridge_status_code)
+        if message_payload.get("type") == 2 or (
+            bridge_failed and self._message_processing_timed_out(box)
+        ):
             box.write(
                 {
                     "collect_go_status": "failed",
@@ -187,6 +203,57 @@ class CduCollectGoService(models.AbstractModel):
             "log": log,
             "error_message": error_message,
         }
+
+    def cron_poll_message_processing_status(self):
+        params = self.env["ir.config_parameter"].sudo()
+        if params.get_param(
+            "cdu.collect_go.message_poll_enabled", "True"
+        ) == "False":
+            return False
+
+        try:
+            batch_size = max(
+                int(
+                    params.get_param(
+                        "cdu.collect_go.message_poll_batch_size"
+                    )
+                    or 100
+                ),
+                1,
+            )
+        except ValueError:
+            batch_size = 100
+
+        boxes = self.env["cdu.box"].sudo().search(
+            [
+                ("collect_go_status", "=", "submitted"),
+                ("collect_go_reference_guid", "!=", False),
+            ],
+            order="collect_go_submitted_at asc, id asc",
+            limit=batch_size,
+        )
+        results = {
+            "processed": 0,
+            "failed": 0,
+            "not_ready": 0,
+            "error": 0,
+        }
+        for box in boxes:
+            try:
+                with self.env.cr.savepoint():
+                    result = self.poll_box_message(
+                        box,
+                        raise_on_error=False,
+                    )
+                state = result.get("state", "error")
+                results[state] = results.get(state, 0) + 1
+            except Exception:
+                results["error"] += 1
+                _logger.exception(
+                    "Could not poll Collect-and-Go message status for box %s",
+                    box.display_name,
+                )
+        return results
 
     def cron_poll_parcel_status_updates(self):
         params = self.env["ir.config_parameter"].sudo()
@@ -318,33 +385,53 @@ class CduCollectGoService(models.AbstractModel):
         if missing_parcels:
             raise UserError(_("Every parcel in the box must have a parcel reference."))
 
-    def _build_box_parcel(self, box):
-        params = self.env["ir.config_parameter"].sudo()
-        now = self._collect_go_datetime()
-        collection_location = box.collection_point_id.external_reference
+        invalid_locations = box.line_ids.filtered(
+            lambda line: not (
+                line.collection_point_id.external_reference or ""
+            ).strip().isdigit()
+        )
+        if invalid_locations:
+            raise UserError(
+                _(
+                    "Every parcel collection point must have a numeric Collect-and-Go "
+                    "LocationID before submission."
+                )
+            )
+        self._collect_go_cdu_location_id()
+        self._collect_go_dispatch_tracking_status_type()
+
+    def _build_box_parcel(self, box, now):
+        collection_location = box.collection_point_id.external_reference.strip()
         return {
-            "ChildParcels": [self._build_child_parcel(line, now) for line in box.line_ids],
+            "ChildParcels": [
+                self._build_child_parcel(line, now)
+                for line in box.line_ids
+            ],
             "Customer": None,
-            "ExternalReference": box.name,
+            "ExternalReference": self._collect_go_external_reference(box.name),
+            "ScheduledDeliveryDate": self._date_to_collect_go_datetime(
+                box.next_drug_pickup_date
+            )
+            or now,
             "LocationID": collection_location,
             "ParcelID": None,
             "ParcelStatusType": 0,
             "Pin": None,
-            "ScheduledDeliveryDate": now,
             "TrackingStatuses": [self._build_tracking_status(now)],
             "Volume": box.parcel_count,
             "TemplateID": None,
-            "ParcelType": self._int_param(params, "cdu.collect_go.box_parcel_type", 2),
         }
 
     def _build_child_parcel(self, line, now):
         params = self.env["ir.config_parameter"].sudo()
         prescription = line.prescription_id
-        collection_location = line.collection_point_id.external_reference
+        collection_location = line.collection_point_id.external_reference.strip()
         return {
             "ChildParcels": None,
             "Customer": self._build_customer(prescription),
-            "ExternalReference": line.parcel_reference,
+            "ExternalReference": self._collect_go_external_reference(
+                line.parcel_reference
+            ),
             "LocationID": collection_location,
             "ParcelID": None,
             "ParcelStatusType": 0,
@@ -358,6 +445,14 @@ class CduCollectGoService(models.AbstractModel):
             "TemplateID": None,
             "ParcelType": self._int_param(params, "cdu.collect_go.standard_parcel_type", 0),
         }
+
+    def _collect_go_external_reference(self, parcel_reference):
+        reference = (parcel_reference or "").strip()
+        compact = re.sub(r"[^A-Za-z0-9_-]", "", reference)
+        if len(compact) <= 20:
+            return compact
+        digest = hashlib.sha1(reference.encode("utf-8")).hexdigest()[:8]
+        return "%s%s" % (compact[:12], digest)
 
     def _build_customer(self, prescription):
         first_name, surname = self._split_patient_name(prescription.patient_first_name)
@@ -374,23 +469,39 @@ class CduCollectGoService(models.AbstractModel):
         }
 
     def _build_tracking_status(self, date_value):
+        return {
+            "Date": date_value,
+            "LocationID": int(self._collect_go_cdu_location_id()),
+            "ParcelTrackingStatusID": None,
+            "TrackingStatusType": self._collect_go_dispatch_tracking_status_type(),
+        }
+
+    def _collect_go_cdu_location_id(self):
         params = self.env["ir.config_parameter"].sudo()
         location_id = (params.get_param("cdu.collect_go.cdu_location_id") or "").strip()
         if not location_id:
             raise UserError(
                 _(
                     "Collect-and-Go CDU Location ID is not configured. "
-                    "Sync pickup points or set cdu.collect_go.cdu_location_id before dispatch handover."
+                    "Set it to the numeric CDU source location before dispatch."
                 )
             )
-        return {
-            "Date": date_value,
-            "LocationID": location_id,
-            "ParcelTrackingStatusID": None,
-            "TrackingStatusType": self._int_param(
-                params, "cdu.collect_go.dispatch_tracking_status_type", 0
-            ),
-        }
+        if not location_id.isdigit():
+            raise UserError(
+                _("Collect-and-Go CDU Location ID must be numeric. Current value: %s")
+                % location_id
+            )
+        return location_id
+
+    def _collect_go_dispatch_tracking_status_type(self):
+        params = self.env["ir.config_parameter"].sudo()
+        status_type = (
+            params.get_param("cdu.collect_go.dispatch_tracking_status_type")
+            or "ReadyForDispatch"
+        ).strip()
+        if not status_type:
+            raise UserError(_("Configure the Collect-and-Go dispatch tracking status type."))
+        return status_type
 
     def _split_patient_name(self, patient_name):
         parts = (patient_name or "").strip().split()
@@ -401,8 +512,8 @@ class CduCollectGoService(models.AbstractModel):
         return " ".join(parts[:-1]), parts[-1]
 
     def _collect_go_datetime(self):
-        dt = fields.Datetime.context_timestamp(self, fields.Datetime.now())
-        return dt.isoformat()
+        dt = fields.Datetime.to_datetime(fields.Datetime.now()).replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone(timedelta(hours=2))).isoformat()
 
     def _date_to_collect_go_datetime(self, date_value):
         if not date_value:
@@ -427,6 +538,30 @@ class CduCollectGoService(models.AbstractModel):
         if response_payload:
             return response_payload.get("message") or response_payload.get("error") or response_text
         return response_text or _("No response body returned.")
+
+    def _is_bridge_error(self, status_code):
+        try:
+            return int(status_code) >= 400
+        except (TypeError, ValueError):
+            return False
+
+    def _message_processing_timed_out(self, box):
+        if not box.collect_go_submitted_at:
+            return True
+        params = self.env["ir.config_parameter"].sudo()
+        try:
+            attempts = max(int(params.get_param("cdu.collect_go.poll_attempts") or 10), 1)
+        except ValueError:
+            attempts = 10
+        try:
+            interval = max(
+                int(params.get_param("cdu.collect_go.poll_interval_seconds") or 3),
+                1,
+            )
+        except ValueError:
+            interval = 3
+        elapsed = fields.Datetime.now() - box.collect_go_submitted_at
+        return elapsed.total_seconds() >= attempts * interval
 
     def _extract_message_error(self, response_payload, response_text):
         if response_payload:
@@ -468,7 +603,12 @@ class CduCollectGoService(models.AbstractModel):
         BoxLine = self.env["cdu.box.line"].sudo()
         allowed_references = set()
         if boxes:
-            allowed_references = set(boxes.mapped("line_ids.parcel_reference"))
+            original_references = boxes.mapped("line_ids.parcel_reference")
+            allowed_references = set(original_references)
+            allowed_references.update(
+                self._collect_go_external_reference(reference)
+                for reference in original_references
+            )
 
         matched_lines = BoxLine.browse()
         now = fields.Datetime.now()
@@ -479,6 +619,14 @@ class CduCollectGoService(models.AbstractModel):
             if allowed_references and parcel_reference not in allowed_references:
                 continue
             lines = BoxLine.search([("parcel_reference", "=", parcel_reference)])
+            if not lines:
+                candidates = BoxLine.search([("parcel_reference", "!=", False)])
+                lines = candidates.filtered(
+                    lambda line: self._collect_go_external_reference(
+                        line.parcel_reference
+                    )
+                    == parcel_reference
+                )
             if not lines:
                 continue
             values = {
@@ -592,7 +740,29 @@ class CduCollectGoService(models.AbstractModel):
     def _retry_root_log(self, log):
         if not log:
             return False
-        return log.retry_of or log
+        while log.retry_of:
+            log = log.retry_of
+        return log
+
+    def _submission_log_for_retry(self, box):
+        log = box.collect_go_last_log_id
+        submission_types = ("CREATE_PARCEL", "UPDATE_PARCEL")
+        if log and log.call_type in submission_types:
+            return log
+
+        domain = [
+            ("box_id", "=", box.id),
+            ("call_type", "in", submission_types),
+        ]
+        if box.collect_go_reference_guid:
+            domain.append(
+                ("reference_guid", "=", box.collect_go_reference_guid)
+            )
+        return self.env["cdu.collect.go.api.log"].sudo().search(
+            domain,
+            order="id desc",
+            limit=1,
+        )
 
     def _log_call(
         self,
