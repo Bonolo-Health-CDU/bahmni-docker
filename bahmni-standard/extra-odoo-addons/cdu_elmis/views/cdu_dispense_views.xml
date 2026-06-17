@@ -59,6 +59,12 @@
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
+                    <button name="action_open_next_dispensing_task"
+                            string="Next"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': ['|', ('state', '!=', 'confirmed'), ('labels_printed', '=', False)]}"/>
                     <button name="action_mark_labels_printed"
                             string="Mark Labels Printed"
                             type="object"
@@ -215,6 +221,7 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_dispensing')]</field>
+        <field name="context">{'search_default_group_batch': 1}</field>
     </record>
 
     <record id="action_cdu_awaiting_bagging_qa" model="ir.actions.act_window">

@@ -81,8 +81,8 @@
                                 <label for="collection_point_id"/>
                                 <field name="collection_point_id"
                                        nolabel="1"
-                                       options="{'no_create': True}"
-                                       attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                       readonly="1"
+                                       options="{'no_create': True}"/>
                                 <label for="next_drug_pickup_date"/>
                                 <field name="next_drug_pickup_date" nolabel="1" readonly="1"/>
                             </div>
@@ -129,9 +129,9 @@
                     </div>
 
                     <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
-                        Select a collection point, then add parcels or click <strong>Load Eligible Parcels</strong>
-                        to auto-add matching parcels with the same collection point and next drug pickup date,
-                        up to the box capacity. Remove any parcels that should not be included before confirming.
+                        Scan or select parcels in the table below. When the next scanned parcel belongs to a different
+                        collection point, or the current box reaches max parcels, the current box is closed and a new
+                        box is opened automatically.
                     </div>
 
                     <notebook>
@@ -139,7 +139,7 @@
                             <field name="line_ids" attrs="{'readonly': [('state', '=', 'confirmed')]}">
                                 <tree editable="bottom" default_order="parcel_reference asc">
                                     <field name="bagging_qa_id"
-                                           domain="[('state', '=', 'confirmed'), ('prescription_id.state', '=', 'awaiting_boxing'), ('collection_point_id', '=', parent.collection_point_id)]"
+                                           domain="[('state', '=', 'confirmed'), ('prescription_id.state', '=', 'awaiting_boxing')]"
                                            options="{'no_create': True, 'no_open': True}"/>
                                     <field name="parcel_reference" readonly="1"/>
                                     <field name="patient_name" readonly="1"/>
