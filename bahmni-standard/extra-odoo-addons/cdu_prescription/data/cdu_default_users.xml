@@ -3,28 +3,28 @@
     <record id="user_cdu_data_clerk" model="res.users">
         <field name="name">CDU Data Clerk</field>
         <field name="login">cdu.data.clerk</field>
-        <field name="password">ChangeMe123!</field>
+        <field name="password">eLMIS@1234</field>
         <field name="groups_id" eval="[(6, 0, [ref('cdu_prescription.group_cdu_data_clerk')])]"/>
     </record>
 
     <record id="user_cdu_call_agent" model="res.users">
         <field name="name">CDU Call Agent</field>
         <field name="login">cdu.call.agent</field>
-        <field name="password">ChangeMe123!</field>
+        <field name="password">eLMIS@1234</field>
         <field name="groups_id" eval="[(6, 0, [ref('cdu_prescription.group_cdu_call_agent')])]"/>
     </record>
 
     <record id="user_cdu_dispensing_officer" model="res.users">
         <field name="name">CDU Dispensing Officer</field>
         <field name="login">cdu.dispensing.officer</field>
-        <field name="password">ChangeMe123!</field>
+        <field name="password">eLMIS@1234</field>
         <field name="groups_id" eval="[(6, 0, [ref('cdu_prescription.group_cdu_dispensing_officer')])]"/>
     </record>
 
     <record id="user_cdu_admin" model="res.users">
         <field name="name">CDU Admin</field>
         <field name="login">cdu.admin</field>
-        <field name="password">ChangeMe123!</field>
+        <field name="password">eLMIS@1234</field>
         <field name="groups_id" eval="[(6, 0, [ref('cdu_prescription.group_cdu_admin')])]"/>
     </record>
 </odoo>
