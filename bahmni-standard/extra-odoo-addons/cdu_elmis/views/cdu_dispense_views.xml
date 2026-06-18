@@ -164,6 +164,7 @@
                             <field name="stock_option_ids" readonly="1">
                                 <tree create="0" delete="0" default_order="orderable_name asc, expiration_date asc, lot asc">
                                     <field name="orderable_name" string="Product"/>
+                                    <field name="pack_size"/>
                                     <field name="lot" string="Batch Number"/>
                                     <field name="stock_on_hand"/>
                                     <field name="expiration_date"/>

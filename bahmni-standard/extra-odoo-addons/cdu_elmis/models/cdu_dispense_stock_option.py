@@ -18,6 +18,7 @@ class CduDispenseStockOption(models.Model):
     orderable_code = fields.Char(required=True, index=True)
     orderable_id = fields.Char(string="eLMIS Orderable UUID", index=True)
     orderable_name = fields.Char(required=True)
+    pack_size = fields.Integer(string="Pack Size")
     lot = fields.Char(index=True)
     lot_id = fields.Char(string="eLMIS Lot UUID", index=True)
     stock_on_hand = fields.Integer(required=True)
