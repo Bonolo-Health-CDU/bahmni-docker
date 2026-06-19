@@ -15,7 +15,6 @@
                 <field name="cdu_days_supply"/>
                 <field name="remaining_days_supply"/>
                 <field name="regimen_prescribed_raw"/>
-                <field name="drug_pickup_point_raw"/>
                 <field name="collection_point_id"/>
                 <field name="batch_id"/>
                 <field name="state"/>
@@ -138,7 +137,6 @@
                                     <field name="regimen_id"/>
                                 </group>
                                 <group>
-                                    <field name="drug_pickup_point_raw"/>
                                     <field name="collection_point_id"/>
                                     <field name="e_locker_district"/>
                                     <field name="facility_days_supply" readonly="1"/>
@@ -230,7 +228,7 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_dispensing')]</field>
-        <field name="context">{'search_default_group_batch': 1}</field>
+        <field name="context">{'search_default_group_batch': 1, 'search_default_group_collection_point': 1}</field>
     </record>
 
     <record id="action_cdu_prescription_rejected_to_call_center" model="ir.actions.act_window">
