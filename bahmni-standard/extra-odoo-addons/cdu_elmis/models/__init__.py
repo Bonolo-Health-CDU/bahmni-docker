@@ -5,6 +5,7 @@ from . import cdu_collect_go_service
 from . import cdu_dispense
 from . import cdu_dispense_stock_option
 from . import cdu_dispense_stock_selection
+from . import cdu_stock_summary
 from . import cdu_elmis_api_log
 from . import cdu_elmis_batch
 from . import cdu_elmis_prescription

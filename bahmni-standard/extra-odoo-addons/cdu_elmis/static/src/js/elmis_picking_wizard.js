@@ -82,13 +82,13 @@ function validatePickingWizard(record) {
         if (pickedQty <= 0) {
             return {
                 valid: false,
-                message: `${label}: picked quantity must be greater than zero.`,
+                message: `${label}: picked packs must be greater than zero.`,
             };
         }
         if (requiredQty && pickedQty > requiredQty + EPSILON) {
             return {
                 valid: false,
-                message: `${label}: picked quantity cannot exceed required packs (${formatQty(
+                message: `${label}: picked packs cannot exceed required packs (${formatQty(
                     requiredQty
                 )}).`,
             };
@@ -96,9 +96,9 @@ function validatePickingWizard(record) {
         if (stockOnHand && pickedQty > stockOnHand + EPSILON) {
             return {
                 valid: false,
-                message: `${label}: picked quantity (${formatQty(
+                message: `${label}: picked packs (${formatQty(
                     pickedQty
-                )}) exceeds available SOH (${formatQty(stockOnHand)}).`,
+                )}) exceed available packs (${formatQty(stockOnHand)}).`,
             };
         }
 
@@ -113,7 +113,7 @@ function validatePickingWizard(record) {
         if (requiredQty && totalPicked > requiredQty + EPSILON) {
             return {
                 valid: false,
-                message: `${labelsByPickingLine[pickingLineKey]}: picked quantity exceeds required packs by ${formatQty(
+                message: `${labelsByPickingLine[pickingLineKey]}: picked packs exceed required packs by ${formatQty(
                     totalPicked - requiredQty
                 )}.`,
             };

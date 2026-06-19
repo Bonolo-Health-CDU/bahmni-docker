@@ -2,6 +2,8 @@ from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from werkzeug import urls
 
+from .cdu_stock_summary import highest_stock_status
+
 
 class CduDispense(models.Model):
     _name = "cdu.dispense"
@@ -73,6 +75,11 @@ class CduDispense(models.Model):
         "cdu.dispense.stock.option",
         "dispense_id",
         string="Available Production Floor Stock",
+    )
+    stock_summary_ids = fields.One2many(
+        "cdu.dispense.stock.summary",
+        "dispense_id",
+        string="Available CDU Production Floor Stock Summary",
     )
     stock_selection_ids = fields.One2many(
         "cdu.dispense.stock.selection",
@@ -184,6 +191,7 @@ class CduDispense(models.Model):
                         "selected_orderable_code": line.selected_orderable_code,
                         "selected_orderable_id": line.selected_orderable_id,
                         "selected_orderable_name": line.selected_orderable_name,
+                        "selected_pack_size": line.selected_pack_size,
                         "selected_lot": line.selected_lot,
                         "selected_lot_id": line.selected_lot_id,
                         "selected_lot_expiry": line.selected_lot_expiry,
@@ -221,10 +229,10 @@ class CduDispense(models.Model):
             if not line.stock_option_id:
                 errors.append(_("%s: select an eLMIS Production Floor stock option.") % label)
             if line.quantity_dispensed <= 0:
-                errors.append(_("%s: dispensed quantity must be greater than zero.") % label)
+                errors.append(_("%s: dispensed packs must be greater than zero.") % label)
             if line.quantity_dispensed and line.quantity_dispensed > line.selected_stock_on_hand:
                 errors.append(
-                    _("%s: dispensed quantity (%s) exceeds available SOH (%s).")
+                    _("%s: dispensed packs (%s) exceed available packs (%s).")
                     % (label, line.quantity_dispensed, line.selected_stock_on_hand)
                 )
             if not (line.dosage_instructions or "").strip():
@@ -299,7 +307,48 @@ class CduDispense(models.Model):
             values.append(option)
         if values:
             self.env["cdu.dispense.stock.option"].create(values)
+        self._rebuild_stock_summaries()
         self._relink_selection_stock_options()
+
+    def _rebuild_stock_summaries(self):
+        Summary = self.env["cdu.dispense.stock.summary"]
+        for dispense in self:
+            dispense.stock_summary_ids.unlink()
+            grouped_options = {}
+            for option in dispense.stock_option_ids:
+                key = (
+                    option.orderable_code or "",
+                    option.orderable_id or "",
+                    option.orderable_name or "",
+                )
+                grouped_options.setdefault(key, self.env["cdu.dispense.stock.option"])
+                grouped_options[key] |= option
+
+            for (orderable_code, orderable_id, orderable_name), options in grouped_options.items():
+                dated_options = options.filtered("expiration_date")
+                occurred_options = options.filtered("occurred_date")
+                Summary.create(
+                    {
+                        "dispense_id": dispense.id,
+                        "orderable_code": orderable_code,
+                        "orderable_id": orderable_id,
+                        "orderable_name": orderable_name,
+                        "lot_count": len(options),
+                        "total_stock_on_hand": sum(options.mapped("stock_on_hand")),
+                        "total_stock_on_hand_units": sum(
+                            options.mapped("stock_on_hand_units")
+                        ),
+                        "earliest_expiration_date": min(
+                            dated_options.mapped("expiration_date")
+                        )
+                        if dated_options
+                        else False,
+                        "latest_stock_date": max(occurred_options.mapped("occurred_date"))
+                        if occurred_options
+                        else False,
+                        "stock_status": highest_stock_status(options),
+                    }
+                )
 
     def _relink_selection_stock_options(self):
         for selection in self.stock_selection_ids:

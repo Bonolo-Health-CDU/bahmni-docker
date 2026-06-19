@@ -8,6 +8,8 @@ from io import BytesIO
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
+from .cdu_stock_summary import highest_stock_status
+
 
 class CduBatch(models.Model):
     _inherit = "cdu.batch"
@@ -55,6 +57,11 @@ class CduBatch(models.Model):
         "cdu.elmis.stock.option",
         "batch_id",
         string="Available eLMIS Stock",
+    )
+    elmis_stock_summary_ids = fields.One2many(
+        "cdu.elmis.stock.summary",
+        "batch_id",
+        string="Available CDU Store Stock Summary",
     )
     residual_return_line_ids = fields.One2many(
         "cdu.residual.return.line",
@@ -683,7 +690,13 @@ class CduBatch(models.Model):
                     grouped[key]["lotId"] = line.selected_lot_id
                 if line.selected_lot:
                     grouped[key]["lot"] = line.selected_lot
-            grouped[key]["quantity"] += line.quantity_picked
+            pack_size = (
+                line.selected_pack_size
+                or line.selected_stock_option_id.pack_size
+                or line.pack_size
+                or 30
+            )
+            grouped[key]["quantity"] += line.quantity_picked * pack_size
         return list(grouped.values())
 
     def action_calculate_residual_stock(self):
@@ -938,7 +951,7 @@ class CduBatch(models.Model):
                 and line.quantity_picked > line.selected_stock_on_hand
             ):
                 errors.append(
-                    _("%s: picked quantity (%s) exceeds available SOH (%s).")
+                    _("%s: picked packs (%s) exceed available packs (%s).")
                     % (label, line.quantity_picked, line.selected_stock_on_hand)
                 )
         return errors
@@ -1000,6 +1013,47 @@ class CduBatch(models.Model):
         )
         if option_values:
             self.env["cdu.elmis.stock.option"].create(option_values)
+        self._rebuild_elmis_stock_summaries()
+
+    def _rebuild_elmis_stock_summaries(self):
+        Summary = self.env["cdu.elmis.stock.summary"]
+        for batch in self:
+            batch.elmis_stock_summary_ids.unlink()
+            grouped_options = {}
+            for option in batch.elmis_stock_option_ids:
+                key = (
+                    option.orderable_code or "",
+                    option.orderable_id or "",
+                    option.orderable_name or "",
+                )
+                grouped_options.setdefault(key, self.env["cdu.elmis.stock.option"])
+                grouped_options[key] |= option
+
+            for (orderable_code, orderable_id, orderable_name), options in grouped_options.items():
+                dated_options = options.filtered("expiration_date")
+                occurred_options = options.filtered("occurred_date")
+                Summary.create(
+                    {
+                        "batch_id": batch.id,
+                        "orderable_code": orderable_code,
+                        "orderable_id": orderable_id,
+                        "orderable_name": orderable_name,
+                        "lot_count": len(options),
+                        "total_stock_on_hand": sum(options.mapped("stock_on_hand")),
+                        "total_stock_on_hand_units": sum(
+                            options.mapped("stock_on_hand_units")
+                        ),
+                        "earliest_expiration_date": min(
+                            dated_options.mapped("expiration_date")
+                        )
+                        if dated_options
+                        else False,
+                        "latest_stock_date": max(occurred_options.mapped("occurred_date"))
+                        if occurred_options
+                        else False,
+                        "stock_status": highest_stock_status(options),
+                    }
+                )
 
     def _stock_options_from_payload(self, payload, facility_code, program_code):
         summaries = self._extract_stock_summaries(payload)
@@ -1023,13 +1077,19 @@ class CduBatch(models.Model):
             )
             pack_size = self._extract_elmis_pack_size(summary, orderable_name)
             for card in summary.get("stockCards") or []:
-                stock_on_hand = card.get("stockOnHand") or 0
-                if stock_on_hand <= 0:
+                stock_on_hand_units = self._coerce_quantity_units(card.get("stockOnHand"))
+                if stock_on_hand_units <= 0:
                     continue
                 card_pack_size = (
                     self._extract_elmis_pack_size(card, orderable_name)
                     or pack_size
                 )
+                stock_on_hand_packs = self._units_to_packs(
+                    stock_on_hand_units,
+                    card_pack_size,
+                )
+                if stock_on_hand_packs <= 0:
+                    continue
                 option_values.append(
                     {
                         "batch_id": self.id,
@@ -1039,7 +1099,8 @@ class CduBatch(models.Model):
                         "orderable_name": orderable_name,
                         "pack_size": card_pack_size,
                         "lot": card.get("lot"),
-                        "stock_on_hand": stock_on_hand,
+                        "stock_on_hand": stock_on_hand_packs,
+                        "stock_on_hand_units": stock_on_hand_units,
                         "expiration_date": fields.Date.to_date(card.get("expirationDate")),
                         "occurred_date": fields.Date.to_date(card.get("occurredDate")),
                     }
@@ -1056,8 +1117,8 @@ class CduBatch(models.Model):
     def _stock_options_from_resolved_summary(self, summary, facility_code, program_code):
         option_values = []
         for entry in summary.get("canFulfillForMe") or []:
-            stock_on_hand = entry.get("stockOnHand") or 0
-            if stock_on_hand <= 0:
+            stock_on_hand_units = self._coerce_quantity_units(entry.get("stockOnHand"))
+            if stock_on_hand_units <= 0:
                 continue
 
             orderable = entry.get("orderable") or {}
@@ -1066,6 +1127,9 @@ class CduBatch(models.Model):
             lot_id = lot.get("id")
             orderable_name = entry.get("orderableName") or orderable_id
             pack_size = self._extract_elmis_pack_size(entry, orderable_name)
+            stock_on_hand_packs = self._units_to_packs(stock_on_hand_units, pack_size)
+            if stock_on_hand_packs <= 0:
+                continue
             option_values.append(
                 {
                     "batch_id": self.id,
@@ -1077,7 +1141,8 @@ class CduBatch(models.Model):
                     "pack_size": pack_size,
                     "lot": entry.get("lotCode"),
                     "lot_id": lot_id,
-                    "stock_on_hand": stock_on_hand,
+                    "stock_on_hand": stock_on_hand_packs,
+                    "stock_on_hand_units": stock_on_hand_units,
                     "expiration_date": fields.Date.to_date(
                         entry.get("lotExpirationDate")
                     ),
@@ -1085,6 +1150,20 @@ class CduBatch(models.Model):
                 }
             )
         return option_values
+
+    def _coerce_quantity_units(self, value):
+        try:
+            return int(float(value or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def _units_to_packs(self, quantity_units, pack_size):
+        try:
+            units = float(quantity_units or 0)
+        except (TypeError, ValueError):
+            units = 0.0
+        pack_size = self._coerce_pack_size(pack_size) or 30
+        return int(math.floor(units / pack_size))
 
     def _extract_elmis_pack_size(self, payload, product_name=None):
         direct_keys = (

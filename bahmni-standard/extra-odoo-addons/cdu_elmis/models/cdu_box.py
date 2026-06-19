@@ -734,7 +734,7 @@ class CduBox(models.Model):
             if not (line.selected_orderable_id or line.selected_orderable_code):
                 raise UserError(_("%s: eLMIS product is missing.") % label)
             if line.quantity_dispensed <= 0:
-                raise UserError(_("%s: dispensed quantity must be greater than zero.") % label)
+                raise UserError(_("%s: dispensed packs must be greater than zero.") % label)
 
             key = (
                 line.selected_orderable_id or line.selected_orderable_code,
@@ -752,7 +752,12 @@ class CduBox(models.Model):
                     grouped[key]["lotId"] = line.selected_lot_id
                 if line.selected_lot:
                     grouped[key]["lot"] = line.selected_lot
-            grouped[key]["quantity"] += line.quantity_dispensed
+            pack_size = (
+                line.selected_pack_size
+                or line.stock_option_id.pack_size
+                or 30
+            )
+            grouped[key]["quantity"] += line.quantity_dispensed * pack_size
         return list(grouped.values())
 
 

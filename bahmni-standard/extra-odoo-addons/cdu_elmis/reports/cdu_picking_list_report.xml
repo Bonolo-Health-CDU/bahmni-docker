@@ -202,10 +202,10 @@
                                     <th style="width: 8%;" class="text-end">Pack Size</th>
                                     <th style="width: 12%;">Lot</th>
                                     <th style="width: 10%;">Expiry</th>
-                                    <th style="width: 9%;" class="text-end">Available SOH</th>
+                                    <th style="width: 9%;" class="text-end">Available Packs</th>
                                     <th style="width: 9%;" class="text-end">Required Units</th>
                                     <th style="width: 9%;" class="text-end">Packs/Bottles To Pick</th>
-                                    <th style="width: 6%;">Picked Qty</th>
+                                    <th style="width: 6%;">Picked Packs</th>
                                     <th style="width: 3%;">Tick</th>
                                 </tr>
                             </thead>
@@ -217,7 +217,7 @@
                                         <span t-if="not line.selected_orderable_name" class="text-muted">Not selected</span>
                                     </td>
                                     <td class="text-end">
-                                        <span t-if="line.pack_size" t-esc="'%d' % int(round(line.pack_size))"/>
+                                        <span t-if="line.selected_pack_size or line.pack_size" t-esc="'%d' % int(round(line.selected_pack_size or line.pack_size))"/>
                                     </td>
                                     <td><span t-field="line.selected_lot"/></td>
                                     <td><span t-field="line.selected_lot_expiry"/></td>
