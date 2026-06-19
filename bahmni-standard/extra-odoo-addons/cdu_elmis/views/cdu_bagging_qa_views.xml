@@ -171,39 +171,49 @@
                     </div>
 
                     <div class="o_cdu_elmis_section_title">QA Checklist</div>
-                    <div class="o_cdu_qa_checklist">
-                        <div class="o_cdu_qa_check_item">
-                            <field name="patient_details_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Patient details checked</span>
+                    <div class="o_cdu_qa_checklist_row">
+                        <div class="o_cdu_qa_checklist">
+                            <div class="o_cdu_qa_check_item">
+                                <field name="patient_details_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Patient details checked</span>
+                            </div>
+                            <div class="o_cdu_qa_check_item">
+                                <field name="medicine_product_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Medicine/product checked</span>
+                            </div>
+                            <div class="o_cdu_qa_check_item">
+                                <field name="quantity_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Quantity checked</span>
+                            </div>
+                            <div class="o_cdu_qa_check_item">
+                                <field name="dosing_instructions_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Dosing instructions checked</span>
+                            </div>
+                            <div class="o_cdu_qa_check_item">
+                                <field name="product_labels_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Product labels attached</span>
+                            </div>
+                            <div class="o_cdu_qa_check_item">
+                                <field name="bag_label_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Bag label attached</span>
+                            </div>
+                            <div class="o_cdu_qa_check_item">
+                                <field name="medicines_placed_in_bag" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Medicines placed in bag</span>
+                            </div>
+                            <div class="o_cdu_qa_check_item">
+                                <field name="bag_sealed" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <span>Bag sealed</span>
+                            </div>
                         </div>
-                        <div class="o_cdu_qa_check_item">
-                            <field name="medicine_product_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Medicine/product checked</span>
-                        </div>
-                        <div class="o_cdu_qa_check_item">
-                            <field name="quantity_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Quantity checked</span>
-                        </div>
-                        <div class="o_cdu_qa_check_item">
-                            <field name="dosing_instructions_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Dosing instructions checked</span>
-                        </div>
-                        <div class="o_cdu_qa_check_item">
-                            <field name="product_labels_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Product labels attached</span>
-                        </div>
-                        <div class="o_cdu_qa_check_item">
-                            <field name="bag_label_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Bag label attached</span>
-                        </div>
-                        <div class="o_cdu_qa_check_item">
-                            <field name="medicines_placed_in_bag" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Medicines placed in bag</span>
-                        </div>
-                        <div class="o_cdu_qa_check_item">
-                            <field name="bag_sealed" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
-                            <span>Bag sealed</span>
-                        </div>
+                        <button name="action_scan_label_qr"
+                                string="Scan QR Code"
+                                type="object"
+                                icon="fa-qrcode"
+                                class="btn-primary o_cdu_scan_qr_button"
+                                title="Scan the QR code printed on the bag label"
+                                groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                                attrs="{'invisible': [('state', '=', 'confirmed')]}"/>
                     </div>
 
                     <notebook>

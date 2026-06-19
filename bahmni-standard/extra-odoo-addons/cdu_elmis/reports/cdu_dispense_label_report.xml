@@ -166,18 +166,46 @@
                             font-size: 13px;
                             padding-left: 5mm;
                         }
+                        .cdu-code-grid {
+                            display: table;
+                            width: 100%;
+                        }
+                        .cdu-code-barcode,
+                        .cdu-code-qr {
+                            display: table-cell;
+                            vertical-align: top;
+                        }
+                        .cdu-code-barcode {
+                            width: 64%;
+                        }
+                        .cdu-code-qr {
+                            width: 36%;
+                            text-align: center;
+                        }
                         .cdu-barcode {
                             display: block;
-                            width: 58mm;
-                            height: 16mm;
+                            width: 40mm;
+                            height: 14mm;
                             margin: 1mm 0 2mm;
                             background: #fff;
                         }
                         .cdu-barcode-caption {
                             font-size: 14px;
                             text-align: center;
-                            width: 58mm;
+                            width: 40mm;
                             margin-bottom: 8mm;
+                        }
+                        .cdu-qr {
+                            display: block;
+                            width: 20mm;
+                            height: 20mm;
+                            margin: 0 auto 1mm;
+                            background: #fff;
+                        }
+                        .cdu-qr-caption {
+                            font-size: 9px;
+                            line-height: 1.1;
+                            text-align: center;
                         }
                         .cdu-bag-section {
                             margin-top: 5mm;
@@ -303,11 +331,21 @@
                                     <div class="cdu-script">
                                         Script Number:<span t-esc="script_number"/>
                                     </div>
-                                    <img class="cdu-barcode"
-                                         t-att-src="dispense.get_barcode_url(script_number)"
-                                         t-att-alt="'Barcode for %s' % script_number"/>
-                                    <div class="cdu-barcode-caption">
-                                        <span t-esc="script_number"/>
+                                    <div class="cdu-code-grid">
+                                        <div class="cdu-code-barcode">
+                                            <img class="cdu-barcode"
+                                                 t-att-src="dispense.get_barcode_url(script_number)"
+                                                 t-att-alt="'Barcode for %s' % script_number"/>
+                                            <div class="cdu-barcode-caption">
+                                                <span t-esc="script_number"/>
+                                            </div>
+                                        </div>
+                                        <div class="cdu-code-qr">
+                                            <img class="cdu-qr"
+                                                 t-att-src="dispense.get_barcode_url(dispense.get_label_qr_value(), 'QR', 220, 220)"
+                                                 t-att-alt="'QR code for %s' % script_number"/>
+                                            <div class="cdu-qr-caption">Patient / Prescription</div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="cdu-bag-dates">

@@ -509,11 +509,28 @@
     color: #27663a;
 }
 
+.o_cdu_batch_form .o_cdu_qa_checklist_row {
+    align-items: start;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin: 0 0 12px;
+}
+
 .o_cdu_batch_form .o_cdu_qa_checklist {
     display: grid;
     gap: 10px;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    margin: 0 0 12px;
+    margin: 0;
+}
+
+.o_cdu_batch_form .o_cdu_scan_qr_button {
+    align-items: center;
+    display: inline-flex;
+    gap: 8px;
+    justify-content: center;
+    min-height: 42px;
+    white-space: nowrap;
 }
 
 .o_cdu_batch_form .o_cdu_qa_check_item {
@@ -579,6 +596,16 @@
     color: #3d4652;
     font-weight: 650;
     line-height: 1.25;
+}
+
+@media (max-width: 767px) {
+    .o_cdu_batch_form .o_cdu_qa_checklist_row {
+        grid-template-columns: 1fr;
+    }
+
+    .o_cdu_batch_form .o_cdu_scan_qr_button {
+        justify-self: stretch;
+    }
 }
 
 .o_cdu_batch_form .o_notebook {

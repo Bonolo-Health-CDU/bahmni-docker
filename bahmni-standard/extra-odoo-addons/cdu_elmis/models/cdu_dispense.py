@@ -448,6 +448,15 @@ class CduDispense(models.Model):
         )
         return "/report/barcode?%s" % query
 
+    def get_label_qr_value(self):
+        self.ensure_one()
+        prescription_number = self.prescription_id.name or self.name or ""
+        return "\n".join(
+            value
+            for value in ((self.patient_name or "").strip(), prescription_number)
+            if value
+        )
+
     def action_open_or_create_for_prescription(self):
         self.ensure_one()
         return self._action_open()

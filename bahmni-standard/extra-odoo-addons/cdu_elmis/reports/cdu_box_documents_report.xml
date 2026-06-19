@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="paperformat_cdu_box_label" model="report.paperformat">
+        <field name="name">CDU Box Label 4x6</field>
+        <field name="default" eval="False"/>
+        <field name="format">custom</field>
+        <field name="page_width">102</field>
+        <field name="page_height">152</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">4</field>
+        <field name="margin_bottom">4</field>
+        <field name="margin_left">5</field>
+        <field name="margin_right">5</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">203</field>
+    </record>
+
+    <record id="action_report_cdu_box_label" model="ir.actions.report">
+        <field name="name">CDU Box Label</field>
+        <field name="model">cdu.box</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">cdu_elmis.report_cdu_box_label</field>
+        <field name="report_file">cdu_elmis.report_cdu_box_label</field>
+        <field name="paperformat_id" ref="cdu_elmis.paperformat_cdu_box_label"/>
+        <field name="print_report_name">'CDU Box Label - %s' % object.name</field>
+        <field name="binding_model_id" ref="model_cdu_box"/>
+        <field name="binding_type">report</field>
+        <field name="groups_id" eval="[(4, ref('cdu_prescription.group_cdu_dispensing_officer')), (4, ref('cdu_prescription.group_cdu_admin'))]"/>
+    </record>
+
+    <record id="action_report_cdu_box_manifest" model="ir.actions.report">
+        <field name="name">CDU Box Manifest</field>
+        <field name="model">cdu.box</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">cdu_elmis.report_cdu_box_manifest</field>
+        <field name="report_file">cdu_elmis.report_cdu_box_manifest</field>
+        <field name="print_report_name">'CDU Box Manifest - %s' % object.name</field>
+        <field name="binding_model_id" ref="model_cdu_box"/>
+        <field name="binding_type">report</field>
+        <field name="groups_id" eval="[(4, ref('cdu_prescription.group_cdu_dispensing_officer')), (4, ref('cdu_prescription.group_cdu_admin'))]"/>
+    </record>
+
+    <template id="report_cdu_box_label">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="box">
+                <t t-call="web.basic_layout">
+                    <div class="page cdu-box-label-page">
+                        <style>
+                            .cdu-box-label-page {
+                                color: #111;
+                                font-family: Arial, sans-serif;
+                                font-size: 21px;
+                                font-weight: 700;
+                                line-height: 1.2;
+                            }
+                            .cdu-box-label-barcode {
+                                display: block;
+                                height: 18mm;
+                                margin: 0 auto 1mm;
+                                width: 88mm;
+                            }
+                            .cdu-box-label-reference {
+                                font-size: 13px;
+                                margin-bottom: 3mm;
+                                text-align: center;
+                            }
+                            .cdu-box-label-row {
+                                display: table;
+                                margin-bottom: 4mm;
+                                width: 100%;
+                            }
+                            .cdu-box-label-row > div {
+                                display: table-cell;
+                                vertical-align: top;
+                            }
+                            .cdu-box-label-route {
+                                text-align: right;
+                            }
+                            .cdu-box-label-heading {
+                                margin-bottom: 1mm;
+                            }
+                            .cdu-box-label-value {
+                                font-size: 23px;
+                                font-weight: 500;
+                            }
+                        </style>
+
+                        <img class="cdu-box-label-barcode"
+                             t-att-src="box.get_barcode_url(box.name)"
+                             t-att-alt="'Barcode for %s' % box.name"/>
+                        <div class="cdu-box-label-reference"><span t-field="box.name"/></div>
+
+                        <div style="margin-bottom: 4mm;">
+                            Production Date:
+                            <span t-field="box.confirmed_at" t-options="{'widget': 'date'}"/>
+                        </div>
+                        <div class="cdu-box-label-row">
+                            <div>Box Nr: <span t-esc="box.get_box_number()"/></div>
+                            <div class="cdu-box-label-route">Route: <span t-esc="box.get_route_label()"/></div>
+                        </div>
+                        <div style="margin-bottom: 4mm;">
+                            <div class="cdu-box-label-heading">Deliver To:</div>
+                            <div class="cdu-box-label-value"><span t-field="box.collection_point_id"/></div>
+                        </div>
+                        <div style="margin-bottom: 4mm;">
+                            <div class="cdu-box-label-heading">Collection Date:</div>
+                            <div class="cdu-box-label-value">
+                                <span t-field="box.next_drug_pickup_date"/>
+                                <span> to </span>
+                                <span t-field="box.next_drug_pickup_date"/>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="cdu-box-label-heading">Produced By:</div>
+                            <div class="cdu-box-label-value"><span t-esc="box.get_produced_by()"/></div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_cdu_box_manifest">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="box">
+                <t t-call="web.basic_layout">
+                    <div class="page cdu-box-manifest-page">
+                        <style>
+                            .cdu-box-manifest-page {
+                                color: #111;
+                                font-family: Arial, sans-serif;
+                                font-size: 11px;
+                            }
+                            .cdu-box-manifest-title {
+                                font-size: 21px;
+                                font-weight: 700;
+                                margin-bottom: 8mm;
+                                text-align: center;
+                            }
+                            .cdu-box-manifest-header {
+                                display: table;
+                                margin-bottom: 7mm;
+                                width: 100%;
+                            }
+                            .cdu-box-manifest-header > div {
+                                display: table-cell;
+                                vertical-align: top;
+                            }
+                            .cdu-box-manifest-destination {
+                                width: 50%;
+                            }
+                            .cdu-box-manifest-summary {
+                                width: 25%;
+                            }
+                            .cdu-box-manifest-barcode-cell {
+                                text-align: right;
+                                width: 25%;
+                            }
+                            .cdu-box-manifest-field {
+                                margin-bottom: 4mm;
+                            }
+                            .cdu-box-manifest-field strong {
+                                display: inline-block;
+                                min-width: 30mm;
+                            }
+                            .cdu-box-manifest-barcode {
+                                display: block;
+                                height: 13mm;
+                                margin-left: auto;
+                                width: 58mm;
+                            }
+                            .cdu-box-manifest-reference {
+                                font-size: 9px;
+                                margin-top: 1mm;
+                                text-align: center;
+                                width: 58mm;
+                                margin-left: auto;
+                            }
+                            .cdu-box-manifest-table {
+                                border-collapse: collapse;
+                                table-layout: fixed;
+                                width: 100%;
+                            }
+                            .cdu-box-manifest-table th {
+                                border-bottom: 1px solid #333;
+                                border-top: 1px solid #333;
+                                font-weight: 700;
+                                padding: 3mm 2mm;
+                                text-align: left;
+                            }
+                            .cdu-box-manifest-table td {
+                                border: 1px solid #aaa;
+                                min-height: 12mm;
+                                padding: 3mm 2mm;
+                                vertical-align: top;
+                                word-wrap: break-word;
+                            }
+                            .cdu-box-manifest-blank {
+                                display: block;
+                                border-bottom: 1px solid #333;
+                                height: 6mm;
+                            }
+                            .cdu-box-manifest-received {
+                                display: table;
+                                font-size: 13px;
+                                font-weight: 700;
+                                margin-top: 9mm;
+                                width: 100%;
+                            }
+                            .cdu-box-manifest-received > div {
+                                display: table-cell;
+                                vertical-align: bottom;
+                            }
+                            .cdu-box-manifest-received-line {
+                                border-bottom: 1px solid #333;
+                                display: inline-block;
+                                margin-left: 2mm;
+                                min-width: 38mm;
+                            }
+                        </style>
+
+                        <div class="cdu-box-manifest-title">MANIFEST</div>
+                        <div class="cdu-box-manifest-header">
+                            <div class="cdu-box-manifest-destination">
+                                <div class="cdu-box-manifest-field">
+                                    <strong>Deliver To:</strong>
+                                    <span t-field="box.collection_point_id"/>
+                                </div>
+                                <div class="cdu-box-manifest-field">
+                                    <strong>Collection Date:</strong>
+                                    <span t-field="box.next_drug_pickup_date"/>
+                                    <span> to </span>
+                                    <span t-field="box.next_drug_pickup_date"/>
+                                </div>
+                                <div class="cdu-box-manifest-field">
+                                    <strong>Produced By:</strong>
+                                    <span t-esc="box.get_produced_by()"/>
+                                </div>
+                            </div>
+                            <div class="cdu-box-manifest-summary">
+                                <div class="cdu-box-manifest-field">
+                                    <strong>Route:</strong>
+                                    <span t-esc="box.get_route_label()"/>
+                                </div>
+                                <div class="cdu-box-manifest-field">
+                                    <strong>Box Nr:</strong>
+                                    <span t-esc="box.get_box_number()"/>
+                                </div>
+                                <div class="cdu-box-manifest-field">
+                                    <strong>Parcels In Box:</strong>
+                                    <span t-field="box.parcel_count"/>
+                                </div>
+                                <div class="cdu-box-manifest-field">
+                                    <strong>Production Date:</strong>
+                                    <span t-field="box.confirmed_at" t-options="{'widget': 'date'}"/>
+                                </div>
+                            </div>
+                            <div class="cdu-box-manifest-barcode-cell">
+                                <img class="cdu-box-manifest-barcode"
+                                     t-att-src="box.get_barcode_url(box.name)"
+                                     t-att-alt="'Barcode for %s' % box.name"/>
+                                <div class="cdu-box-manifest-reference"><span t-field="box.name"/></div>
+                            </div>
+                        </div>
+
+                        <table class="cdu-box-manifest-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 18%;">Parcel #</th>
+                                    <th style="width: 15%;">Collection Date</th>
+                                    <th style="width: 27%;">Patient</th>
+                                    <th style="width: 10%;">No of Parcels</th>
+                                    <th style="width: 15%;">Date Collected</th>
+                                    <th style="width: 15%;">Signature</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="box.line_ids.sorted(lambda line: ((line.parcel_reference or ''), line.id))" t-as="line">
+                                    <td><span t-field="line.parcel_reference"/></td>
+                                    <td><span t-field="line.next_drug_pickup_date"/></td>
+                                    <td><span t-field="line.patient_name"/></td>
+                                    <td style="text-align: center;">1</td>
+                                    <td><span class="cdu-box-manifest-blank"/></td>
+                                    <td><span class="cdu-box-manifest-blank"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="cdu-box-manifest-received">
+                            <div style="width: 42%;">Received in Good Order</div>
+                            <div style="width: 29%;">Name:<span class="cdu-box-manifest-received-line"/></div>
+                            <div style="width: 29%;">Signature:<span class="cdu-box-manifest-received-line"/></div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

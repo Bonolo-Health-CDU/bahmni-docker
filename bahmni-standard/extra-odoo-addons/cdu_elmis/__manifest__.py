@@ -28,12 +28,15 @@
         "views/cdu_elmis_user_views.xml",
         "reports/cdu_picking_list_report.xml",
         "reports/cdu_dispense_label_report.xml",
+        "reports/cdu_box_documents_report.xml",
         "views/cdu_elmis_batch_views.xml",
         "views/cdu_elmis_menus.xml",
     ],
     "assets": {
         "web.assets_backend": [
             "cdu_elmis/static/src/js/box_parcel_scanner.js",
+            "cdu_elmis/static/src/js/bagging_qa_qr_scanner.js",
+            "cdu_elmis/static/src/js/box_documents_print.js",
             "cdu_elmis/static/src/js/elmis_picking_wizard.js",
         ],
     },

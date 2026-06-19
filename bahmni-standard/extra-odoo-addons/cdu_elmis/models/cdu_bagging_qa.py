@@ -226,6 +226,87 @@ class CduBaggingQa(models.Model):
             raise UserError(_("This Bagging / QA record is not linked to a dispense record."))
         return dispenses.action_print_labels()
 
+    def action_scan_label_qr(self):
+        self.ensure_one()
+        self._ensure_bagging_qa_access()
+        if self.state != "draft":
+            raise UserError(_("QR verification is only available for draft Bagging / QA records."))
+        return {
+            "type": "ir.actions.client",
+            "tag": "cdu_bagging_qa_scan_qr",
+            "params": {"qa_id": self.id},
+        }
+
+    def action_validate_label_qr(self, scanned_value):
+        self.ensure_one()
+        self._ensure_bagging_qa_access()
+        if self.state != "draft":
+            raise UserError(_("QR verification is only available for draft Bagging / QA records."))
+
+        values = [
+            value.strip()
+            for value in str(scanned_value or "").replace("\r\n", "\n").split("\n")
+            if value.strip()
+        ]
+        if len(values) != 2:
+            raise UserError(
+                _("This is not a valid CDU bag label QR code. Please scan the QR code on the bag.")
+            )
+
+        scanned_patient, scanned_prescription = values
+        expected_patient = (self.patient_name or "").strip()
+        expected_prescription = (self.prescription_id.name or "").strip()
+        normalize = lambda value: " ".join(value.split()).casefold()
+
+        if (
+            normalize(scanned_patient) != normalize(expected_patient)
+            or normalize(scanned_prescription) != normalize(expected_prescription)
+        ):
+            raise UserError(
+                _(
+                    "Wrong box scanned.\n\n"
+                    "Expected: %(patient)s / %(prescription)s\n"
+                    "Scanned: %(scanned_patient)s / %(scanned_prescription)s"
+                )
+                % {
+                    "patient": expected_patient,
+                    "prescription": expected_prescription,
+                    "scanned_patient": scanned_patient,
+                    "scanned_prescription": scanned_prescription,
+                }
+            )
+
+        self.write(
+            {
+                "patient_details_checked": True,
+                "medicine_product_checked": True,
+                "quantity_checked": True,
+                "dosing_instructions_checked": True,
+                "product_labels_attached": True,
+                "bag_label_attached": True,
+                "medicines_placed_in_bag": True,
+                "bag_sealed": True,
+            }
+        )
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Box verified"),
+                "message": _(
+                    "%(patient)s and %(prescription)s match this Bagging / QA task. "
+                    "The QA checklist has been completed."
+                )
+                % {
+                    "patient": expected_patient,
+                    "prescription": expected_prescription,
+                },
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
     def _action_open(self):
         self.ensure_one()
         return {

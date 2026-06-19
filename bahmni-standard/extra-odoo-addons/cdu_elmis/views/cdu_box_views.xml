@@ -40,6 +40,13 @@
                             class="btn-secondary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_print_box_documents"
+                            string="Print Box Documents"
+                            type="object"
+                            icon="fa-print"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
                     <button name="action_confirm_dispatch_handover"
                             string="Confirm Dispatch Handover"
                             type="object"

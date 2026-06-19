@@ -1,6 +1,7 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.osv import expression
+from werkzeug import urls
 
 
 class CduBox(models.Model):
@@ -315,7 +316,9 @@ class CduBox(models.Model):
             current_box.parcel_count >= current_box.max_parcels
             or current_box.collection_point_id != parcel.collection_point_id
         ):
-            confirm_action = current_box.action_confirm_box()
+            confirm_action = current_box.with_context(
+                cdu_skip_box_document_print=True
+            ).action_confirm_box()
             if confirm_action.get("type") != "ir.actions.client":
                 return confirm_action
             closed_box = current_box
@@ -364,6 +367,24 @@ class CduBox(models.Model):
             }
             notification_type = "success"
 
+        next_action = {
+            "type": "ir.actions.act_window",
+            "name": _("Box"),
+            "res_model": "cdu.box",
+            "res_id": current_box.id,
+            "views": [(False, "form")],
+            "view_mode": "form",
+            "target": "current",
+        }
+        if closed_box:
+            return closed_box._box_documents_action(
+                title=title,
+                message=message,
+                notification_type=notification_type,
+                sticky=True,
+                next_action=next_action,
+            )
+
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -372,15 +393,7 @@ class CduBox(models.Model):
                 "message": message,
                 "type": notification_type,
                 "sticky": bool(closed_box),
-                "next": {
-                    "type": "ir.actions.act_window",
-                    "name": _("Box"),
-                    "res_model": "cdu.box",
-                    "res_id": current_box.id,
-                    "views": [(False, "form")],
-                    "view_mode": "form",
-                    "target": "current",
-                },
+                "next": next_action,
             },
         }
 
@@ -415,20 +428,93 @@ class CduBox(models.Model):
             )
             prescriptions.write({"state": "awaiting_dispatch"})
             moved_count += len(prescriptions)
+        message = _(
+            "Production Floor stock was consumed in eLMIS. %(count)s parcel(s) moved to Awaiting Dispatch."
+        ) % {"count": moved_count}
+        if self.env.context.get("cdu_skip_box_document_print"):
+            return {
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "title": _("Box confirmed"),
+                    "message": message,
+                    "type": "success",
+                    "sticky": False,
+                    "next": {"type": "ir.actions.client", "tag": "reload"},
+                },
+            }
+        return self._box_documents_action(
+            title=_("Box confirmed"),
+            message=message,
+            notification_type="success",
+            next_action={"type": "ir.actions.client", "tag": "reload"},
+        )
+
+    def action_print_box_documents(self):
+        self._ensure_boxing_access()
+        if self.filtered(lambda box: box.state != "confirmed"):
+            raise UserError(_("Confirm the box before printing its label and manifest."))
+        return self._box_documents_action(
+            title=_("Box documents ready"),
+            message=_("The box label and manifest were generated for printing."),
+            notification_type="success",
+        )
+
+    def _box_documents_action(
+        self,
+        title,
+        message,
+        notification_type="success",
+        sticky=False,
+        next_action=False,
+    ):
         return {
             "type": "ir.actions.client",
-            "tag": "display_notification",
+            "tag": "cdu_print_box_documents",
             "params": {
-                "title": _("Box confirmed"),
-                "message": _(
-                    "Production Floor stock was consumed in eLMIS. %(count)s parcel(s) moved to Awaiting Dispatch."
-                )
-                % {"count": moved_count},
-                "type": "success",
-                "sticky": False,
-                "next": {"type": "ir.actions.client", "tag": "reload"},
+                "report_actions": [
+                    self.env.ref("cdu_elmis.action_report_cdu_box_label").report_action(
+                        self, config=False
+                    ),
+                    self.env.ref("cdu_elmis.action_report_cdu_box_manifest").report_action(
+                        self, config=False
+                    ),
+                ],
+                "title": title,
+                "message": message,
+                "notification_type": notification_type,
+                "sticky": sticky,
+                "next": next_action,
             },
         }
+
+    def get_barcode_url(self, value, width=760, height=120):
+        query = urls.url_encode(
+            {
+                "barcode_type": "Code128",
+                "value": value or "",
+                "width": width,
+                "height": height,
+                "humanreadable": 0,
+                "quiet": 1,
+            }
+        )
+        return "/report/barcode?%s" % query
+
+    def get_box_number(self):
+        self.ensure_one()
+        value = self.name or ""
+        return value.rsplit("/", 1)[-1].lstrip("0") or value
+
+    def get_route_label(self):
+        self.ensure_one()
+        point = self.collection_point_id
+        return point.external_reference or point.code or point.name or ""
+
+    def get_produced_by(self):
+        self.ensure_one()
+        prescription = self.line_ids.mapped("prescription_id")[:1]
+        return prescription.facility_name or self.env.company.name
 
     def action_confirm_dispatch_handover(self):
         self._ensure_boxing_access()
