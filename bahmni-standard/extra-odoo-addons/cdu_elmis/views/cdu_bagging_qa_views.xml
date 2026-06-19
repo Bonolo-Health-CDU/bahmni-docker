@@ -270,6 +270,6 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_bagging_qa')]</field>
-        <field name="context">{'search_default_group_batch': 1, 'search_default_group_collection_point': 1}</field>
+        <field name="context">{'search_default_group_batch': 1}</field>
     </record>
 </odoo>
