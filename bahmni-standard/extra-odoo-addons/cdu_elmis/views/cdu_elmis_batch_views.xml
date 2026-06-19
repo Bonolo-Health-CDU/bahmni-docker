@@ -44,7 +44,7 @@
                         <field name="picking_ready" nolabel="1" readonly="1"/>
                     </div>
                 </div>
-                <div class="o_cdu_batch_card">
+                <div class="o_cdu_batch_card" attrs="{'invisible': [('state', '=', 'draft')]}">
                     <h3>Milestones</h3>
                     <div class="o_cdu_batch_card_fields">
                         <label for="picking_confirmed_at"/>
@@ -71,7 +71,7 @@
                 </span>
             </xpath>
             <xpath expr="//div[contains(@class, 'o_cdu_batch_table_context')]" position="after">
-                <div class="o_cdu_batch_readiness_message" attrs="{'invisible': [('picking_ready', '=', True)]}">
+                <div class="o_cdu_batch_readiness_message" attrs="{'invisible': ['|', ('state', '=', 'draft'), ('picking_ready', '=', True)]}">
                     <span>Picking selections are incomplete.</span>
                     <button name="action_open_elmis_picking_wizard"
                             string="Open stock selection"
@@ -82,6 +82,7 @@
             </xpath>
             <xpath expr="//page[field[@name='picking_line_ids']]" position="replace">
                 <page string="Picking Summary"
+                      attrs="{'invisible': [('state', '=', 'draft')]}"
                       groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
                     <field name="picking_line_ids" readonly="1">
                         <tree>
@@ -97,6 +98,7 @@
             </xpath>
             <xpath expr="//page[field[@name='patient_picking_line_ids']]" position="replace">
                 <page string="Patient Picking Lines"
+                      attrs="{'invisible': [('state', '=', 'draft')]}"
                       groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
                     <div class="o_cdu_patient_pick_table">
                         <div class="o_cdu_patient_pick_header">
@@ -207,7 +209,7 @@
                 </page>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Available eLMIS Stock">
+                <page string="Available eLMIS Stock" attrs="{'invisible': [('state', '=', 'draft')]}">
                     <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
                          role="alert"
                          attrs="{'invisible': [('elmis_stock_option_ids', '!=', [])]}">
@@ -230,7 +232,7 @@
                         </tree>
                     </field>
                 </page>
-                <page string="eLMIS Picking Selections">
+                <page string="eLMIS Picking Selections" attrs="{'invisible': [('state', '=', 'draft')]}">
                     <button name="action_open_elmis_picking_wizard"
                             string="Revise Selection"
                             type="object"
@@ -279,7 +281,7 @@
                         </tree>
                     </field>
                 </page>
-                <page string="eLMIS API Logs">
+                <page string="eLMIS API Logs" attrs="{'invisible': [('state', '=', 'draft')]}">
                     <field name="stock_event_log_ids" readonly="1">
                         <tree decoration-danger="not success" decoration-success="success">
                             <field name="timestamp"/>
@@ -291,7 +293,7 @@
                         </tree>
                     </field>
                 </page>
-                <page string="Residual Return">
+                <page string="Residual Return" attrs="{'invisible': [('state', '=', 'draft')]}">
                     <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
                         Residual stock is calculated as <strong>picked quantity minus dispensed quantity</strong>
                         for each eLMIS product and batch number. Return residual stock only after the

@@ -66,7 +66,7 @@
                                    nolabel="1"
                                    class="o_cdu_regimen_repeat_table"
                                    context="{'display_regimen_prescribed_raw': True}">
-                                <tree editable="bottom" create="false">
+                                <tree editable="bottom" create="false" delete="true">
                                     <field name="regimen_prescription_id"
                                            string="Regimen"
                                            domain="[('id', 'in', parent.repeat_apply_regimen_domain_ids)]"
@@ -77,12 +77,14 @@
                                     <field name="days_to_serve"
                                            string="Repeat Days To Serve"
                                            class="o_cdu_regimen_repeat_days_cell"/>
+                                    <button name="action_add_regimen_repeat_line"
+                                            string="Actions"
+                                            type="object"
+                                            icon="fa-plus"
+                                            class="btn-link o_cdu_repeat_add_icon"
+                                            title="Add regimen"/>
                                 </tree>
                             </field>
-                            <button name="action_add_regimen_repeat_line"
-                                    string="+ Add Regimen"
-                                    type="object"
-                                    class="btn-secondary o_cdu_repeat_add_button"/>
                             <button name="action_apply_regimen_repeat_days"
                                     string="Apply"
                                     type="object"
@@ -113,6 +115,7 @@
                         </page>
 
                         <page string="Picking Summary"
+                            attrs="{'invisible': [('state', '=', 'draft')]}"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
 
                             <field name="picking_line_ids" readonly="1">
@@ -143,6 +146,7 @@
 
                         
                         <page string="Patient Picking Lines"
+                            attrs="{'invisible': [('state', '=', 'draft')]}"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
 
                             <field

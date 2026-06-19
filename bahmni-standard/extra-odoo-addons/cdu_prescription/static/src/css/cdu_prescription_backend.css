@@ -269,8 +269,8 @@
 }
 
 .o_cdu_batch_form .o_cdu_regimen_repeat_table {
-    flex: 0 1 640px;
-    max-width: 640px;
+    flex: 0 1 690px;
+    max-width: 690px;
     min-width: 420px;
 }
 
@@ -302,6 +302,63 @@
     width: 180px;
 }
 
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table thead th:nth-child(3),
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table tbody td:nth-child(3) {
+    border-right: 0;
+    padding-right: 2px;
+    text-align: center;
+    width: 44px;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table thead th.o_list_record_remove_header,
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table tbody td.o_list_record_remove {
+    border-left: 0;
+    padding-left: 2px;
+    text-align: center;
+    width: 34px;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table thead th.o_list_record_remove_header {
+    color: transparent;
+    font-size: 0;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table tbody td.o_list_record_remove button {
+    align-items: center;
+    display: inline-flex;
+    height: 26px;
+    justify-content: center;
+    min-width: 26px;
+    padding: 0;
+    width: 26px;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon {
+    align-items: center;
+    border: 1px solid #b8d7ef;
+    border-radius: 999px;
+    color: #005baa;
+    display: inline-flex;
+    font-size: 0;
+    height: 26px;
+    justify-content: center;
+    min-width: 26px;
+    padding: 0;
+    width: 26px;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon:hover,
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon:focus {
+    background: #e8f4ff;
+    color: #004780;
+    text-decoration: none;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon .fa {
+    font-size: 12px;
+    line-height: 1;
+}
+
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table td.o_cdu_regimen_repeat_days_cell input {
     width: 100%;
 }
@@ -327,11 +384,6 @@
 .o_cdu_batch_form .o_cdu_repeat_apply_button {
     min-height: 34px;
     white-space: normal;
-}
-
-.o_cdu_batch_form .o_cdu_repeat_add_button {
-    min-height: 34px;
-    white-space: nowrap;
 }
 
 @media (max-width: 900px) {
