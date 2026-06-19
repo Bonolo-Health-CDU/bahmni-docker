@@ -213,9 +213,10 @@
                                       default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
                                     <field name="openmrs_drug_name"/>
                                     <field name="selected_orderable_name"/>
+                                    <field name="selected_pack_size"/>
                                     <field name="selected_lot"/>
                                     <field name="selected_lot_expiry"/>
-                                    <field name="quantity_dispensed"/>
+                                    <field name="quantity_dispensed" string="Dispensed Packs"/>
                                     <field name="dosage_instructions"/>
                                 </tree>
                             </field>

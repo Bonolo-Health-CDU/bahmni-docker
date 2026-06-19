@@ -52,8 +52,9 @@
                             <field name="selected_orderable_name" invisible="1" force_save="1"/>
                             <field name="selected_lot" string="Batch No." readonly="1" force_save="1"/>
                             <field name="selected_lot_expiry" string="Expiry" readonly="1" force_save="1"/>
-                            <field name="selected_stock_on_hand" string="Avail. SOH" readonly="1" force_save="1"/>
-                            <field name="quantity_picked" string="Picked Qty"/>
+                            <field name="selected_pack_size" string="Pack Size" readonly="1" force_save="1"/>
+                            <field name="selected_stock_on_hand" string="Available (packs)" readonly="1" force_save="1"/>
+                            <field name="quantity_picked" string="Picked (packs)"/>
                             <field name="selected_orderable_code" invisible="1" force_save="1"/>
                             <field name="selected_orderable_id" invisible="1" force_save="1"/>
                             <field name="selected_lot_id" invisible="1" force_save="1"/>

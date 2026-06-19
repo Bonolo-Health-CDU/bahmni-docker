@@ -209,21 +209,98 @@
                 </page>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Available eLMIS Stock" attrs="{'invisible': [('state', '=', 'draft')]}">
+                <page string="Available CDU Store Stock" attrs="{'invisible': [('state', '=', 'draft')]}">
                     <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
                          role="alert"
                          attrs="{'invisible': [('elmis_stock_option_ids', '!=', [])]}">
-                        No eLMIS stock has been loaded for this batch yet. Click
+                        No CDU Store stock has been loaded for this batch yet. Click
                         <strong>Refresh Store Stock</strong> or
                         <strong>Generate Picking List</strong> to fetch current CDU Store stock.
                     </div>
-                    <field name="elmis_stock_option_ids" readonly="1">
-                        <tree create="0" delete="0" default_order="orderable_name asc, expiration_date asc, lot asc">
+                    <div class="alert alert-info o_cdu_elmis_stock_hint" role="alert">
+                        Review the product summary first, then open Batches/Lots for expiry and batch detail. Red rows are expired, amber rows need attention, and grey rows have no expiry date.
+                    </div>
+                    <div class="o_cdu_elmis_section_title">Product Summary</div>
+                    <field name="elmis_stock_summary_ids" readonly="1">
+                        <tree create="0" delete="0"
+                              default_order="orderable_name asc"
+                              decoration-danger="stock_status == 'expired'"
+                              decoration-warning="stock_status in ('expires_soon', 'low_stock')"
+                              decoration-muted="stock_status == 'no_expiry'">
                             <field name="orderable_name" string="Product"/>
+                            <field name="stock_status" string="Status" widget="badge"
+                                   decoration-danger="stock_status == 'expired'"
+                                   decoration-warning="stock_status in ('expires_soon', 'low_stock')"
+                                   decoration-muted="stock_status == 'no_expiry'"/>
+                            <field name="lot_count"/>
+                            <field name="total_stock_on_hand" sum="Total Packs"/>
+                            <field name="total_stock_on_hand_units" sum="Total Units"/>
+                            <field name="earliest_expiration_date"/>
+                            <field name="latest_stock_date"/>
+                            <button name="action_open_lot_details"
+                                    type="object"
+                                    string="Batches/Lots"
+                                    icon="fa-list-ul"/>
+                            <field name="orderable_code" optional="hide"/>
+                            <field name="orderable_id" optional="hide"/>
+                        </tree>
+                        <form string="Product Stock Summary">
+                            <sheet>
+                                <group>
+                                    <group>
+                                        <field name="orderable_name"/>
+                                        <field name="stock_status" widget="badge"/>
+                                        <field name="lot_count"/>
+                                    </group>
+                                    <group>
+                                        <field name="total_stock_on_hand"/>
+                                        <field name="total_stock_on_hand_units"/>
+                                        <field name="earliest_expiration_date"/>
+                                        <field name="latest_stock_date"/>
+                                    </group>
+                                </group>
+                                <group string="Batches/Lots">
+                                    <field name="detail_option_ids" readonly="1">
+                                        <tree create="0" delete="0"
+                                              default_order="expiration_date asc, lot asc"
+                                              decoration-danger="stock_status == 'expired'"
+                                              decoration-warning="stock_status in ('expires_soon', 'low_stock')"
+                                              decoration-muted="stock_status == 'no_expiry'">
+                                            <field name="stock_status" string="Status" widget="badge"
+                                                   decoration-danger="stock_status == 'expired'"
+                                                   decoration-warning="stock_status in ('expires_soon', 'low_stock')"
+                                                   decoration-muted="stock_status == 'no_expiry'"/>
+                                            <field name="lot" string="Batch Number"/>
+                                            <field name="expiration_date" string="Expiry Date"/>
+                                            <field name="pack_size"/>
+                                            <field name="stock_on_hand" string="Available Packs"/>
+                                            <field name="stock_on_hand_units" string="Available Units"/>
+                                            <field name="occurred_date" string="Stock Date"/>
+                                        </tree>
+                                    </field>
+                                </group>
+                            </sheet>
+                        </form>
+                    </field>
+                    <div class="o_cdu_elmis_section_title">Batch/Lot Details</div>
+                    <field name="elmis_stock_option_ids" readonly="1">
+                        <tree create="0" delete="0"
+                              default_order="orderable_name asc, expiration_date asc, lot asc"
+                              decoration-danger="stock_status == 'expired'"
+                              decoration-warning="stock_status in ('expires_soon', 'low_stock')"
+                              decoration-muted="stock_status == 'no_expiry'">
+                            <field name="orderable_name" string="Product"/>
+                            <field name="stock_status" string="Status" widget="badge"
+                                   decoration-danger="stock_status == 'expired'"
+                                   decoration-warning="stock_status in ('expires_soon', 'low_stock')"
+                                   decoration-muted="stock_status == 'no_expiry'"/>
                             <field name="lot" string="Batch Number"/>
-                            <field name="stock_on_hand"/>
-                            <field name="expiration_date"/>
-                            <field name="occurred_date"/>
+                            <field name="expiration_date" string="Expiry Date"/>
+                            <field name="pack_size"/>
+                            <field name="stock_on_hand" string="Available Packs" sum="Total Packs"/>
+                            <field name="stock_on_hand_units" string="Available Units" optional="show" sum="Total Units"/>
+                            <field name="expires_in_days" optional="hide"/>
+                            <field name="occurred_date" string="Stock Date"/>
                             <field name="orderable_code" optional="hide"/>
                             <field name="orderable_id" optional="hide"/>
                             <field name="lot_id" optional="hide"/>
@@ -256,7 +333,7 @@
                             <field name="available_quantity" readonly="1" optional="hide"/>
                             <field name="picked_quantity" readonly="1" optional="show"/>
                             <field name="remaining_quantity" readonly="1" optional="show"/>
-                            <field name="quantity_to_pick" readonly="1"/>
+                            <field name="quantity_to_pick" string="Required Packs" readonly="1"/>
                         </tree>
                     </field>
                     <div class="o_cdu_elmis_section_title">Fulfil with eLMIS stock</div>
@@ -268,13 +345,14 @@
                                    options="{'no_create': True, 'no_open': True}"
                                    required="1"/>
                             <field name="openmrs_drug_name" readonly="1" optional="hide"/>
-                            <field name="required_quantity" readonly="1"/>
+                            <field name="required_quantity" string="Required Packs" readonly="1"/>
                             <field name="selected_stock_option_id" string="Fulfil With" options="{'no_create': True, 'no_open': True}"/>
                             <field name="selected_orderable_name" invisible="1" force_save="1"/>
                             <field name="selected_lot" string="Batch Number" readonly="1" force_save="1"/>
                             <field name="selected_lot_expiry" string="Expiry Date" readonly="1" force_save="1"/>
-                            <field name="selected_stock_on_hand" readonly="1" force_save="1"/>
-                            <field name="quantity_picked"/>
+                            <field name="selected_pack_size" string="Pack Size" readonly="1" force_save="1"/>
+                            <field name="selected_stock_on_hand" string="Available Packs" readonly="1" force_save="1"/>
+                            <field name="quantity_picked" string="Picked Packs"/>
                             <field name="selected_orderable_code" invisible="1" force_save="1"/>
                             <field name="selected_orderable_id" invisible="1" force_save="1"/>
                             <field name="selected_lot_id" invisible="1" force_save="1"/>

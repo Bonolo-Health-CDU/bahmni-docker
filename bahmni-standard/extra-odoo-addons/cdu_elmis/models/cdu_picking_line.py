@@ -47,7 +47,7 @@ class CduPickingLine(models.Model):
         string="Fulfil With",
         domain="[('batch_id', '=', batch_id), ('stock_on_hand', '>', 0)]",
     )
-    selected_stock_on_hand = fields.Integer(string="Available SOH", readonly=True)
+    selected_stock_on_hand = fields.Integer(string="Available Packs", readonly=True)
     available_quantity = fields.Float(
         string="Available Quantity",
         compute="_compute_stock_quantities",
@@ -88,19 +88,18 @@ class CduPickingLine(models.Model):
         string="Coverage Days",
         compute="_compute_repeat_report_fields",
     )
-    # quantity_to_pick = fields.Float(string="Required Qty", required=True)
     quantity_to_pick = fields.Float(
-        string="Required Qty", 
+        string="Required Packs",
         required=True
     )
-    quantity_picked = fields.Float(string="Picked Qty")
+    quantity_picked = fields.Float(string="Picked Packs")
     fulfilment_line_ids = fields.One2many(
         "cdu.picking.fulfilment.line",
         "picking_line_id",
         string="eLMIS Fulfilment Lines",
     )
     total_quantity_picked = fields.Float(
-        string="Total Picked Qty",
+        string="Total Picked Packs",
         compute="_compute_total_quantity_picked",
     )
 
