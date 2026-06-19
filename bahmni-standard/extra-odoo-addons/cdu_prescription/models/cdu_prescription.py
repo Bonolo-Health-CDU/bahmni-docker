@@ -137,12 +137,21 @@ class CduPrescription(models.Model):
                 (
                     prescription.id,
                     prescription.regimen_prescribed_raw
-                    or prescription.name
                     or _("No regimen"),
                 )
                 for prescription in self
             ]
         return super().name_get()
+
+    @api.model
+    def name_search(self, name="", args=None, operator="ilike", limit=100):
+        if self.env.context.get("display_regimen_prescribed_raw"):
+            args = list(args or [])
+            if name:
+                args.append(("regimen_prescribed_raw", operator, name))
+            prescriptions = self.search(args, limit=limit)
+            return prescriptions.name_get()
+        return super().name_search(name=name, args=args, operator=operator, limit=limit)
 
     @api.model
     def create(self, vals):

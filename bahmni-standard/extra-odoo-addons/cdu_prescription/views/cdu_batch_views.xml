@@ -66,23 +66,20 @@
                                    nolabel="1"
                                    class="o_cdu_regimen_repeat_table"
                                    context="{'display_regimen_prescribed_raw': True}">
-                                <tree editable="bottom" create="false" delete="true">
+                                <tree editable="bottom" create="true" delete="true">
+                                    <control>
+                                        <create string="Add Regimen"/>
+                                    </control>
                                     <field name="regimen_prescription_id"
                                            string="Regimen"
                                            domain="[('id', 'in', parent.repeat_apply_regimen_domain_ids)]"
                                            context="{'display_regimen_prescribed_raw': True}"
                                            class="o_cdu_regimen_repeat_regimen_cell"
-                                           placeholder="--Select Regimen--"
+                                           placeholder="Select Regimen"
                                            options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="days_to_serve"
+                                    <field name="days_to_serve_input"
                                            string="Repeat Days To Serve"
                                            class="o_cdu_regimen_repeat_days_cell"/>
-                                    <button name="action_add_regimen_repeat_line"
-                                            string="Actions"
-                                            type="object"
-                                            icon="fa-plus"
-                                            class="btn-link o_cdu_repeat_add_icon"
-                                            title="Add regimen"/>
                                 </tree>
                             </field>
                             <button name="action_apply_regimen_repeat_days"

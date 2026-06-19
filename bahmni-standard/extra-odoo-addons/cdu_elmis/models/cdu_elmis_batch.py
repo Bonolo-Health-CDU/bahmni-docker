@@ -394,6 +394,64 @@ class CduBatch(models.Model):
             },
         }
 
+    def _calculate_total_bottles_from_patient_lines(
+        self,
+        patient_lines,
+        pack_size,
+        required_units=0.0,
+    ):
+        pack_size = pack_size or 30
+        if patient_lines:
+            return sum(
+                math.ceil(
+                    (patient_line.required_units or patient_line.required_quantity or 0.0)
+                    / pack_size
+                )
+                for patient_line in patient_lines
+                if (patient_line.required_units or patient_line.required_quantity or 0.0) > 0
+            )
+        return math.ceil(required_units / pack_size) if required_units > 0 else 0
+
+    def _sync_patient_picking_lines_for_pack_size(self, patient_lines, pack_size):
+        pack_size = pack_size or 30
+        for patient_line in patient_lines:
+            daily_dose = patient_line.daily_dose or 0
+            effective_days = (
+                patient_line.effective_repeat_days
+                or patient_line.prescription_repeat_days
+                or patient_line.repeat_days
+                or 0
+            )
+            required_units = daily_dose * effective_days
+            packs_to_pick = math.ceil(required_units / pack_size) if required_units > 0 else 0
+            picked_units = packs_to_pick * pack_size
+            actual_supplied_days = picked_units / daily_dose if daily_dose else 0
+            back_order_days = max((patient_line.cdu_days or 0) - actual_supplied_days, 0)
+            next_pickup_date = False
+            if patient_line.prescription_id.next_drug_pickup_date and actual_supplied_days:
+                next_pickup_date = patient_line.prescription_id.next_drug_pickup_date + timedelta(
+                    days=int(actual_supplied_days)
+                )
+
+            patient_line.write(
+                {
+                    "pack_size": pack_size,
+                    "required_quantity": required_units,
+                    "required_units": required_units,
+                    "picked_quantity": picked_units,
+                    "picked_units": picked_units,
+                    "packs_to_pick": packs_to_pick,
+                    "actual_supplied_days": actual_supplied_days,
+                    "served_days": int(actual_supplied_days),
+                    "back_order_days": back_order_days,
+                    "remaining_days": int(back_order_days),
+                    "cdu_bottles_required": packs_to_pick,
+                    "bottles_required": packs_to_pick,
+                    "recalculated_next_drug_pickup_date": next_pickup_date,
+                    "calculated_next_pickup_date": next_pickup_date,
+                }
+            )
+
     def _sync_picking_summary_from_elmis_lines(self):
         for batch in self:
             for line in batch.elmis_picking_line_ids:
@@ -406,20 +464,25 @@ class CduBatch(models.Model):
                     or 30
                 )
                 matching_patient_lines = line._get_matching_patient_picking_lines()
+                batch._sync_patient_picking_lines_for_pack_size(
+                    matching_patient_lines,
+                    pack_size,
+                )
                 required_units = (
                     sum(matching_patient_lines.mapped("required_units"))
                     or line.summary_line_id.total_tablets
                     or 0.0
                 )
+                total_bottles = batch._calculate_total_bottles_from_patient_lines(
+                    matching_patient_lines,
+                    pack_size,
+                    required_units=required_units,
+                )
                 line.summary_line_id.write(
                     {
                         "pack_size": pack_size,
                         "total_tablets": required_units,
-                        "total_bottles": (
-                            math.ceil(required_units / pack_size)
-                            if required_units > 0
-                            else 0
-                        ),
+                        "total_bottles": total_bottles,
                     }
                 )
 
@@ -442,15 +505,19 @@ class CduBatch(models.Model):
                     continue
 
                 matching_patient_lines = line._get_matching_patient_picking_lines()
+                batch._sync_patient_picking_lines_for_pack_size(
+                    matching_patient_lines,
+                    pack_size,
+                )
                 required_units = (
                     sum(matching_patient_lines.mapped("required_units"))
                     or line.summary_line_id.total_tablets
                     or 0.0
                 )
-                packs_to_pick = (
-                    math.ceil(required_units / pack_size)
-                    if required_units > 0
-                    else 0
+                packs_to_pick = batch._calculate_total_bottles_from_patient_lines(
+                    matching_patient_lines,
+                    pack_size,
+                    required_units=required_units,
                 )
 
                 line.summary_line_id.write(

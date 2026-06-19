@@ -130,19 +130,12 @@ class CduBatch(models.Model):
             ).casefold() not in used_keys
         )
 
-    def _get_repeat_days_default_for_regimen_prescription(self, prescription):
-        self.ensure_one()
-        if not prescription:
-            return 0
-        return max(0, prescription.cdu_days_supply or 0)
-
-    def _prepare_repeat_apply_line_vals(self, prescription=False):
+    def _prepare_repeat_apply_line_vals(self, sequence=10):
         self.ensure_one()
         return {
-            "regimen_prescription_id": prescription.id if prescription else False,
-            "days_to_serve": self._get_repeat_days_default_for_regimen_prescription(
-                prescription
-            ),
+            "regimen_prescription_id": False,
+            "days_to_serve_input": False,
+            "sequence": sequence,
         }
 
     def _sync_selected_prescription_repeat_days_defaults(self):
@@ -157,41 +150,33 @@ class CduBatch(models.Model):
                 (
                     0,
                     0,
-                    batch._prepare_repeat_apply_line_vals(False),
+                    batch._prepare_repeat_apply_line_vals(),
                 )
             ]
 
     def _set_single_default_repeat_apply_line(self):
         for batch in self:
-            default_regimen = batch.repeat_apply_regimen_domain_ids[:1]
-            commands = [(5, 0, 0)]
+            commands: list[tuple[int, int, Any]] = [(5, 0, 0)]
             commands.append(
                 (
                     0,
                     0,
-                    batch._prepare_repeat_apply_line_vals(default_regimen),
+                    batch._prepare_repeat_apply_line_vals(),
                 )
             )
             batch.repeat_apply_line_ids = commands
 
-    def action_add_regimen_repeat_line(self):
-        self.ensure_one()
-        self._ensure_batch_workflow_access()
-        available_regimens = self._get_available_repeat_regimen_prescriptions()
-        if not available_regimens:
-            raise ValidationError(_("No additional regimens are available in this batch."))
-        self.write(
-            {
-                "repeat_apply_line_ids": [
+    @api.onchange("repeat_apply_line_ids")
+    def _onchange_repeat_apply_line_ids_keep_blank_row(self):
+        for batch in self:
+            if not batch.repeat_apply_line_ids:
+                batch.repeat_apply_line_ids = [
                     (
                         0,
                         0,
-                        self._prepare_repeat_apply_line_vals(available_regimens[:1]),
+                        batch._prepare_repeat_apply_line_vals(),
                     )
                 ]
-            }
-        )
-        return {"type": "ir.actions.client", "tag": "reload"}
 
     def _get_prescriptions_for_repeat_regimen(self, regimen):
         self.ensure_one()
@@ -207,9 +192,9 @@ class CduBatch(models.Model):
         return {
             self._normalize_repeat_regimen_text(
                 line.regimen_prescription_id.regimen_prescribed_raw
-            ).casefold(): line.days_to_serve
+            ).casefold(): line._get_days_to_serve_value()
             for line in self.repeat_apply_line_ids
-            if line.regimen_prescription_id and line.days_to_serve >= 0
+            if line.regimen_prescription_id and line._get_days_to_serve_value()
         }
 
     @api.model
@@ -434,9 +419,14 @@ class CduBatch(models.Model):
         seen_regimen_keys = set()
         applied_prescription_count = 0
         for line in self.repeat_apply_line_ids:
-            if not line.regimen_prescription_id:
+            has_regimen = bool(line.regimen_prescription_id)
+            has_days = bool((line.days_to_serve_input or "").strip())
+            if not has_regimen and not has_days:
+                continue
+            if not has_regimen:
                 raise ValidationError(_("Regimen is required."))
-            line._validate_days_to_serve()
+            days_to_serve = line._get_days_to_serve_value(required=True)
+            line._validate_days_to_serve(days_to_serve)
 
             selected_regimen = self._normalize_repeat_regimen_text(
                 line.regimen_prescription_id.regimen_prescribed_raw
@@ -454,7 +444,7 @@ class CduBatch(models.Model):
             if not matching_prescriptions:
                 continue
             excessive_prescriptions = matching_prescriptions.filtered(
-                lambda prescription: line.days_to_serve
+                lambda prescription: days_to_serve
                 > (prescription.cdu_days_supply or 0)
             )
             if excessive_prescriptions:
@@ -469,11 +459,18 @@ class CduBatch(models.Model):
                     % {"regimen": selected_regimen, "names": names}
                 )
 
-            matching_prescriptions.write({"repeat_days": line.days_to_serve})
+            line.write({
+                "days_to_serve": days_to_serve,
+                "days_to_serve_input": str(days_to_serve),
+            })
+            matching_prescriptions.write({"repeat_days": days_to_serve})
             applied_prescription_count += len(matching_prescriptions)
 
         if not applied_prescription_count:
             raise ValidationError(_("No selected prescriptions match the configured regimens."))
+
+        if self.patient_picking_line_ids or self.picking_line_ids:
+            self._generate_picking_lines()
 
         return {"type": "ir.actions.client", "tag": "reload"}
 
@@ -797,7 +794,11 @@ class CduBatch(models.Model):
 class CduBatchRegimenRepeatLine(models.Model):
     _name = "cdu.batch.regimen.repeat.line"
     _description = "CDU Batch Regimen Repeat Days"
-    _order = "id"
+    _order = "sequence, id"
+
+    sequence = fields.Integer(
+        default=10,
+    )
 
     batch_id = fields.Many2one(
         "cdu.batch",
@@ -810,50 +811,33 @@ class CduBatchRegimenRepeatLine(models.Model):
     )
     days_to_serve = fields.Integer(
         string="Repeat Days To Serve",
+        default=False,
     )
-
-    def action_add_regimen_repeat_line(self):
-        self.ensure_one()
-        if not self.batch_id:
-            return False
-        return self.batch_id.action_add_regimen_repeat_line()
-
-    def _get_default_days_to_serve(self, regimen_prescription):
-        self.ensure_one()
-        if not self.batch_id or not regimen_prescription:
-            return 0
-        return self.batch_id._get_repeat_days_default_for_regimen_prescription(
-            regimen_prescription
-        )
+    days_to_serve_input = fields.Char(
+        string="Repeat Days To Serve",
+        default=False,
+    )
 
     @api.model_create_multi
     def create(self, vals_list):
-        prescription_model = self.env["cdu.prescription"]
-        batch_model = self.env["cdu.batch"]
         for vals in vals_list:
-            if "days_to_serve" in vals or not vals.get("regimen_prescription_id"):
-                continue
-            batch = batch_model.browse(vals.get("batch_id"))
-            prescription = prescription_model.browse(vals["regimen_prescription_id"])
-            vals["days_to_serve"] = (
-                batch._get_repeat_days_default_for_regimen_prescription(prescription)
-                if batch
-                else max(0, prescription.cdu_days_supply or 0)
-            )
+            if "days_to_serve_input" not in vals and vals.get("days_to_serve"):
+                vals["days_to_serve_input"] = str(vals["days_to_serve"])
+            elif "days_to_serve_input" in vals:
+                days_to_serve = self._parse_days_to_serve_text(
+                    vals.get("days_to_serve_input"),
+                    required=False,
+                )
+                vals["days_to_serve"] = days_to_serve or 0
         return super().create(vals_list)
 
     def write(self, vals):
-        if "regimen_prescription_id" in vals and "days_to_serve" not in vals:
-            prescription = self.env["cdu.prescription"].browse(
-                vals.get("regimen_prescription_id")
+        if "days_to_serve_input" in vals:
+            days_to_serve = self._parse_days_to_serve_text(
+                vals.get("days_to_serve_input"),
+                required=False,
             )
-            for line in self:
-                line_vals = dict(vals)
-                line_vals["days_to_serve"] = line._get_default_days_to_serve(
-                    prescription
-                )
-                super(CduBatchRegimenRepeatLine, line).write(line_vals)
-            return True
+            vals = dict(vals, days_to_serve=days_to_serve or 0)
         return super().write(vals)
 
     def _get_regimen_key(self):
@@ -862,10 +846,32 @@ class CduBatchRegimenRepeatLine(models.Model):
             self.regimen_prescription_id.regimen_prescribed_raw
         ).casefold()
 
-    def _validate_days_to_serve(self):
+    @api.model
+    def _parse_days_to_serve_text(self, value, required=False):
+        text_value = str(value or "").strip()
+        if not text_value:
+            if required:
+                raise ValidationError(_("Repeat Days To Serve is required."))
+            return False
+        if not text_value.isdigit():
+            raise ValidationError(_("Repeat Days To Serve must be a whole number greater than 0."))
+        days_to_serve = int(text_value)
+        if days_to_serve <= 0:
+            raise ValidationError(_("Repeat Days To Serve must be greater than 0."))
+        return days_to_serve
+
+    def _get_days_to_serve_value(self, required=False):
+        self.ensure_one()
+        return self._parse_days_to_serve_text(
+            self.days_to_serve_input,
+            required=required,
+        )
+
+    def _validate_days_to_serve(self, days_to_serve=False):
         for line in self:
-            if line.days_to_serve < 0:
-                raise ValidationError(_("Repeat Days To Serve cannot be negative."))
+            days_to_serve = days_to_serve or line._get_days_to_serve_value()
+            if not days_to_serve:
+                continue
             if not line.batch_id or not line.regimen_prescription_id:
                 continue
             selected_regimen = line.batch_id._normalize_repeat_regimen_text(
@@ -875,7 +881,7 @@ class CduBatchRegimenRepeatLine(models.Model):
                 selected_regimen
             )
             excessive_prescriptions = matching_prescriptions.filtered(
-                lambda prescription: line.days_to_serve
+                lambda prescription: days_to_serve
                 > (prescription.cdu_days_supply or 0)
             )
             if excessive_prescriptions:
@@ -890,22 +896,15 @@ class CduBatchRegimenRepeatLine(models.Model):
                     % {"regimen": selected_regimen, "names": names}
                 )
 
-    @api.constrains("days_to_serve", "regimen_prescription_id", "batch_id")
+    @api.constrains("days_to_serve_input", "regimen_prescription_id", "batch_id")
     def _check_days_to_serve(self):
         self._validate_days_to_serve()
 
-    @api.onchange("days_to_serve")
+    @api.onchange("days_to_serve_input")
     def _onchange_days_to_serve(self):
         for line in self:
-            if line.days_to_serve < 0:
-                line.days_to_serve = 0
-
-    @api.onchange("regimen_prescription_id")
-    def _onchange_regimen_prescription_id(self):
-        for line in self:
-            line.days_to_serve = line._get_default_days_to_serve(
-                line.regimen_prescription_id
-            )
+            text_value = (line.days_to_serve_input or "").strip()
+            line.days_to_serve = int(text_value) if text_value.isdigit() else 0
 
     @api.constrains("batch_id", "regimen_prescription_id")
     def _check_unique_regimen_per_batch(self):

@@ -287,7 +287,25 @@
 }
 
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_renderer .o_list_table tbody tr:not(.o_data_row) {
-    display: none;
+    display: table-row;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_renderer .o_list_table tbody tr:not(.o_data_row) td {
+    border-top: 0;
+    padding-top: 6px;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_renderer .o_list_table tbody tr:not(.o_data_row) a {
+    align-items: center;
+    color: #005baa;
+    display: inline-flex;
+    font-weight: 600;
+    gap: 4px;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_renderer .o_list_table tbody tr:not(.o_data_row) a::before {
+    content: "+";
+    font-weight: 700;
 }
 
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table th.o_cdu_regimen_repeat_regimen_cell,
@@ -302,25 +320,18 @@
     width: 180px;
 }
 
-.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table thead th:nth-child(3),
-.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table tbody td:nth-child(3) {
-    border-right: 0;
-    padding-right: 2px;
-    text-align: center;
-    width: 44px;
-}
-
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table thead th.o_list_record_remove_header,
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table tbody td.o_list_record_remove {
-    border-left: 0;
-    padding-left: 2px;
     text-align: center;
-    width: 34px;
+    width: 42px;
 }
 
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table thead th.o_list_record_remove_header {
-    color: transparent;
-    font-size: 0;
+    font-size: 12px;
+}
+
+.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table thead th.o_list_record_remove_header::before {
+    content: "Action";
 }
 
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table tbody td.o_list_record_remove button {
@@ -331,32 +342,6 @@
     min-width: 26px;
     padding: 0;
     width: 26px;
-}
-
-.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon {
-    align-items: center;
-    border: 1px solid #b8d7ef;
-    border-radius: 999px;
-    color: #005baa;
-    display: inline-flex;
-    font-size: 0;
-    height: 26px;
-    justify-content: center;
-    min-width: 26px;
-    padding: 0;
-    width: 26px;
-}
-
-.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon:hover,
-.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon:focus {
-    background: #e8f4ff;
-    color: #004780;
-    text-decoration: none;
-}
-
-.o_cdu_batch_form .o_cdu_regimen_repeat_table .o_cdu_repeat_add_icon .fa {
-    font-size: 12px;
-    line-height: 1;
 }
 
 .o_cdu_batch_form .o_cdu_regimen_repeat_table .o_list_table td.o_cdu_regimen_repeat_days_cell input {

@@ -158,8 +158,23 @@ class CduDispense(models.Model):
                 continue
 
             for line in fulfilment_lines:
-                prescription_count = line.picking_line_id.prescription_count or 1
-                quantity = line.quantity_picked / prescription_count if prescription_count else line.quantity_picked
+                patient_line = line.picking_line_id._get_matching_patient_picking_lines().filtered(
+                    lambda picking_line, prescription=prescription: (
+                        picking_line.prescription_id == prescription
+                    )
+                )[:1]
+                quantity = (
+                    patient_line.packs_to_pick
+                    or patient_line.cdu_bottles_required
+                    or patient_line.bottles_required
+                )
+                if not quantity:
+                    prescription_count = line.picking_line_id.prescription_count or 1
+                    quantity = (
+                        line.quantity_picked / prescription_count
+                        if prescription_count
+                        else line.quantity_picked
+                    )
                 self.env["cdu.dispense.stock.selection"].create(
                     {
                         "dispense_id": dispense.id,
