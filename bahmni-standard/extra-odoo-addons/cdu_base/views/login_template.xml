@@ -2,27 +2,29 @@
 <odoo>
     <data>
         <template id="cdu_login_logo" inherit_id="web.login_layout">
-            <xpath expr="//img[contains(@t-attf-src, 'company_logo')]" position="replace">
-                <div style="text-align: center;">
-                    <img src="/cdu_base/static/src/img/logo.png" style="max-height:120px; max-width:100%; width:auto;"/>
-                    <h3 style="margin-top: 12px; margin-bottom: 18px; text-align: center; font-weight: 600;">
-                        Central Dispensing Unit
-                    </h3>
+            <xpath expr="//div[hasclass('container') and hasclass('py-5')]" position="attributes">
+                <attribute name="class">container py-5 cdu-login-shell</attribute>
+            </xpath>
+            <xpath expr="//div[contains(@t-attf-class, 'o_database_list')]" position="attributes">
+                <attribute name="t-attf-class">card border-0 mx-auto bg-100 {{login_card_classes}} o_database_list cdu-login-card</attribute>
+            </xpath>
+            <xpath expr="//div[hasclass('card-body')]" position="attributes">
+                <attribute name="class">card-body cdu-login-card-body</attribute>
+            </xpath>
+            <xpath expr="//div[contains(@t-attf-class, 'text-center') and contains(@t-attf-class, 'border-bottom')]" position="replace">
+                <div class="cdu-login-brand">
+                    <div class="cdu-login-emblem">
+                        <img src="/cdu_base/static/src/img/logo.png" alt="Central Dispensing Unit"/>
+                    </div>
+                    <p class="cdu-login-eyebrow">Ministry of Health</p>
+                    <h1>Central Dispensing Unit</h1>
+                    <p class="cdu-login-subtitle">
+                        Supporting decentralized drug distribution through coordinated prescription processing,
+                        stock management, dispensing, and collection-point fulfilment.
+                    </p>
                 </div>
             </xpath>
-        </template>
-
-        <template id="cdu_login_button_style" inherit_id="web.login">
-            <xpath expr="//t[@t-call='web.login_layout']" position="inside">
-                <t>
-                    <style>
-                        .oe_login_form .btn-primary {
-                            background-color: #005baa !important;
-                            border-color: #005baa !important;
-                        }
-                    </style>
-                </t>
-            </xpath>
+            <xpath expr="//div[hasclass('text-center') and hasclass('border-top')]" position="replace"/>
         </template>
     </data>
 </odoo>
