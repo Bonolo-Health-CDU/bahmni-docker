@@ -17,6 +17,11 @@ STOCK_STATUS_PRIORITY = {
 }
 
 
+def table_exists(env, table_name):
+    env.cr.execute("SELECT to_regclass(%s)", (table_name,))
+    return bool(env.cr.fetchone()[0])
+
+
 def highest_stock_status(options):
     status = False
     for option in options:
@@ -55,6 +60,9 @@ class CduElmisStockSummary(models.Model):
     )
 
     def init(self):
+        if not table_exists(self.env, "cdu_elmis_stock_option"):
+            return
+
         self.env.cr.execute("DELETE FROM cdu_elmis_stock_summary")
         self.env.cr.execute(
             """
@@ -158,6 +166,9 @@ class CduDispenseStockSummary(models.Model):
     )
 
     def init(self):
+        if not table_exists(self.env, "cdu_dispense_stock_option"):
+            return
+
         self.env.cr.execute("DELETE FROM cdu_dispense_stock_summary")
         self.env.cr.execute(
             """

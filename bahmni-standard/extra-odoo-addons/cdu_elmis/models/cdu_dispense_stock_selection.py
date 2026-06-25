@@ -50,6 +50,9 @@ class CduDispenseStockSelection(models.Model):
     dosage_instructions = fields.Text(string="Dosing / Instructions")
 
     def init(self):
+        if not self._table_exists("cdu_dispense_stock_option"):
+            return
+
         self.env.cr.execute(
             """
             UPDATE cdu_dispense_stock_selection selection
@@ -59,6 +62,9 @@ class CduDispenseStockSelection(models.Model):
                AND selection.selected_pack_size IS NULL
             """
         )
+        if not self._table_exists("cdu_picking_fulfilment_line"):
+            return
+
         self.env.cr.execute(
             """
             UPDATE cdu_dispense_stock_selection selection
@@ -71,6 +77,10 @@ class CduDispenseStockSelection(models.Model):
                AND selection.selected_pack_size IS NULL
             """
         )
+
+    def _table_exists(self, table_name):
+        self.env.cr.execute("SELECT to_regclass(%s)", (table_name,))
+        return bool(self.env.cr.fetchone()[0])
 
     @api.constrains("quantity_dispensed")
     def _check_quantity_dispensed(self):
