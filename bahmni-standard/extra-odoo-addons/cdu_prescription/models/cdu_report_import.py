@@ -111,16 +111,17 @@ class CduReportRun(models.Model):
 
         file_bytes = file_bytes or base64.b64decode(self.source_file)
         file_hash = hashlib.sha256(file_bytes).hexdigest()
+        # Allow retries for completed_with_errors runs; reference-data fixes may let failed rows import.
         duplicate_run = self.search([
             ("id", "!=", self.id),
             ("file_hash", "=", file_hash),
-            ("state", "in", ["completed", "completed_with_errors"]),
+            ("state", "=", "completed"),
         ], limit=1)
         if duplicate_run:
             self.write({
                 "file_hash": file_hash,
                 "state": "duplicate",
-                "error_message": "This file was already imported in %s." % duplicate_run.display_name,
+                "error_message": "This file was already imported successfully in %s." % duplicate_run.display_name,
             })
             return
 

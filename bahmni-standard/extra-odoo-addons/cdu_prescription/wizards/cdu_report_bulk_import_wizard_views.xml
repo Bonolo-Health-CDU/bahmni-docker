@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_report_bulk_import_wizard_form" model="ir.ui.view">
+        <field name="name">cdu.report.bulk.import.wizard.form</field>
+        <field name="model">cdu.report.bulk.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Multiple Reports" class="o_cdu_bulk_import_wizard">
+                <sheet>
+                    <field name="state" invisible="1"/>
+                    <div class="oe_title">
+                        <h1>Import Multiple eRegister Reports</h1>
+                    </div>
+
+                    <div attrs="{'invisible': [('state', '!=', 'upload')]}">
+                        <div class="alert alert-info" role="alert">
+                            Upload one or more eRegister CSV reports. CDU will read each file's Location column and create one report import per file.
+                        </div>
+                        <group string="Report Files">
+                            <field name="file_ids"
+                                   widget="many2many_binary"
+                                   options="{'accepted_file_extensions': '.csv'}"
+                                   nolabel="1"/>
+                        </group>
+                        <group string="Ready">
+                            <field name="selected_file_count" readonly="1"/>
+                        </group>
+                    </div>
+
+                    <div attrs="{'invisible': [('state', '!=', 'results')]}">
+                        <div class="o_cdu_bulk_status">
+                            <div class="o_cdu_bulk_status_card o_cdu_bulk_status_primary">
+                                <span class="o_cdu_bulk_status_label">Processed</span>
+                                <field name="processed_count" readonly="1" class="o_cdu_bulk_status_value"/>
+                                <span class="o_cdu_bulk_status_hint">files</span>
+                            </div>
+                            <div class="o_cdu_bulk_status_card o_cdu_bulk_status_success">
+                                <span class="o_cdu_bulk_status_label">Completed</span>
+                                <field name="completed_count" readonly="1" class="o_cdu_bulk_status_value"/>
+                                <span class="o_cdu_bulk_status_hint">clean imports</span>
+                            </div>
+                            <div class="o_cdu_bulk_status_card o_cdu_bulk_status_warning">
+                                <span class="o_cdu_bulk_status_label">Needs Review</span>
+                                <field name="attention_count" readonly="1" class="o_cdu_bulk_status_value"/>
+                                <span class="o_cdu_bulk_status_hint">files</span>
+                            </div>
+                            <div class="o_cdu_bulk_status_card o_cdu_bulk_status_muted">
+                                <span class="o_cdu_bulk_status_label">Rows Imported</span>
+                                <field name="imported_rows" readonly="1" class="o_cdu_bulk_status_value"/>
+                                <span class="o_cdu_bulk_status_hint">new prescriptions</span>
+                            </div>
+                        </div>
+
+                        <group string="Batch Totals" col="6">
+                            <field name="total_files"/>
+                            <field name="progress_percent" widget="progressbar"/>
+                            <field name="total_rows"/>
+                            <field name="updated_rows"/>
+                            <field name="duplicate_rows"/>
+                            <field name="failed_rows"/>
+                            <field name="completed_with_errors_count"/>
+                            <field name="duplicate_count"/>
+                            <field name="failed_count"/>
+                        </group>
+
+                        <separator string="File Results"/>
+                        <field name="result_line_ids" readonly="1" nolabel="1">
+                            <tree decoration-success="state == 'completed'"
+                                  decoration-warning="state in ('completed_with_errors', 'duplicate')"
+                                  decoration-danger="state == 'failed'"
+                              create="0"
+                              delete="0">
+                                <field name="sequence" string="#"/>
+                                <field name="file_name"/>
+                                <field name="location_summary"/>
+                                <field name="state"/>
+                                <field name="total_rows"/>
+                                <field name="imported_rows"/>
+                                <field name="updated_rows"/>
+                                <field name="duplicate_rows"/>
+                                <field name="failed_rows"/>
+                                <field name="report_run_id"/>
+                                <field name="error_message"/>
+                            </tree>
+                        </field>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_import_reports"
+                            string="Import Reports"
+                            type="object"
+                            class="btn-primary"
+                            attrs="{'invisible': [('state', '!=', 'upload')]}"/>
+                    <button name="action_view_report_imports"
+                            string="Open Report Imports"
+                            type="object"
+                            class="btn-secondary"
+                            attrs="{'invisible': [('state', '!=', 'results')]}"/>
+                    <button name="action_view_attention_reports"
+                            string="Review Attention Items"
+                            type="object"
+                            class="btn-primary"
+                            attrs="{'invisible': ['|', ('state', '!=', 'results'), ('attention_count', '=', 0)]}"/>
+                    <button name="action_view_completed_reports"
+                            string="View Completed"
+                            type="object"
+                            class="btn-secondary"
+                            attrs="{'invisible': [('state', '!=', 'results')]}"/>
+                    <button string="Close" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_report_bulk_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Multiple Reports</field>
+        <field name="res_model">cdu.report.bulk.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cdu_report_bulk_import_wizard_form"/>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="model_cdu_report_run"/>
+        <field name="binding_view_types">list</field>
+    </record>
+</odoo>

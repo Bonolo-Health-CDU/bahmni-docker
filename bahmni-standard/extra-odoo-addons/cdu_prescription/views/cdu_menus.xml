@@ -57,6 +57,14 @@
         groups="cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_report_bulk_import"
+        name="Import Multiple Reports"
+        parent="menu_cdu_prescription_intake"
+        action="action_cdu_report_bulk_import_wizard"
+        sequence="11"
+        groups="cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_prescriptions"
         name="All Prescriptions"
         parent="menu_cdu_prescription_intake"

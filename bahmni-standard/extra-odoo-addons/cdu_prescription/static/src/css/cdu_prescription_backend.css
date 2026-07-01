@@ -797,3 +797,84 @@
         grid-template-columns: repeat(2, minmax(120px, 1fr));
     }
 }
+
+.o_cdu_bulk_import_wizard .oe_title {
+    margin-bottom: 18px;
+}
+
+.o_cdu_bulk_import_wizard .alert {
+    border-radius: 6px;
+    margin-bottom: 18px;
+}
+
+.o_cdu_bulk_status {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    margin: 4px 0 18px;
+}
+
+.o_cdu_bulk_status_card {
+    background: #f8fafc;
+    border: 1px solid #dbe4ee;
+    border-left: 4px solid #6b7280;
+    border-radius: 6px;
+    min-width: 0;
+    padding: 12px 14px;
+}
+
+.o_cdu_bulk_status_primary {
+    border-left-color: #005baa;
+}
+
+.o_cdu_bulk_status_success {
+    border-left-color: #1f8f4d;
+}
+
+.o_cdu_bulk_status_warning {
+    border-left-color: #c97a00;
+}
+
+.o_cdu_bulk_status_muted {
+    border-left-color: #607080;
+}
+
+.o_cdu_bulk_status_label,
+.o_cdu_bulk_status_hint {
+    color: #5c6670;
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.o_cdu_bulk_status_hint {
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 2px;
+    text-transform: none;
+}
+
+.o_cdu_bulk_status_value,
+.o_cdu_bulk_status_value .o_field_integer {
+    color: #102a43;
+    display: block;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-top: 6px;
+}
+
+.o_cdu_bulk_import_wizard .o_field_progressbar {
+    min-width: 180px;
+}
+
+.o_cdu_bulk_import_wizard .o_list_table td {
+    vertical-align: top;
+}
+
+@media (max-width: 900px) {
+    .o_cdu_bulk_status {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+}

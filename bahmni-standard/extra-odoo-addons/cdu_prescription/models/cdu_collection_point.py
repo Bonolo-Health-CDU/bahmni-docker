@@ -48,6 +48,7 @@ class CduCollectionPoint(models.Model):
     owner_id = fields.Char(readonly=True)
     external_reference = fields.Char(
         string="Collect-and-Go Reference",
+        readonly=True,
         help="External identifier used when dispatch jobs are submitted.",
     )
     last_synced_at = fields.Datetime(readonly=True)

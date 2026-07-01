@@ -269,14 +269,27 @@ class CduCollectionPointSyncConfig(models.Model):
         url = self.response_endpoint_template.format(guid=reference)
         last_payload = False
         for attempt in range(self.poll_attempts):
+            time.sleep(self.poll_interval_seconds)
             payload = self._http_json_request("GET", url)
             last_payload = payload
+            if self._is_transient_processing_error(payload) and attempt < self.poll_attempts - 1:
+                continue
             self._raise_for_bridge_error(payload)
             if self._response_contains_message(payload):
                 return payload
-            if attempt < self.poll_attempts - 1:
-                time.sleep(self.poll_interval_seconds)
         raise UserError(_("No response message was available for reference %s after %s attempts.") % (reference, self.poll_attempts))
+
+    def _is_transient_processing_error(self, payload):
+        expanded = self._expand_json_strings(payload)
+        if not isinstance(expanded, dict):
+            return False
+        status_code = expanded.get("statusCode")
+        try:
+            failed = int(status_code) >= 400
+        except (TypeError, ValueError):
+            failed = False
+        message = (expanded.get("message") or expanded.get("error") or "").lower()
+        return failed and "xml document" in message
 
     def _raise_for_bridge_error(self, payload):
         expanded = self._expand_json_strings(payload)
@@ -412,7 +425,7 @@ class CduCollectionPointSyncConfig(models.Model):
         }
 
     def _upsert_collection_points(self, locations):
-        CollectionPoint = self.env["cdu.collection.point"]
+        CollectionPoint = self.env["cdu.collection.point"].sudo()
         counts = {"created": 0, "updated": 0}
         for location in locations:
             point = False

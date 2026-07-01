@@ -30,6 +30,7 @@
         "views/cdu_onedrive_views.xml",
         "views/cdu_patient_views.xml",
         "views/cdu_user_views.xml",
+        "wizards/cdu_report_bulk_import_wizard_views.xml",
         "views/cdu_report_import_views.xml",
         "views/cdu_prescription_views.xml",
         "views/cdu_product_template_views.xml",
