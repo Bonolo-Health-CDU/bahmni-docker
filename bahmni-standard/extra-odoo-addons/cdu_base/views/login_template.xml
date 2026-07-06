@@ -16,7 +16,7 @@
                     <div class="cdu-login-emblem">
                         <img src="/cdu_base/static/src/img/logo.png" alt="Central Dispensing Unit"/>
                     </div>
-                    <p class="cdu-login-eyebrow">Ministry of Health</p>
+                    <!-- <p class="cdu-login-eyebrow">Ministry of Health</p> -->
                     <h1>Central Dispensing Unit</h1>
                     <p class="cdu-login-subtitle">
                         Supporting decentralized drug distribution through coordinated prescription processing,
