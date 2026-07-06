@@ -50,6 +50,11 @@
         <field name="value">changeme</field>
     </record>
 
+    <record id="param_report_url" model="ir.config_parameter">
+        <field name="key">report.url</field>
+        <field name="value">http://127.0.0.1:8069</field>
+    </record>
+
     <data noupdate="1">
         <record id="param_cdu_collect_go_base_url" model="ir.config_parameter">
             <field name="key">cdu.collect_go.base_url</field>

@@ -1,3 +1,5 @@
+import base64
+
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from werkzeug import urls
@@ -97,6 +99,13 @@ class CduDispense(models.Model):
         compute="_compute_labels_printed",
         store=True,
     )
+    _AUTO_REFRESH_FORM_FIELDS = frozenset(
+        (
+            "stock_option_ids",
+            "stock_summary_ids",
+            "stock_selection_ids",
+        )
+    )
 
     _sql_constraints = [
         (
@@ -113,6 +122,18 @@ class CduDispense(models.Model):
         dispense = super().create(vals)
         dispense._prefill_from_picking()
         return dispense
+
+    def read(self, fields=None, load="_classic_read"):
+        if self._should_auto_refresh_production_stock_on_read(fields):
+            self._auto_refresh_production_stock(silent=True)
+        return super().read(fields=fields, load=load)
+
+    def _should_auto_refresh_production_stock_on_read(self, requested_fields):
+        if self.env.context.get("cdu_skip_auto_refresh_production_stock"):
+            return False
+        if requested_fields and not self._AUTO_REFRESH_FORM_FIELDS.intersection(requested_fields):
+            return False
+        return any(dispense.state == "draft" for dispense in self)
 
     @api.depends("labels_printed_at")
     def _compute_labels_printed(self):
@@ -249,11 +270,9 @@ class CduDispense(models.Model):
 
     def action_refresh_production_stock(self):
         self._ensure_dispensing_access()
-        service = self.env["cdu.elmis.stock.service"]
-        if not service.has_valid_current_user_elmis_token():
-            return service.action_open_elmis_auth_wizard()
-        for dispense in self:
-            dispense._refresh_production_stock_options()
+        auth_action = self._auto_refresh_production_stock(silent=False)
+        if auth_action:
+            return auth_action
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -265,6 +284,20 @@ class CduDispense(models.Model):
                 "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
+
+    def _auto_refresh_production_stock(self, silent=False):
+        service = self.env["cdu.elmis.stock.service"]
+        if not service.has_valid_current_user_elmis_token():
+            return False if silent else service.action_open_elmis_auth_wizard(
+                batch=self[:1].batch_id
+            )
+        for dispense in self.filtered(lambda record: record.state == "draft"):
+            try:
+                dispense._refresh_production_stock_options()
+            except UserError:
+                if not silent:
+                    raise
+        return False
 
     def _refresh_production_stock_options(self):
         self.ensure_one()
@@ -384,17 +417,7 @@ class CduDispense(models.Model):
             )
             if dispense.prescription_id.state == "awaiting_dispensing":
                 dispense.prescription_id.write({"state": "awaiting_bagging_qa"})
-        return {
-            "type": "ir.actions.client",
-            "tag": "display_notification",
-            "params": {
-                "title": _("Dispensing confirmed"),
-                "message": _("Prescription moved to Awaiting Bagging / QA."),
-                "type": "success",
-                "sticky": False,
-                "next": {"type": "ir.actions.client", "tag": "reload"},
-            },
-        }
+        return self.with_context(cdu_label_layout="all")._action_generate_labels()
 
     def action_mark_labels_printed(self):
         self._ensure_dispensing_access()
@@ -426,19 +449,9 @@ class CduDispense(models.Model):
             if dispense.state != "confirmed":
                 raise UserError(_("Confirm dispensing before printing labels."))
 
-        if not self.env.context.get("cdu_skip_label_print_wizard") and len(self) == 1:
-            return {
-                "type": "ir.actions.act_window",
-                "name": _("Preview / Print Labels"),
-                "res_model": "cdu.label.print.wizard",
-                "view_mode": "form",
-                "target": "new",
-                "context": {
-                    "default_dispense_id": self.id,
-                    "default_label_layout": self.env.context.get("cdu_label_layout", "all"),
-                },
-            }
+        return self._action_generate_labels()
 
+    def _action_generate_labels(self):
         for dispense in self:
             if not dispense.labels_printed_at:
                 dispense.write(
@@ -496,6 +509,18 @@ class CduDispense(models.Model):
             }
         )
         return "/report/barcode?%s" % query
+
+    def get_barcode_data_uri(self, value, barcode_type="Code128", width=580, height=160):
+        barcode = self.env["ir.actions.report"].barcode(
+            barcode_type,
+            value or "",
+            width=width,
+            height=height,
+            humanreadable=0,
+            quiet=1,
+        )
+        encoded = base64.b64encode(barcode).decode("ascii")
+        return "data:image/png;base64,%s" % encoded
 
     def get_label_qr_value(self):
         self.ensure_one()

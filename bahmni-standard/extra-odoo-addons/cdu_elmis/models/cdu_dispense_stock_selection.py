@@ -47,7 +47,12 @@ class CduDispenseStockSelection(models.Model):
     selected_lot_expiry = fields.Date(string="Expiry")
     selected_stock_on_hand = fields.Integer(string="Available Packs", readonly=True)
     quantity_dispensed = fields.Float(string="Dispensed Packs")
-    dosage_instructions = fields.Text(string="Dosing / Instructions")
+    dosage_instructions = fields.Text(
+        string="Dosing / Instructions",
+        related="prescription_id.dosage_instructions",
+        readonly=False,
+        store=True,
+    )
 
     def init(self):
         if not self._table_exists("cdu_dispense_stock_option"):
@@ -75,6 +80,17 @@ class CduDispenseStockSelection(models.Model):
               FROM cdu_picking_fulfilment_line fulfilment
              WHERE fulfilment.id = selection.picking_fulfilment_line_id
                AND selection.selected_pack_size IS NULL
+            """
+        )
+
+        self.env.cr.execute(
+            """
+            UPDATE cdu_dispense_stock_selection selection
+               SET dosage_instructions = prescription.dosage_instructions
+              FROM cdu_prescription prescription
+             WHERE prescription.id = selection.prescription_id
+               AND COALESCE(selection.dosage_instructions, '') !=
+                   COALESCE(prescription.dosage_instructions, '')
             """
         )
 

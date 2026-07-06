@@ -18,6 +18,9 @@ class CduPrescription(models.Model):
         )
         if not dispense:
             dispense = self.env["cdu.dispense"].create({"prescription_id": self.id})
+        auth_action = dispense._auto_refresh_production_stock(silent=False)
+        if auth_action:
+            return auth_action
         return {
             "type": "ir.actions.act_window",
             "name": _("Dispense Prescription"),

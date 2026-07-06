@@ -40,21 +40,15 @@
         <field name="arch" type="xml">
             <form class="o_cdu_prescription_form o_cdu_batch_form">
                 <header>
-                    <button name="action_refresh_production_stock"
-                            string="Refresh Production Floor Stock"
-                            type="object"
-                            class="btn-secondary"
-                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_confirm_dispensing"
                             string="Confirm Dispensing"
                             type="object"
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            confirm="Confirm dispensing for this prescription?&#10;&#10;Before continuing, make sure the eLMIS product, batch number, dispensed packs, and dosing instructions are correct.&#10;&#10;This moves the prescription to Awaiting Bagging / QA. eLMIS stock is not consumed at this step; consumption happens when the box is confirmed."
+                            confirm="Confirm dispensing for this prescription?&#10;&#10;Before continuing, make sure the eLMIS product, batch number, dispensed packs, and dosing instructions are correct.&#10;&#10;This moves the prescription to Awaiting Bagging / QA and generates the dispensing slip, medicine label, and bag label. eLMIS stock is not consumed at this step; consumption happens when the box is confirmed."
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_print_labels"
-                            string="Print Labels"
+                            string="Reprint Labels"
                             type="object"
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
@@ -133,8 +127,7 @@
                     <notebook>
                         <page string="Dispense Selections">
                             <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
-                                Selections are prefilled from the batch picking lines. Refresh Production Floor stock,
-                                then confirm or adjust the exact product, batch, quantity, and dosing instructions.
+                                Selections are prefilled from the batch picking lines. Production Floor stock refreshes automatically when dispensing starts and when this page is loaded. Confirm or adjust the exact product, batch, quantity, and dosing instructions.
                             </div>
                             <field name="stock_selection_ids">
                                 <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
@@ -159,8 +152,7 @@
                             <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
                                  role="alert"
                                  attrs="{'invisible': [('stock_option_ids', '!=', [])]}">
-                                No Production Floor stock has been loaded for this prescription yet.
-                                Click <strong>Refresh Production Floor Stock</strong>.
+                                No Production Floor stock has been loaded for this prescription yet. Reload the page to retry the automatic refresh, or confirm your eLMIS session is active.
                             </div>
                             <div class="alert alert-info o_cdu_elmis_stock_hint" role="alert">
                                 Review the product summary first, then open Batches/Lots for expiry and batch detail. Red rows are expired, amber rows need attention, and grey rows have no expiry date.

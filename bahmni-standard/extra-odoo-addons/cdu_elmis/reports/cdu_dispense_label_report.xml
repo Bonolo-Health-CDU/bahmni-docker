@@ -334,7 +334,7 @@
                                     <div class="cdu-code-grid">
                                         <div class="cdu-code-barcode">
                                             <img class="cdu-barcode"
-                                                 t-att-src="dispense.get_barcode_url(script_number)"
+                                                 t-att-src="dispense.get_barcode_data_uri(script_number)"
                                                  t-att-alt="'Barcode for %s' % script_number"/>
                                             <div class="cdu-barcode-caption">
                                                 <span t-esc="script_number"/>
@@ -342,7 +342,7 @@
                                         </div>
                                         <div class="cdu-code-qr">
                                             <img class="cdu-qr"
-                                                 t-att-src="dispense.get_barcode_url(dispense.get_label_qr_value(), 'QR', 220, 220)"
+                                                 t-att-src="dispense.get_barcode_data_uri(dispense.get_label_qr_value(), 'QR', 220, 220)"
                                                  t-att-alt="'QR code for %s' % script_number"/>
                                             <div class="cdu-qr-caption">Patient / Prescription</div>
                                         </div>
