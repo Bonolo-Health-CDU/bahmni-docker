@@ -533,6 +533,48 @@
     white-space: nowrap;
 }
 
+.o_cdu_batch_form .o_cdu_qa_scan_panel {
+    align-self: stretch;
+    background: #eef7ff;
+    border: 1px solid #9ed0f5;
+    border-radius: 8px;
+    display: grid;
+    gap: 6px;
+    min-width: 280px;
+    padding: 10px 12px;
+}
+
+.o_cdu_batch_form .o_cdu_qa_scan_panel > label {
+    color: #245278;
+    font-size: 12px;
+    font-weight: 750;
+    letter-spacing: 0.03em;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.o_cdu_batch_form .o_cdu_qa_scan_panel .o_field_widget {
+    margin: 0;
+    width: 100%;
+}
+
+.o_cdu_batch_form .o_cdu_qa_scan_panel textarea {
+    border-color: #79b9e8;
+    font-weight: 650;
+    min-height: 54px;
+}
+
+.o_cdu_batch_form .o_cdu_qa_scan_panel textarea:focus {
+    border-color: #005baa;
+    box-shadow: 0 0 0 2px rgba(0, 91, 170, 0.14);
+}
+
+.o_cdu_batch_form .o_cdu_qa_scan_panel > span {
+    color: #4f6f8a;
+    font-size: 12px;
+    font-weight: 650;
+}
+
 .o_cdu_batch_form .o_cdu_qa_check_item {
     align-items: center;
     background: #fbfcfe;
@@ -605,6 +647,10 @@
 
     .o_cdu_batch_form .o_cdu_scan_qr_button {
         justify-self: stretch;
+    }
+
+    .o_cdu_batch_form .o_cdu_qa_scan_panel {
+        min-width: 0;
     }
 }
 

@@ -78,15 +78,51 @@ class CduBaggingQa(models.Model):
         readonly=True,
         string="Dispensed Products",
     )
-    patient_details_checked = fields.Boolean(string="Patient details checked", tracking=True)
-    medicine_product_checked = fields.Boolean(string="Medicine/product checked", tracking=True)
-    quantity_checked = fields.Boolean(string="Quantity checked", tracking=True)
-    dosing_instructions_checked = fields.Boolean(string="Dosing instructions checked", tracking=True)
-    product_labels_attached = fields.Boolean(string="Product labels attached", tracking=True)
-    bag_label_attached = fields.Boolean(string="Bag label attached", tracking=True)
-    medicines_placed_in_bag = fields.Boolean(string="Medicines placed in bag", tracking=True)
-    labels_attached = fields.Boolean(string="Labels attached", tracking=True)
-    bag_sealed = fields.Boolean(string="Bag sealed", tracking=True)
+    patient_details_checked = fields.Boolean(
+        string="Patient details checked",
+        readonly=True,
+        tracking=True,
+    )
+    medicine_product_checked = fields.Boolean(
+        string="Medicine/product checked",
+        readonly=True,
+        tracking=True,
+    )
+    quantity_checked = fields.Boolean(
+        string="Quantity checked",
+        readonly=True,
+        tracking=True,
+    )
+    dosing_instructions_checked = fields.Boolean(
+        string="Dosing instructions checked",
+        readonly=True,
+        tracking=True,
+    )
+    product_labels_attached = fields.Boolean(
+        string="Product labels attached",
+        readonly=True,
+        tracking=True,
+    )
+    bag_label_attached = fields.Boolean(
+        string="Bag label attached",
+        readonly=True,
+        tracking=True,
+    )
+    medicines_placed_in_bag = fields.Boolean(
+        string="Medicines placed in bag",
+        readonly=True,
+        tracking=True,
+    )
+    labels_attached = fields.Boolean(
+        string="Labels attached",
+        readonly=True,
+        tracking=True,
+    )
+    bag_sealed = fields.Boolean(
+        string="Bag sealed",
+        readonly=True,
+        tracking=True,
+    )
     qa_notes = fields.Text(string="QA Notes", tracking=True)
     state = fields.Selection(
         [
@@ -98,6 +134,16 @@ class CduBaggingQa(models.Model):
     )
     qa_ready = fields.Boolean(compute="_compute_qa_readiness", store=True)
     qa_readiness_message = fields.Text(compute="_compute_qa_readiness", compute_sudo=True)
+    label_qr_scan_input = fields.Text(
+        string="Scan Bag Label to Pass QA",
+        compute="_compute_label_qr_scan_input",
+        inverse="_inverse_label_qr_scan_input",
+        store=False,
+        help=(
+            "Scan the bag label QR after checking the patient, medicines, quantity, "
+            "dosing instructions, labels, bag contents, and seal."
+        ),
+    )
     bagged_by = fields.Many2one("res.users", readonly=True)
     bagged_at = fields.Datetime(readonly=True)
     qa_checked_by = fields.Many2one("res.users", readonly=True)
@@ -132,6 +178,13 @@ class CduBaggingQa(models.Model):
             or self.env.user.has_group("cdu_prescription.group_cdu_admin")
         ):
             raise AccessError(_("Only CDU dispensing officers can manage Bagging / QA."))
+
+    def _compute_label_qr_scan_input(self):
+        for qa in self:
+            qa.label_qr_scan_input = False
+
+    def _inverse_label_qr_scan_input(self):
+        return
 
     @api.depends(
         "dispense_id.state",
@@ -184,29 +237,61 @@ class CduBaggingQa(models.Model):
         if errors:
             raise ValidationError(_("Bagging / QA cannot be confirmed yet:\n\n%s") % "\n".join(errors))
 
+    def _confirm_bagging_qa_record(self):
+        self.ensure_one()
+        if self.state == "confirmed":
+            raise UserError(_("Bagging / QA has already been confirmed for %s.") % self.name)
+        self._ensure_qa_ready()
+        now = fields.Datetime.now()
+        self.write(
+            {
+                "parcel_reference": self.parcel_reference
+                or self.env["ir.sequence"].next_by_code("cdu.parcel")
+                or "/",
+                "state": "confirmed",
+                "confirmed_by": self.env.user.id,
+                "confirmed_at": now,
+                "bagged_by": self.bagged_by.id or self.env.user.id,
+                "bagged_at": self.bagged_at or now,
+                "qa_checked_by": self.qa_checked_by.id or self.env.user.id,
+                "qa_checked_at": self.qa_checked_at or now,
+            }
+        )
+        if self.prescription_id.state == "awaiting_bagging_qa":
+            self.prescription_id.write({"state": "awaiting_boxing"})
+
+    def _get_next_bagging_qa_action(self):
+        self.ensure_one()
+        domain = [
+            ("state", "=", "awaiting_bagging_qa"),
+            ("id", "!=", self.prescription_id.id),
+        ]
+        if self.batch_id:
+            domain.append(("batch_id", "=", self.batch_id.id))
+        else:
+            domain.append(("batch_id", "=", False))
+
+        next_prescription = self.env["cdu.prescription"].search(
+            domain,
+            order="next_drug_pickup_date asc, patient_first_name asc, id asc",
+            limit=1,
+        )
+        if next_prescription:
+            return next_prescription.action_open_bagging_qa()
+
+        action = self.env.ref("cdu_elmis.action_cdu_bagging_qa_work_queue").read()[0]
+        action["views"] = [(False, "tree"), (False, "form")]
+        if self.batch_id:
+            action["domain"] = [
+                ("state", "=", "awaiting_bagging_qa"),
+                ("batch_id", "=", self.batch_id.id),
+            ]
+        return action
+
     def action_confirm_bagging_qa(self):
         self._ensure_bagging_qa_access()
         for qa in self:
-            if qa.state == "confirmed":
-                raise UserError(_("Bagging / QA has already been confirmed for %s.") % qa.name)
-            qa._ensure_qa_ready()
-            now = fields.Datetime.now()
-            qa.write(
-                {
-                    "parcel_reference": qa.parcel_reference
-                    or self.env["ir.sequence"].next_by_code("cdu.parcel")
-                    or "/",
-                    "state": "confirmed",
-                    "confirmed_by": self.env.user.id,
-                    "confirmed_at": now,
-                    "bagged_by": qa.bagged_by.id or self.env.user.id,
-                    "bagged_at": qa.bagged_at or now,
-                    "qa_checked_by": qa.qa_checked_by.id or self.env.user.id,
-                    "qa_checked_at": qa.qa_checked_at or now,
-                }
-            )
-            if qa.prescription_id.state == "awaiting_bagging_qa":
-                qa.prescription_id.write({"state": "awaiting_boxing"})
+            qa._confirm_bagging_qa_record()
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -215,7 +300,7 @@ class CduBaggingQa(models.Model):
                 "message": _("Prescription moved to Awaiting Boxing."),
                 "type": "success",
                 "sticky": False,
-                "next": {"type": "ir.actions.client", "tag": "reload"},
+                "next": self[:1]._get_next_bagging_qa_action() if len(self) == 1 else False,
             },
         }
 
@@ -286,24 +371,26 @@ class CduBaggingQa(models.Model):
                 "bag_label_attached": True,
                 "medicines_placed_in_bag": True,
                 "bag_sealed": True,
+                "qa_checked_by": self.env.user.id,
+                "qa_checked_at": fields.Datetime.now(),
             }
+        )
+        self._confirm_bagging_qa_record()
+        next_action = self._get_next_bagging_qa_action()
+        next_message = (
+            _("QA passed for %(patient)s. Opening the next prescription...")
+            if next_action.get("res_model") == "cdu.bagging.qa" and next_action.get("res_id")
+            else _("QA passed for %(patient)s. Returning to the QA work queue...")
         )
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
-                "title": _("Box verified"),
-                "message": _(
-                    "%(patient)s and %(prescription)s match this Bagging / QA task. "
-                    "The QA checklist has been completed."
-                )
-                % {
-                    "patient": expected_patient,
-                    "prescription": expected_prescription,
-                },
+                "title": _("Bag passed QA"),
+                "message": next_message % {"patient": expected_patient},
                 "type": "success",
                 "sticky": False,
-                "next": {"type": "ir.actions.client", "tag": "reload"},
+                "next": next_action,
             },
         }
 
@@ -315,5 +402,6 @@ class CduBaggingQa(models.Model):
             "res_model": "cdu.bagging.qa",
             "res_id": self.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "current",
         }

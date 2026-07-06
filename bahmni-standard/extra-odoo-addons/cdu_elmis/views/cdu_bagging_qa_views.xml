@@ -54,13 +54,6 @@
                             class="btn-secondary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('labels_printed', '=', False)]}"/>
-                    <button name="action_confirm_bagging_qa"
-                            string="Confirm Bagging / QA"
-                            type="object"
-                            class="btn-primary"
-                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            confirm="This will confirm Bagging / QA and move the prescription to Awaiting Boxing. Continue?"
-                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
                 </header>
                 <sheet>
@@ -174,46 +167,52 @@
                     <div class="o_cdu_qa_checklist_row">
                         <div class="o_cdu_qa_checklist">
                             <div class="o_cdu_qa_check_item">
-                                <field name="patient_details_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="patient_details_checked" nolabel="1" readonly="1"/>
                                 <span>Patient details checked</span>
                             </div>
                             <div class="o_cdu_qa_check_item">
-                                <field name="medicine_product_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="medicine_product_checked" nolabel="1" readonly="1"/>
                                 <span>Medicine/product checked</span>
                             </div>
                             <div class="o_cdu_qa_check_item">
-                                <field name="quantity_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="quantity_checked" nolabel="1" readonly="1"/>
                                 <span>Quantity checked</span>
                             </div>
                             <div class="o_cdu_qa_check_item">
-                                <field name="dosing_instructions_checked" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="dosing_instructions_checked" nolabel="1" readonly="1"/>
                                 <span>Dosing instructions checked</span>
                             </div>
                             <div class="o_cdu_qa_check_item">
-                                <field name="product_labels_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="product_labels_attached" nolabel="1" readonly="1"/>
                                 <span>Product labels attached</span>
                             </div>
                             <div class="o_cdu_qa_check_item">
-                                <field name="bag_label_attached" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="bag_label_attached" nolabel="1" readonly="1"/>
                                 <span>Bag label attached</span>
                             </div>
                             <div class="o_cdu_qa_check_item">
-                                <field name="medicines_placed_in_bag" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="medicines_placed_in_bag" nolabel="1" readonly="1"/>
                                 <span>Medicines placed in bag</span>
                             </div>
                             <div class="o_cdu_qa_check_item">
-                                <field name="bag_sealed" nolabel="1" attrs="{'readonly': [('state', '=', 'confirmed')]}"/>
+                                <field name="bag_sealed" nolabel="1" readonly="1"/>
                                 <span>Bag sealed</span>
                             </div>
                         </div>
-                        <button name="action_scan_label_qr"
-                                string="Scan QR Code"
-                                type="object"
-                                icon="fa-qrcode"
-                                class="btn-primary o_cdu_scan_qr_button"
-                                title="Scan the QR code printed on the bag label"
-                                groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                                attrs="{'invisible': [('state', '=', 'confirmed')]}"/>
+                        <div class="o_cdu_qa_scan_panel"
+                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                             attrs="{'invisible': [('state', '=', 'confirmed')]}">
+                            <label for="label_qr_scan_input"/>
+                            <field name="label_qr_scan_input"
+                                   nolabel="1"
+                                   widget="cdu_bagging_qa_qr_input"
+                                   placeholder="Scan bag label after QA check"
+                                   rows="2"/>
+                            <span>
+                                Scanning confirms the bag label, medicines, quantity,
+                                dosing instructions, labels, contents, and seal were checked.
+                            </span>
+                        </div>
                     </div>
 
                     <notebook>

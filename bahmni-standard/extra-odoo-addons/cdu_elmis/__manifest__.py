@@ -36,6 +36,7 @@
         "web.assets_backend": [
             "cdu_elmis/static/src/js/box_parcel_scanner.js",
             "cdu_elmis/static/src/js/bagging_qa_qr_scanner.js",
+            "cdu_elmis/static/src/js/bagging_qa_qr_input.js",
             "cdu_elmis/static/src/js/box_documents_print.js",
             "cdu_elmis/static/src/js/elmis_picking_wizard.js",
         ],
