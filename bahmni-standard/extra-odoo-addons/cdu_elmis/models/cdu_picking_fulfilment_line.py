@@ -1,3 +1,5 @@
+import math
+
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -29,7 +31,7 @@ class CduPickingFulfilmentLine(models.Model):
     )
     required_quantity = fields.Float(
         string="Required Packs",
-        related="picking_line_id.quantity_to_pick",
+        related="picking_line_id.packs_to_pick",
         readonly=True,
     )
     prescription_count = fields.Integer(
@@ -82,17 +84,32 @@ class CduPickingFulfilmentLine(models.Model):
     selected_stock_on_hand = fields.Integer(string="Available Packs", readonly=True)
     quantity_picked = fields.Float(string="Picked Packs")
 
-    @api.constrains("quantity_picked")
+    @api.constrains("quantity_picked", "selected_stock_option_id", "selected_stock_on_hand")
     def _check_quantity_picked(self):
         for line in self:
             if line.quantity_picked < 0:
                 raise ValidationError(_("Picked quantity cannot be negative."))
+            if line.quantity_picked and not float(line.quantity_picked).is_integer():
+                raise ValidationError(_("Picked packs must be a whole number."))
+            if (
+                line.selected_stock_option_id
+                and line.selected_stock_on_hand
+                and line.quantity_picked > line.selected_stock_on_hand
+            ):
+                raise ValidationError(
+                    _("%s: picked packs (%s) exceed available packs (%s).")
+                    % (
+                        line.openmrs_drug_name or _("Fulfilment line"),
+                        line.quantity_picked,
+                        line.selected_stock_on_hand,
+                    )
+                )
 
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
         if any(values.get("selected_stock_option_id") for values in vals_list):
-            records._sync_selected_stock_option()
+            records._sync_selected_stock_option(reset_quantity=True)
             records.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return records
 
@@ -101,16 +118,18 @@ class CduPickingFulfilmentLine(models.Model):
         for line in self:
             if line.picking_line_id and not line.batch_id:
                 line.batch_id = line.picking_line_id.batch_id
+            if line.selected_stock_option_id:
+                line._sync_selected_stock_option(reset_quantity=True)
 
     @api.onchange("selected_stock_option_id")
     def _onchange_selected_stock_option_id(self):
         for line in self:
-            line._sync_selected_stock_option()
+            line._sync_selected_stock_option(reset_quantity=True)
 
     def write(self, vals):
         result = super().write(vals)
         if "selected_stock_option_id" in vals:
-            self._sync_selected_stock_option()
+            self._sync_selected_stock_option(reset_quantity=True)
             self.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return result
 
@@ -138,7 +157,7 @@ class CduPickingFulfilmentLine(models.Model):
     
     # Locate the _sync_selected_stock_option method in cdu_picking_fulfilment_line.py and verify the default assignment:
 
-    def _sync_selected_stock_option(self):
+    def _sync_selected_stock_option(self, reset_quantity=False):
         for line in self:
             option = line.selected_stock_option_id
             if not option:
@@ -161,6 +180,20 @@ class CduPickingFulfilmentLine(models.Model):
             line.selected_lot_expiry = option.expiration_date
             line.selected_stock_on_hand = option.stock_on_hand
             
-            default_quantity = min(line.required_quantity or 0, option.stock_on_hand or 0)
-            if not line.quantity_picked or line.quantity_picked > option.stock_on_hand:
+            required_packs = line._calculate_required_packs_for_selected_stock()
+            default_quantity = min(required_packs, option.stock_on_hand or 0)
+            if line.picking_line_id and required_packs:
+                line.picking_line_id.quantity_to_pick = required_packs
+                if line.picking_line_id.summary_line_id:
+                    line.picking_line_id.summary_line_id.pack_size = line.selected_pack_size
+                    line.picking_line_id.summary_line_id.total_bottles = required_packs
+            if reset_quantity:
                 line.quantity_picked = default_quantity
+
+    def _calculate_required_packs_for_selected_stock(self):
+        self.ensure_one()
+        pack_size = self.selected_pack_size or self.selected_stock_option_id.pack_size or 0
+        required_units = self.required_units or self.picking_line_id.required_units or 0.0
+        if required_units > 0 and pack_size > 0:
+            return math.ceil(required_units / pack_size)
+        return self.required_quantity or 0.0

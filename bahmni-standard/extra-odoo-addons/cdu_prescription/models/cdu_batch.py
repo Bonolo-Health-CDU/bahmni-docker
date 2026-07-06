@@ -578,13 +578,13 @@ class CduBatch(models.Model):
                 if line is not None:
                     product = line.product_id
                     daily_dose = line.daily_dose or 0
-                    pack_size = product.product_tmpl_id.cdu_pack_size or 30
+                    pack_size = product.product_tmpl_id.cdu_pack_size or 0
                     drug_name = product.display_name
                 else:
                     # Fallback for unmapped prescriptions
                     product = self.env['product.product'] # Empty
                     daily_dose = 1.0 # Assume 1 unit/day
-                    pack_size = 30
+                    pack_size = 0
                     drug_name = (prescription.regimen_prescribed_raw or "Unknown Drug").strip()
 
                 if not drug_name:
@@ -598,8 +598,10 @@ class CduBatch(models.Model):
                     daily_dose * facility_days
                 )
 
-                facility_bottles_required = math.ceil(
-                    facility_units_required / pack_size
+                facility_bottles_required = (
+                    math.ceil(facility_units_required / pack_size)
+                    if facility_units_required > 0 and pack_size > 0
+                    else 0
                 )
 
                 # -------------------------------------------------
@@ -610,8 +612,10 @@ class CduBatch(models.Model):
                     daily_dose * operational_days
                 )
 
-                cdu_bottles_required = math.ceil(
-                    cdu_units_required / pack_size
+                cdu_bottles_required = (
+                    math.ceil(cdu_units_required / pack_size)
+                    if cdu_units_required > 0 and pack_size > 0
+                    else 0
                 )
                 picked_units = cdu_bottles_required * pack_size
                 actual_supplied_days = picked_units / daily_dose if daily_dose else 0
@@ -631,8 +635,10 @@ class CduBatch(models.Model):
                     daily_dose * total_days
                 )
 
-                total_bottles_required = math.ceil(
-                    total_units_required / pack_size
+                total_bottles_required = (
+                    math.ceil(total_units_required / pack_size)
+                    if total_units_required > 0 and pack_size > 0
+                    else 0
                 )
 
                 # -------------------------------------------------

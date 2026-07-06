@@ -28,8 +28,6 @@
                             <field name="openmrs_drug_name" string="Regimen"/>
                             <field name="prescription_count" string="Prescriptions"/>
                             <field name="required_units" string="Required (tabs)"/>
-                            <field name="quantity_to_pick" string="Required (packs)"/>
-                            <field name="remaining_packs_to_pick" string="Remaining"/>
                         </tree>
                     </field>
 
@@ -46,6 +44,7 @@
                                    required="1"/>
                             <field name="openmrs_drug_name" readonly="1" optional="hide"/>
                             <field name="required_quantity" readonly="1" optional="hide"/>
+                            <field name="required_units" readonly="1" optional="hide"/>
                             <field name="selected_stock_option_id"
                                    string="Fulfil With"
                                    options="{'no_create': True, 'no_open': True}"/>
@@ -69,6 +68,7 @@
                     <button name="action_confirm"
                             string="Generate Picking List"
                             type="object"
+                            confirm="This will move the selected stock from CDU Store to Production Floor. Continue?"
                             class="btn-primary o_cdu_generate_picking_button"/>
                 </footer>
             </form>

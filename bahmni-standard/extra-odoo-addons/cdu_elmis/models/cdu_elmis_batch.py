@@ -210,7 +210,7 @@ class CduBatch(models.Model):
                         if product
                         else False
                     ),
-                    "quantity_to_pick": item["total_bottles"] or 1.0,
+                    "quantity_to_pick": item["total_bottles"] or 0.0,
                     "prescription_count": item["prescription_count"],
                 })
             
@@ -244,18 +244,7 @@ class CduBatch(models.Model):
                     "prescription_count": 0,
                     "quantity_to_pick": 0,
                 }
-            
-            # Estimate requirement for unmapped drugs: 
-            # Assume 1 unit/day and 30 units/pack as a safer fallback than +1
-            effective_days = (
-                prescription.repeat_days
-                or prescription.cdu_days_supply
-                or 0
-            )
-            estimated_bottles = math.ceil(effective_days / 30) if effective_days > 0 else 1
-            
             fallback_summary[key]["prescription_count"] += 1
-            fallback_summary[key]["quantity_to_pick"] += estimated_bottles
 
         for values in fallback_summary.values():
             self.env["cdu.picking.line"].create(
@@ -273,6 +262,7 @@ class CduBatch(models.Model):
         "elmis_picking_line_ids.quantity_to_pick",
         "elmis_picking_line_ids.selected_stock_on_hand",
         "elmis_picking_fulfilment_line_ids.selected_stock_option_id",
+        "elmis_picking_fulfilment_line_ids.selected_pack_size",
         "elmis_picking_fulfilment_line_ids.quantity_picked",
         "elmis_picking_fulfilment_line_ids.selected_stock_on_hand",
     )
@@ -332,7 +322,6 @@ class CduBatch(models.Model):
         for batch in self:
             if batch.picking_confirmed_at:
                 raise UserError(_("Picking has already been confirmed for %s.") % batch.name)
-            batch._ensure_picking_ready()
             if not batch.picking_line_ids or not batch.patient_picking_line_ids:
                 batch._generate_elmis_picking_lines()
                 batch.invalidate_recordset(
@@ -345,6 +334,8 @@ class CduBatch(models.Model):
                 )
             batch._link_elmis_lines_to_summary_lines()
             batch.elmis_picking_fulfilment_line_ids._sync_selected_stock_option()
+            batch._sync_picking_quantities_from_elmis_pack_sizes()
+            batch._ensure_picking_ready()
             batch._apply_repeat_fulfilment_results()
             batch.stock_event_status = "pending"
             store_items = batch._build_picking_stock_event_items(store_debit_reason)
@@ -407,7 +398,9 @@ class CduBatch(models.Model):
         pack_size,
         required_units=0.0,
     ):
-        pack_size = pack_size or 30
+        pack_size = pack_size or 0
+        if pack_size <= 0:
+            return 0
         if patient_lines:
             return sum(
                 math.ceil(
@@ -420,7 +413,7 @@ class CduBatch(models.Model):
         return math.ceil(required_units / pack_size) if required_units > 0 else 0
 
     def _sync_patient_picking_lines_for_pack_size(self, patient_lines, pack_size):
-        pack_size = pack_size or 30
+        pack_size = pack_size or 0
         for patient_line in patient_lines:
             daily_dose = patient_line.daily_dose or 0
             effective_days = (
@@ -430,7 +423,11 @@ class CduBatch(models.Model):
                 or 0
             )
             required_units = daily_dose * effective_days
-            packs_to_pick = math.ceil(required_units / pack_size) if required_units > 0 else 0
+            packs_to_pick = (
+                math.ceil(required_units / pack_size)
+                if required_units > 0 and pack_size > 0
+                else 0
+            )
             picked_units = packs_to_pick * pack_size
             actual_supplied_days = picked_units / daily_dose if daily_dose else 0
             back_order_days = max((patient_line.cdu_days or 0) - actual_supplied_days, 0)
@@ -468,8 +465,10 @@ class CduBatch(models.Model):
                     batch._get_selected_elmis_pack_size(line)
                     or line.summary_line_id.pack_size
                     or line.pack_size
-                    or 30
+                    or 0
                 )
+                if pack_size <= 0:
+                    continue
                 matching_patient_lines = line._get_matching_patient_picking_lines()
                 batch._sync_patient_picking_lines_for_pack_size(
                     matching_patient_lines,
@@ -534,7 +533,7 @@ class CduBatch(models.Model):
                         "total_bottles": packs_to_pick,
                     }
                 )
-                line.quantity_to_pick = packs_to_pick or line.quantity_to_pick or 1
+                line.quantity_to_pick = packs_to_pick
                 for fulfilment_line in line.fulfilment_line_ids:
                     if (
                         not fulfilment_line.quantity_picked
@@ -592,7 +591,9 @@ class CduBatch(models.Model):
                 patient_lines = line._get_matching_patient_picking_lines()
                 if not patient_lines:
                     continue
-                pack_size = line.summary_line_id.pack_size or line.pack_size or 30
+                pack_size = line.summary_line_id.pack_size or line.pack_size or 0
+                if pack_size <= 0:
+                    continue
                 available_units = sum(
                     line.fulfilment_line_ids.mapped("selected_stock_on_hand")
                 ) * pack_size
@@ -607,7 +608,7 @@ class CduBatch(models.Model):
                     line_available_quantity = min(required_quantity, available_units)
                     bottle_quantity = (
                         (patient_line.cdu_bottles_required or 0)
-                        * (patient_line.pack_size or pack_size or 30)
+                        * (patient_line.pack_size or pack_size)
                     )
                     picked_bottle_quantity = min(bottle_quantity, remaining_units)
                     actual_supplied_days = picked_bottle_quantity / daily_dose if daily_dose else 0
@@ -693,9 +694,12 @@ class CduBatch(models.Model):
             pack_size = (
                 line.selected_pack_size
                 or line.selected_stock_option_id.pack_size
-                or line.pack_size
-                or 30
             )
+            if not pack_size:
+                raise ValidationError(
+                    _("%s: selected eLMIS stock option has no pack size.")
+                    % (line.openmrs_drug_name or _("Fulfilment line"))
+                )
             grouped[key]["quantity"] += line.quantity_picked * pack_size
         return list(grouped.values())
 
@@ -930,6 +934,37 @@ class CduBatch(models.Model):
                 continue
             required_qty = picking_line.quantity_to_pick or 0.0
             picked_qty = picking_line.total_quantity_picked or 0.0
+            selected_pack_sizes = {
+                line.selected_pack_size or line.selected_stock_option_id.pack_size
+                for line in picking_line.fulfilment_line_ids
+                if line.selected_stock_option_id
+            }
+            selected_pack_sizes.discard(0)
+            selected_pack_sizes.discard(False)
+            selected_pack_sizes.discard(None)
+            if not selected_pack_sizes:
+                errors.append(
+                    _("%s: choose an eLMIS stock option with a valid pack size.")
+                    % (picking_line.openmrs_drug_name or _("Picking line"))
+                )
+            elif len(selected_pack_sizes) > 1:
+                errors.append(
+                    _("%s: selected stock options must use the same pack size.")
+                    % (picking_line.openmrs_drug_name or _("Picking line"))
+                )
+            if required_qty <= 0:
+                errors.append(
+                    _("%s: required packs could not be calculated from the selected pack size.")
+                    % (picking_line.openmrs_drug_name or _("Picking line"))
+                )
+            if picked_qty + 0.0001 < required_qty:
+                errors.append(
+                    _("%s: picked packs are short by %.2f.")
+                    % (
+                        picking_line.openmrs_drug_name or _("Picking line"),
+                        required_qty - picked_qty,
+                    )
+                )
             if picked_qty > required_qty + 0.0001:
                 errors.append(
                     _("%s: picked quantity exceeds required packs by %.2f.")
@@ -943,8 +978,19 @@ class CduBatch(models.Model):
             label = line.openmrs_drug_name or _("Fulfilment line %s") % index
             if not line.selected_stock_option_id:
                 errors.append(_("%s: choose an eLMIS stock option before generating the picking list.") % label)
+            selected_pack_size = 0
+            if line.selected_stock_option_id:
+                selected_pack_size = (
+                    line.selected_pack_size
+                    or line.selected_stock_option_id.pack_size
+                    or 0
+                )
+            if line.selected_stock_option_id and selected_pack_size <= 0:
+                errors.append(_("%s: selected eLMIS stock option has no pack size.") % label)
             if line.quantity_picked <= 0:
                 errors.append(_("%s: picked quantity must be greater than zero.") % label)
+            if line.quantity_picked and not float(line.quantity_picked).is_integer():
+                errors.append(_("%s: picked packs must be a whole number.") % label)
             if (
                 line.selected_stock_option_id
                 and line.quantity_picked
@@ -1162,7 +1208,9 @@ class CduBatch(models.Model):
             units = float(quantity_units or 0)
         except (TypeError, ValueError):
             units = 0.0
-        pack_size = self._coerce_pack_size(pack_size) or 30
+        pack_size = self._coerce_pack_size(pack_size)
+        if pack_size <= 0:
+            return 0
         return int(math.floor(units / pack_size))
 
     def _extract_elmis_pack_size(self, payload, product_name=None):

@@ -309,9 +309,13 @@ class CduBatchPatientLine(models.Model):
         for line in self:
             effective_days = line.prescription_repeat_days
             daily_dose = line.daily_dose or 0
-            pack_size = line.pack_size or 30
+            pack_size = line.pack_size or 0
             required_units = daily_dose * effective_days
-            packs_to_pick = math.ceil(required_units / pack_size) if required_units > 0 else 0
+            packs_to_pick = (
+                math.ceil(required_units / pack_size)
+                if required_units > 0 and pack_size > 0
+                else 0
+            )
             picked_units = packs_to_pick * pack_size
             actual_supplied_days = picked_units / daily_dose if daily_dose else 0
             back_order_days = max((line.cdu_days or 0) - actual_supplied_days, 0)

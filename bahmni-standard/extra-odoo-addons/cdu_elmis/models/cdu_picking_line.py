@@ -1,3 +1,5 @@
+import math
+
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -119,8 +121,8 @@ class CduPickingLine(models.Model):
     @api.constrains("quantity_to_pick", "quantity_picked")
     def _check_quantities(self):
         for line in self:
-            if line.quantity_to_pick <= 0:
-                raise ValidationError(_("Quantity to pick must be greater than zero."))
+            if line.quantity_to_pick < 0:
+                raise ValidationError(_("Quantity to pick cannot be negative."))
             if line.quantity_picked < 0:
                 raise ValidationError(_("Quantity picked cannot be negative."))
 
@@ -132,24 +134,27 @@ class CduPickingLine(models.Model):
     @api.depends(
         "fulfilment_line_ids.quantity_picked",
         "fulfilment_line_ids.selected_stock_on_hand",
+        "fulfilment_line_ids.selected_pack_size",
+        "fulfilment_line_ids.selected_stock_option_id.pack_size",
         "summary_line_id.pack_size",
         "required_units",
         "pack_size",
     )
     def _compute_stock_quantities(self):
         for line in self:
-            pack_size = line.summary_line_id.pack_size or line.pack_size or 30
+            pack_size = line._get_effective_pack_size()
             available_packs = sum(line.fulfilment_line_ids.mapped("selected_stock_on_hand"))
             picked_packs = sum(line.fulfilment_line_ids.mapped("quantity_picked"))
             line.available_quantity = available_packs * pack_size
             line.picked_quantity = picked_packs * pack_size
             line.remaining_quantity = max((line.required_units or 0.0) - line.picked_quantity, 0.0)
-            line.remaining_packs_to_pick = max((line.quantity_to_pick or 0.0) - picked_packs, 0.0)
+            line.remaining_packs_to_pick = max((line._calculate_required_packs() or 0.0) - picked_packs, 0.0)
 
     @api.depends(
         "quantity_to_pick",
         "summary_line_id.pack_size",
         "selected_stock_option_id.pack_size",
+        "fulfilment_line_ids.selected_pack_size",
         "fulfilment_line_ids.selected_stock_option_id.pack_size",
         "summary_line_id.total_tablets",
         "batch_id.patient_picking_line_ids.effective_repeat_days",
@@ -174,7 +179,7 @@ class CduPickingLine(models.Model):
                     0,
                 )
                 or line.summary_line_id.pack_size
-                or 30
+                or 0
             )
             required_units = sum(matching_patient_lines.mapped("required_units"))
 
@@ -182,7 +187,31 @@ class CduPickingLine(models.Model):
             line.required_units = (
                 required_units or line.summary_line_id.total_tablets or 0.0
             )
-            line.packs_to_pick = line.quantity_to_pick
+            line.packs_to_pick = line._calculate_required_packs()
+
+    def _get_effective_pack_size(self):
+        self.ensure_one()
+        return (
+            self.selected_stock_option_id.pack_size
+            or next(
+                (
+                    line.selected_pack_size or line.selected_stock_option_id.pack_size
+                    for line in self.fulfilment_line_ids
+                    if line.selected_pack_size or line.selected_stock_option_id.pack_size
+                ),
+                0,
+            )
+            or self.summary_line_id.pack_size
+            or 0
+        )
+
+    def _calculate_required_packs(self):
+        self.ensure_one()
+        required_units = self.required_units or self.summary_line_id.total_tablets or 0.0
+        pack_size = self._get_effective_pack_size()
+        if required_units > 0 and pack_size > 0:
+            return math.ceil(required_units / pack_size)
+        return self.quantity_to_pick or 0.0
 
     @api.depends(
         "batch_id.patient_picking_line_ids.effective_repeat_days",
@@ -241,7 +270,7 @@ class CduPickingLine(models.Model):
             values = {
                 "batch_id": line.batch_id.id,
                 "picking_line_id": line.id,
-                "quantity_picked": line.quantity_picked or line.quantity_to_pick or 1,
+                "quantity_picked": line.quantity_picked or line.quantity_to_pick or 0,
             }
             if line.selected_stock_option_id:
                 values["selected_stock_option_id"] = line.selected_stock_option_id.id

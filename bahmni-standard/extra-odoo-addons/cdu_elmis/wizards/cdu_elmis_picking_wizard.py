@@ -43,6 +43,7 @@ class CduElmisPickingWizard(models.TransientModel):
 
     @api.depends(
         "batch_id.elmis_picking_line_ids.fulfilment_line_ids.selected_stock_option_id",
+        "batch_id.elmis_picking_line_ids.fulfilment_line_ids.selected_pack_size",
         "batch_id.elmis_picking_line_ids.fulfilment_line_ids.quantity_picked",
         "batch_id.elmis_picking_line_ids.fulfilment_line_ids.selected_stock_on_hand",
         "batch_id.elmis_picking_line_ids.quantity_to_pick",

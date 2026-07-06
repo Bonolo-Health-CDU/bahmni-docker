@@ -64,13 +64,19 @@ function validatePickingWizard(record) {
     const totalsByPickingLine = {};
     const requiredByPickingLine = {};
     const labelsByPickingLine = {};
+    const packSizesByPickingLine = {};
 
     for (const [index, lineRecord] of records.entries()) {
         const data = lineRecord.data || {};
         const label = lineLabel(data, index);
         const stockOptionId = many2OneId(data.selected_stock_option_id);
         const pickedQty = numberValue(data.quantity_picked);
-        const requiredQty = numberValue(data.required_quantity);
+        const selectedPackSize = numberValue(data.selected_pack_size);
+        const requiredUnits = numberValue(data.required_units);
+        const requiredQty =
+            selectedPackSize > 0 && requiredUnits > 0
+                ? Math.ceil(requiredUnits / selectedPackSize)
+                : numberValue(data.required_quantity);
         const stockOnHand = numberValue(data.selected_stock_on_hand);
 
         if (!stockOptionId) {
@@ -79,10 +85,28 @@ function validatePickingWizard(record) {
                 message: `${label}: choose an eLMIS stock option before generating the picking list.`,
             };
         }
+        if (selectedPackSize <= 0) {
+            return {
+                valid: false,
+                message: `${label}: selected eLMIS stock option has no pack size.`,
+            };
+        }
+        if (requiredQty <= 0) {
+            return {
+                valid: false,
+                message: `${label}: required packs could not be calculated from the selected pack size.`,
+            };
+        }
         if (pickedQty <= 0) {
             return {
                 valid: false,
                 message: `${label}: picked packs must be greater than zero.`,
+            };
+        }
+        if (!Number.isInteger(pickedQty)) {
+            return {
+                valid: false,
+                message: `${label}: picked packs must be a whole number.`,
             };
         }
         if (requiredQty && pickedQty > requiredQty + EPSILON) {
@@ -93,7 +117,7 @@ function validatePickingWizard(record) {
                 )}).`,
             };
         }
-        if (stockOnHand && pickedQty > stockOnHand + EPSILON) {
+        if (pickedQty > stockOnHand + EPSILON) {
             return {
                 valid: false,
                 message: `${label}: picked packs (${formatQty(
@@ -106,10 +130,26 @@ function validatePickingWizard(record) {
         totalsByPickingLine[pickingLineKey] = (totalsByPickingLine[pickingLineKey] || 0) + pickedQty;
         requiredByPickingLine[pickingLineKey] = requiredQty;
         labelsByPickingLine[pickingLineKey] = label;
+        packSizesByPickingLine[pickingLineKey] = packSizesByPickingLine[pickingLineKey] || {};
+        packSizesByPickingLine[pickingLineKey][selectedPackSize] = true;
     }
 
     for (const [pickingLineKey, totalPicked] of Object.entries(totalsByPickingLine)) {
         const requiredQty = requiredByPickingLine[pickingLineKey] || 0;
+        if (Object.keys(packSizesByPickingLine[pickingLineKey] || {}).length > 1) {
+            return {
+                valid: false,
+                message: `${labelsByPickingLine[pickingLineKey]}: selected stock options must use the same pack size.`,
+            };
+        }
+        if (requiredQty && totalPicked + EPSILON < requiredQty) {
+            return {
+                valid: false,
+                message: `${labelsByPickingLine[pickingLineKey]}: picked packs are short by ${formatQty(
+                    requiredQty - totalPicked
+                )}.`,
+            };
+        }
         if (requiredQty && totalPicked > requiredQty + EPSILON) {
             return {
                 valid: false,
