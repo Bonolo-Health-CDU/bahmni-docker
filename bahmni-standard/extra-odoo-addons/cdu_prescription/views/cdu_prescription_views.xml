@@ -98,7 +98,7 @@
                         <page string="Patient">
                             <group>
                                 <group>
-                                    <field name="patient_id" context="{'default_customer_rank': 1}"/>
+                                    <field name="patient_id" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>
                                     <field name="patient_identifier" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                     <field name="patient_first_name" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                     <field name="hiv_program_id" attrs="{'readonly': [('patient_id', '!=', False)]}"/>

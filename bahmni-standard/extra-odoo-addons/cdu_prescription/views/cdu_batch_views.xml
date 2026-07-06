@@ -153,7 +153,7 @@
                                 <tree editable="bottom" create="0" delete="0">
 
                                     <!-- PATIENT -->
-                                    <field name="patient_id" string="Patient"/>
+                                    <field name="patient_id" string="Patient" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>
 
                                     <field name="drug_name" string="Product/Drug" readonly="1"/>
 

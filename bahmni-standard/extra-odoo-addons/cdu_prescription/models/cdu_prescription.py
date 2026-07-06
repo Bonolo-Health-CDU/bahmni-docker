@@ -258,17 +258,7 @@ class CduPrescription(models.Model):
         if not patient:
             return {}
 
-        snapshot = {
-            "patient_identifier": patient.cdu_eregister_id or patient.ref,
-            "hiv_program_id": patient.cdu_hiv_program_id,
-            "national_id": patient.cdu_national_id,
-            "patient_first_name": patient.name,
-            "patient_date_of_birth": patient.cdu_date_of_birth,
-            "patient_gender": patient.cdu_gender,
-            "patient_phone": patient.phone or patient.mobile,
-            "secondary_contact": patient.cdu_secondary_contact,
-            "patient_address": patient.street,
-        }
+        snapshot = patient._cdu_prescription_snapshot_values()
         existing_vals = existing_vals or {}
         return {
             field_name: value

@@ -73,7 +73,7 @@
                                     <field name="prescription_date"/>
                                     <field name="regimen_prescribed"/>
                                     <field name="drug_pickup_point"/>
-                                    <field name="patient_id"/>
+                                    <field name="patient_id" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>
                                     <field name="prescription_id"/>
                                     <field name="status"/>
                                     <field name="error_message"/>
