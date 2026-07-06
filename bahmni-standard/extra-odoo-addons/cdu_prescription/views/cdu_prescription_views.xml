@@ -132,6 +132,7 @@
                             <group>
                                 <group>
                                     <field name="regimen_prescribed_raw"/>
+                                    <field name="dosage_instructions"/>
                                     <field name="prescriber_name"/>
                                     <field name="next_drug_pickup_date" required="1"/>
                                     <field name="regimen_id"/>

@@ -58,6 +58,7 @@ class CduPrescription(models.Model):
     latest_vl_collection_date = fields.Date(string="Latest VL Collection Date")
     latest_vl_result = fields.Char(string="Latest VL Result")
     regimen_prescribed_raw = fields.Char(string="Regimen Prescribed")
+    dosage_instructions = fields.Text(string="Dosage Instructions")
     regimen_id = fields.Many2one(
         "cdu.regimen",
         string="Mapped Regimen",
@@ -330,6 +331,18 @@ class CduPrescription(models.Model):
     def action_mark_medicine_validated(self):
         self._ensure_cdu_groups("cdu_prescription.group_cdu_dispensing_officer")
         self._ensure_states(("awaiting_validation",))
+        errors_by_prescription = []
+        for prescription in self:
+            missing = prescription._get_validation_errors()
+            if missing:
+                errors_by_prescription.append(
+                    "%s: %s" % (prescription.display_name, ", ".join(missing))
+                )
+        if errors_by_prescription:
+            raise ValidationError(
+                _("Validation cannot continue. Please complete:\n%s")
+                % "\n".join(errors_by_prescription)
+            )
         self.write({
             "state": "awaiting_batching",
             "validated_by": self.env.user.id,
@@ -375,6 +388,8 @@ class CduPrescription(models.Model):
             missing.append("drug pickup point")
         if not self.regimen_prescribed_raw:
             missing.append("regimen prescribed")
+        if not (self.dosage_instructions or "").strip():
+            missing.append("dosage instructions")
         if not self.next_drug_pickup_date:
             missing.append("next drug pickup date")
         return missing

@@ -20,6 +20,7 @@ REPORT_HEADER_ALIASES = {
     "New or Revisit": "new_or_revisit",
     "Prescription Date": "prescription_date",
     "Regimen Prescribed": "regimen_prescribed",
+    "Dosage Instructions": "dosage_instructions",
     "Next Clinical Appointment Date": "next_clinical_appointment_date",
     "Next Drug Pickup Date": "next_drug_pickup_date",
     "Drug Pickup Point": "drug_pickup_point",
@@ -158,6 +159,7 @@ class CduReportRun(models.Model):
                 "eregister_id": parsed_row["values"].get("eregister_id"),
                 "prescription_date": self._parse_date(parsed_row["values"].get("prescription_date")),
                 "regimen_prescribed": parsed_row["values"].get("regimen_prescribed"),
+                "dosage_instructions": parsed_row["values"].get("dosage_instructions"),
                 "drug_pickup_point": parsed_row["values"].get("drug_pickup_point"),
             })
             result = row_record.process_row()
@@ -301,6 +303,7 @@ class CduReportRow(models.Model):
     eregister_id = fields.Char(string="eRegister ID", readonly=True, index=True)
     prescription_date = fields.Date(readonly=True)
     regimen_prescribed = fields.Char(readonly=True)
+    dosage_instructions = fields.Char(readonly=True)
     drug_pickup_point = fields.Char(readonly=True)
     patient_id = fields.Many2one("res.partner", readonly=True)
     prescription_id = fields.Many2one("cdu.prescription", readonly=True)
@@ -415,6 +418,7 @@ class CduReportRow(models.Model):
             "facility_code": facility.code if facility else False,
             "prescription_date": self.run_id._parse_date(values.get("prescription_date")),
             "regimen_prescribed_raw": values.get("regimen_prescribed"),
+            "dosage_instructions": values.get("dosage_instructions") or False,
             "hiv_program_id": values.get("hiv_program_id") or False,
             "national_id": values.get("national_id") or False,
             "hiv_diagnosis_date": self.run_id._parse_date(values.get("hiv_diagnosis_date")),
