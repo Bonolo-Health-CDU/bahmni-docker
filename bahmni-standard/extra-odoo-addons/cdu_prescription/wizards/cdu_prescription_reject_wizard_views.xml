@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_prescription_reject_wizard_form" model="ir.ui.view">
+        <field name="name">cdu.prescription.reject.wizard.form</field>
+        <field name="model">cdu.prescription.reject.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reject Prescription">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        Select the reason for this rejection. The prescription, stage,
+                        destination, reason, user, and time will be recorded in its rejection history.
+                    </div>
+                    <group>
+                        <field name="prescription_id"/>
+                        <field name="stage"/>
+                        <field name="destination"/>
+                        <field name="standard_reason_ids"
+                               widget="many2many_tags"
+                               placeholder="Select a reason…"
+                               domain="[('dispensing_only', '=', False)]"
+                               options="{'no_create': True, 'no_create_edit': True}"
+                               attrs="{'invisible': [('stage', '=', 'awaiting_dispensing')], 'required': [('stage', '!=', 'awaiting_dispensing')]}"/>
+                        <field name="dispensing_reason_ids"
+                               widget="many2many_tags"
+                               placeholder="Select a reason…"
+                               options="{'no_create': True, 'no_create_edit': True}"
+                               attrs="{'invisible': [('stage', '!=', 'awaiting_dispensing')], 'required': [('stage', '=', 'awaiting_dispensing')]}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_rejection"
+                            string="Confirm Rejection"
+                            type="object"
+                            class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

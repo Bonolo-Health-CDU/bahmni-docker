@@ -34,12 +34,6 @@
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             confirm="This will consume the boxed medicines from the eLMIS Production Floor and move the prescriptions to Awaiting Dispatch. Continue?"
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
-                    <button name="action_load_eligible_parcels"
-                            string="Load Eligible Parcels"
-                            type="object"
-                            class="btn-secondary"
-                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_print_box_documents"
                             string="Print Box Documents"
                             type="object"
@@ -136,13 +130,20 @@
                     </div>
 
                     <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
-                        Scan or select parcels in the table below. When the next scanned parcel belongs to a different
+                        Scan the barcode on each bag label below. When the next scanned parcel belongs to a different
                         collection point, or the current box reaches max parcels, the current box is closed and a new
                         box is opened automatically.
                     </div>
 
                     <notebook>
                         <page string="Parcels">
+                            <div class="o_cdu_box_scan_bar"
+                                 attrs="{'invisible': [('state', '=', 'confirmed')]}">
+                                <field name="bag_label_scan_input"
+                                       widget="cdu_box_bag_label_scan_input"
+                                       placeholder="Scan bag label barcode"
+                                       nolabel="1"/>
+                            </div>
                             <field name="line_ids" attrs="{'readonly': [('state', '=', 'confirmed')]}">
                                 <tree editable="bottom" default_order="parcel_reference asc">
                                     <field name="bagging_qa_id"
@@ -235,6 +236,23 @@
         <field name="res_model">cdu.box</field>
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_box_search"/>
+    </record>
+
+    <record id="action_cdu_boxing" model="ir.actions.act_window">
+        <field name="name">Boxing</field>
+        <field name="res_model">cdu.box</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_box_search"/>
+        <field name="domain">[('state', '=', 'draft')]</field>
+        <field name="context">{'default_state': 'draft'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a box and scan approved bag-label barcodes.
+            </p>
+            <p>
+                Draft boxes remain here so boxing can be continued without losing progress.
+            </p>
+        </field>
     </record>
 
     <record id="action_cdu_dispatch_work_queue" model="ir.actions.act_window">

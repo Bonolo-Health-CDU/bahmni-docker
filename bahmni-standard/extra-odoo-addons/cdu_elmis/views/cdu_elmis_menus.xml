@@ -37,11 +37,19 @@
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_boxing"
+        name="Boxing"
+        parent="cdu_prescription.menu_cdu_production_operations"
+        action="action_cdu_boxing"
+        sequence="30"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_boxing_work_queue"
-        name="Boxing Work Queue"
+        name="Parcels Awaiting Boxing"
         parent="cdu_prescription.menu_cdu_production_operations"
         action="action_cdu_boxing_work_queue"
-        sequence="30"
+        sequence="31"
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem

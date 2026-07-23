@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="rejection_reason_missing_patient_demographics" model="cdu.rejection.reason">
+        <field name="name">Missing patient Demographic Information</field>
+        <field name="code">missing_patient_demographics</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="rejection_reason_missing_medicine_information" model="cdu.rejection.reason">
+        <field name="name">Missing Medicine information</field>
+        <field name="code">missing_medicine_information</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="rejection_reason_missing_patient_clinical" model="cdu.rejection.reason">
+        <field name="name">Missing patient Clinical information</field>
+        <field name="code">missing_patient_clinical</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="rejection_reason_missing_collection_information" model="cdu.rejection.reason">
+        <field name="name">Missing Medicine Collection Information</field>
+        <field name="code">missing_collection_information</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="rejection_reason_duplicate_prescription" model="cdu.rejection.reason">
+        <field name="name">Duplicate Prescription</field>
+        <field name="code">duplicate_prescription</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="rejection_reason_out_of_stock" model="cdu.rejection.reason">
+        <field name="name">Out of Stock</field>
+        <field name="code">out_of_stock</field>
+        <field name="dispensing_only" eval="True"/>
+        <field name="sequence">60</field>
+    </record>
+
+    <function
+        model="cdu.prescription.rejection"
+        name="_migrate_legacy_rejection_reasons"
+    />
+</odoo>

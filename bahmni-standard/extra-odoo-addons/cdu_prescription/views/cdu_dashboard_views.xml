@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_cdu_dashboard" model="ir.actions.client">
+        <field name="name">CDU Dashboard</field>
+        <field name="tag">cdu_dashboard</field>
+    </record>
+
+    <record id="action_cdu_prescription_rejected_to_facility" model="ir.actions.act_window">
+        <field name="name">Rejected to Facility</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_prescription_search"/>
+        <field name="domain">[('state', '=', 'rejected_to_facility')]</field>
+    </record>
+</odoo>

@@ -419,6 +419,20 @@ class CduDispense(models.Model):
                 dispense.prescription_id.write({"state": "awaiting_bagging_qa"})
         return self.with_context(cdu_label_layout="all")._action_generate_labels()
 
+    def action_reject_to_call_center(self):
+        self.ensure_one()
+        self._ensure_dispensing_access()
+        if self.state != "draft":
+            raise UserError(_("Only an active dispensing task can be rejected."))
+        return self.prescription_id.action_reject_to_call_center()
+
+    def action_reject_to_facility(self):
+        self.ensure_one()
+        self._ensure_dispensing_access()
+        if self.state != "draft":
+            raise UserError(_("Only an active dispensing task can be rejected."))
+        return self.prescription_id.action_reject_to_facility()
+
     def action_mark_labels_printed(self):
         self._ensure_dispensing_access()
         for dispense in self:
