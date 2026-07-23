@@ -49,6 +49,7 @@
             "cdu_prescription/static/src/css/cdu_intake_workspace.css",
             "cdu_prescription/static/src/css/cdu_admin_workspace.css",
             "cdu_prescription/static/src/css/cdu_dashboard.css",
+            "cdu_prescription/static/src/css/cdu_tablet.css",
             "cdu_prescription/static/src/js/cdu_dashboard.js",
             "cdu_prescription/static/src/xml/cdu_dashboard.xml",
         ],
