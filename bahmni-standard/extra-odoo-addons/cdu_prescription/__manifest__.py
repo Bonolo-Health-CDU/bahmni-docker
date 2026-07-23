@@ -43,7 +43,11 @@
     ],
     "assets": {
         "web.assets_backend": [
+            "cdu_prescription/static/src/css/cdu_design_system.css",
             "cdu_prescription/static/src/css/cdu_prescription_backend.css",
+            "cdu_prescription/static/src/css/cdu_production_workspace.css",
+            "cdu_prescription/static/src/css/cdu_intake_workspace.css",
+            "cdu_prescription/static/src/css/cdu_admin_workspace.css",
             "cdu_prescription/static/src/css/cdu_dashboard.css",
             "cdu_prescription/static/src/js/cdu_dashboard.js",
             "cdu_prescription/static/src/xml/cdu_dashboard.xml",

@@ -4,13 +4,13 @@
         <field name="name">cdu.prescription.reject.wizard.form</field>
         <field name="model">cdu.prescription.reject.wizard</field>
         <field name="arch" type="xml">
-            <form string="Reject Prescription">
+            <form string="Reject Prescription" class="o_cdu_rejection_wizard">
                 <sheet>
                     <div class="alert alert-warning" role="alert">
                         Select the reason for this rejection. The prescription, stage,
                         destination, reason, user, and time will be recorded in its rejection history.
                     </div>
-                    <group>
+                    <group class="o_cdu_rejection_details">
                         <field name="prescription_id"/>
                         <field name="stage"/>
                         <field name="destination"/>

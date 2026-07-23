@@ -20,7 +20,8 @@
         <field name="name">cdu.bagging.qa.tree</field>
         <field name="model">cdu.bagging.qa</field>
         <field name="arch" type="xml">
-            <tree default_order="next_drug_pickup_date asc, patient_name asc"
+            <tree class="o_cdu_production_list"
+                  default_order="next_drug_pickup_date asc, patient_name asc"
                   decoration-success="state == 'confirmed'">
                 <field name="name"/>
                 <field name="patient_name"/>
@@ -31,7 +32,10 @@
                 <field name="batch_id"/>
                 <field name="labels_printed"/>
                 <field name="qa_ready"/>
-                <field name="state"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'confirmed'"/>
             </tree>
         </field>
     </record>
@@ -40,7 +44,7 @@
         <field name="name">cdu.bagging.qa.form</field>
         <field name="model">cdu.bagging.qa</field>
         <field name="arch" type="xml">
-            <form class="o_cdu_prescription_form o_cdu_batch_form">
+            <form class="o_cdu_prescription_form o_cdu_batch_form o_cdu_stage_qa">
                 <header>
                     <button name="action_print_labels"
                             string="Print Labels"
@@ -57,9 +61,12 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
-                        <label for="name"/>
+                    <div class="oe_title o_cdu_workspace_hero">
+                        <span class="o_cdu_workspace_eyebrow">Bagging / QA workspace</span>
                         <h1><field name="name"/></h1>
+                        <p class="o_cdu_workspace_subtitle">
+                            Verify the patient, medicines, labels, bag contents, and seal before boxing.
+                        </p>
                     </div>
                     <field name="labels_printed" invisible="1"/>
                     <field name="qa_ready" invisible="1"/>
@@ -215,7 +222,7 @@
                         </div>
                     </div>
 
-                    <notebook>
+                    <notebook class="o_cdu_workspace_notebook">
                         <page string="Dispensed Products">
                             <field name="stock_selection_ids" readonly="1">
                                 <tree create="0" edit="0" delete="0"

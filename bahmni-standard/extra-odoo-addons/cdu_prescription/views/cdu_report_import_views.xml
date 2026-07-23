@@ -4,7 +4,9 @@
         <field name="name">cdu.report.run.tree</field>
         <field name="model">cdu.report.run</field>
         <field name="arch" type="xml">
-            <tree decoration-danger="state == 'failed'" decoration-warning="state in ('completed_with_errors', 'duplicate')">
+            <tree class="o_cdu_intake_list"
+                  decoration-danger="state == 'failed'"
+                  decoration-warning="state in ('completed_with_errors', 'duplicate')">
                 <field name="name"/>
                 <field name="ingestion_channel"/>
                 <field name="source_file_name"/>
@@ -16,7 +18,12 @@
                 <field name="updated_rows"/>
                 <field name="duplicate_rows"/>
                 <field name="failed_rows"/>
-                <field name="state"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'completed'"
+                       decoration-warning="state in ('completed_with_errors', 'duplicate')"
+                       decoration-danger="state == 'failed'"/>
             </tree>
         </field>
     </record>
@@ -25,18 +32,21 @@
         <field name="name">cdu.report.run.form</field>
         <field name="model">cdu.report.run</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_cdu_intake_form o_cdu_report_import_form">
                 <header>
                     <button name="action_import_file" string="Import Report" type="object" class="btn-primary" attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,completed,completed_with_errors,failed,duplicate"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
-                        <label for="name"/>
+                    <div class="oe_title o_cdu_intake_hero">
+                        <span class="o_cdu_intake_eyebrow">Report intake</span>
                         <h1><field name="name"/></h1>
+                        <p class="o_cdu_intake_subtitle">
+                            Upload an eRegister report and review every imported, updated, duplicate, or failed row.
+                        </p>
                     </div>
-                    <group>
-                        <group string="Source">
+                    <group class="o_cdu_intake_summary_grid">
+                        <group string="Source" class="o_cdu_intake_card">
                             <field name="source_facility_id"/>
                             <field name="ingestion_channel"/>
                             <field name="source_file" filename="source_file_name"/>
@@ -49,24 +59,26 @@
                             <field name="poll_triggered_at"/>
                             <field name="file_hash"/>
                         </group>
-                        <group string="Report Metadata">
+                        <group string="Report Metadata" class="o_cdu_intake_card">
                             <field name="report_title"/>
                             <field name="report_period"/>
                             <field name="report_generated_at"/>
                             <field name="ingested_at"/>
                         </group>
                     </group>
-                    <group string="Import Summary">
+                    <group string="Import Summary" class="o_cdu_import_summary">
                         <field name="total_rows"/>
                         <field name="imported_rows"/>
                         <field name="updated_rows"/>
                         <field name="duplicate_rows"/>
                         <field name="failed_rows"/>
                     </group>
-                    <notebook>
+                    <notebook class="o_cdu_intake_notebook">
                         <page string="Rows">
                             <field name="row_ids">
-                                <tree decoration-danger="status == 'failed'" decoration-muted="status == 'duplicate'">
+                                <tree class="o_cdu_intake_list"
+                                      decoration-danger="status == 'failed'"
+                                      decoration-muted="status == 'duplicate'">
                                     <field name="row_number"/>
                                     <field name="patient_name"/>
                                     <field name="eregister_id"/>
@@ -75,7 +87,12 @@
                                     <field name="drug_pickup_point"/>
                                     <field name="patient_id" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>
                                     <field name="prescription_id"/>
-                                    <field name="status"/>
+                                    <field name="status"
+                                           widget="badge"
+                                           decoration-info="status in ('pending', 'updated')"
+                                           decoration-success="status == 'imported'"
+                                           decoration-warning="status == 'duplicate'"
+                                           decoration-danger="status == 'failed'"/>
                                     <field name="error_message"/>
                                 </tree>
                             </field>

@@ -9,6 +9,8 @@ from datetime import datetime
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+from .constants import normalize_e_locker_district
+
 
 REPORT_HEADER_ALIASES = {
     "Patient Name": "patient_name",
@@ -427,7 +429,9 @@ class CduReportRow(models.Model):
             "next_drug_pickup_date": self.run_id._parse_date(values.get("next_drug_pickup_date")),
             "drug_pickup_point_raw": values.get("drug_pickup_point"),
             "collection_point_id": collection_point.id if collection_point else False,
-            "e_locker_district": values.get("e_locker_district") or False,
+            "e_locker_district": normalize_e_locker_district(
+                values.get("e_locker_district")
+            ),
             "latest_vl_collection_date": self.run_id._parse_date(values.get("latest_vl_collection_date")),
             "latest_vl_result": values.get("latest_vl_result") or False,
             "has_allergies": self._map_has_allergies(values.get("has_allergies")),

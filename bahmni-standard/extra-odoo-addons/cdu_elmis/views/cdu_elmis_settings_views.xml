@@ -5,7 +5,7 @@
         <field name="model">res.config.settings</field>
         <field name="priority">99</field>
         <field name="arch" type="xml">
-            <form string="eLMIS Settings">
+            <form string="eLMIS Settings" class="o_cdu_admin_form">
                 <header>
                     <button name="execute" string="Save" type="object" class="btn-primary"/>
                     <button name="action_resolve_elmis_reference_ids" string="Resolve eLMIS UUIDs" type="object" class="btn-secondary"/>

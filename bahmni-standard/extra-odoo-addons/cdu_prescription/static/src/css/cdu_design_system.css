@@ -1,0 +1,309 @@
+/*
+ * CDU visual foundation
+ *
+ * Keep these styles scoped to CDU view classes so the wider Odoo installation
+ * retains its standard appearance.
+ */
+.o_cdu_prescription_form,
+.o_cdu_prescription_list {
+    --cdu-ink: #203247;
+    --cdu-ink-soft: #5f7183;
+    --cdu-muted: #8190a0;
+    --cdu-primary: #147f97;
+    --cdu-primary-dark: #0f6278;
+    --cdu-primary-soft: #e8f4f6;
+    --cdu-blue: #246a9a;
+    --cdu-canvas: #f3f6f8;
+    --cdu-surface: #ffffff;
+    --cdu-surface-soft: #f8fafb;
+    --cdu-border: #dce5eb;
+    --cdu-border-strong: #c8d6df;
+    --cdu-success: #28724f;
+    --cdu-success-soft: #e7f5ee;
+    --cdu-warning: #8b530f;
+    --cdu-warning-soft: #fff2df;
+    --cdu-danger: #a43b3b;
+    --cdu-danger-soft: #fceaea;
+    --cdu-radius-sm: 8px;
+    --cdu-radius: 12px;
+    --cdu-radius-lg: 16px;
+    --cdu-shadow-sm: 0 3px 10px rgba(30, 55, 75, 0.05);
+    --cdu-shadow: 0 10px 30px rgba(30, 55, 75, 0.08);
+}
+
+.o_cdu_prescription_form {
+    color: var(--cdu-ink);
+    background:
+        radial-gradient(circle at 96% 0%, rgba(20, 127, 151, 0.07), transparent 26%),
+        var(--cdu-canvas);
+}
+
+.o_cdu_prescription_form .o_form_sheet_bg {
+    padding: 24px;
+    background: transparent;
+}
+
+.o_cdu_prescription_form .o_form_sheet {
+    max-width: 1480px;
+    border: 1px solid var(--cdu-border);
+    border-radius: var(--cdu-radius-lg);
+    background: var(--cdu-surface);
+    box-shadow: var(--cdu-shadow);
+}
+
+.o_cdu_prescription_form .o_cdu_record_hero {
+    position: relative;
+    margin: -8px -8px 24px;
+    padding: 22px 24px 20px 28px;
+    border: 1px solid #d8e7eb;
+    border-radius: var(--cdu-radius);
+    overflow: hidden;
+    background:
+        linear-gradient(115deg, rgba(20, 127, 151, 0.1), rgba(255, 255, 255, 0) 56%),
+        var(--cdu-surface-soft);
+}
+
+.o_cdu_prescription_form .o_cdu_record_hero::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--cdu-primary);
+    content: "";
+}
+
+.o_cdu_prescription_form .o_cdu_record_eyebrow {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--cdu-primary-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.o_cdu_prescription_form .o_cdu_record_hero h1 {
+    margin: 0;
+    color: var(--cdu-ink);
+    font-size: clamp(24px, 2.25vw, 34px);
+    font-weight: 750;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+}
+
+.o_cdu_prescription_form .o_cdu_record_subtitle {
+    margin: 7px 0 0;
+    color: var(--cdu-ink-soft);
+    font-size: 13px;
+}
+
+.o_cdu_prescription_form .o_cdu_summary_grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 22px;
+}
+
+.o_cdu_prescription_form .o_cdu_summary_grid > .o_inner_group,
+.o_cdu_prescription_form .o_cdu_section_grid > .o_inner_group {
+    width: 100%;
+}
+
+.o_cdu_prescription_form .o_cdu_section_card {
+    height: 100%;
+    margin: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--cdu-border);
+    border-radius: var(--cdu-radius);
+    background: var(--cdu-surface-soft);
+    box-shadow: var(--cdu-shadow-sm);
+}
+
+.o_cdu_prescription_form .o_cdu_section_card > tbody > tr:first-child > td {
+    padding-top: 0;
+}
+
+.o_cdu_prescription_form .o_cdu_section_card .o_horizontal_separator {
+    margin: 0 0 13px;
+    padding: 0 0 9px;
+    border-bottom: 1px solid var(--cdu-border);
+    color: var(--cdu-primary-dark);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.o_cdu_prescription_form .o_cdu_section_card .o_td_label {
+    padding-right: 16px;
+}
+
+.o_cdu_prescription_form .o_cdu_section_card label {
+    color: var(--cdu-ink-soft);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.o_cdu_prescription_form .o_cdu_notebook {
+    margin-top: 4px;
+}
+
+.o_cdu_prescription_form .o_cdu_notebook > .nav-tabs {
+    gap: 4px;
+    padding: 0 6px;
+    border-bottom: 1px solid var(--cdu-border);
+}
+
+.o_cdu_prescription_form .o_cdu_notebook > .nav-tabs .nav-link {
+    margin: 0;
+    padding: 11px 16px;
+    border: 0;
+    border-radius: 9px 9px 0 0;
+    color: var(--cdu-ink-soft);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.o_cdu_prescription_form .o_cdu_notebook > .nav-tabs .nav-link:hover {
+    color: var(--cdu-primary-dark);
+    background: var(--cdu-primary-soft);
+}
+
+.o_cdu_prescription_form .o_cdu_notebook > .nav-tabs .nav-link.active {
+    color: var(--cdu-primary-dark);
+    background: var(--cdu-primary-soft);
+    box-shadow: inset 0 -3px 0 var(--cdu-primary);
+}
+
+.o_cdu_prescription_form .o_cdu_notebook > .tab-content > .tab-pane {
+    padding: 22px 12px 10px;
+}
+
+.o_cdu_prescription_form .o_cdu_section_grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.o_cdu_prescription_form .oe_chatter {
+    max-width: 1480px;
+    margin: 22px auto 0;
+    border: 1px solid var(--cdu-border);
+    border-radius: var(--cdu-radius);
+    background: var(--cdu-surface);
+    box-shadow: var(--cdu-shadow-sm);
+}
+
+.o_cdu_prescription_list {
+    color: var(--cdu-ink);
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.o_cdu_prescription_list thead th {
+    height: 44px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--cdu-border-strong);
+    color: #4d6072;
+    background: #edf2f5;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.o_cdu_prescription_list tbody td {
+    height: 48px;
+    padding: 9px 12px;
+    border-bottom-color: #e9eef2;
+    vertical-align: middle;
+}
+
+.o_cdu_prescription_list tbody tr.o_data_row {
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.o_cdu_prescription_list tbody tr.o_data_row:nth-child(even):not(.o_selected_row) {
+    background: #fbfcfd;
+}
+
+.o_cdu_prescription_list tbody tr.o_data_row:hover {
+    position: relative;
+    background: #eef7f8;
+    box-shadow: inset 3px 0 0 var(--cdu-primary);
+}
+
+.o_cdu_prescription_list .o_field_badge {
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.o_cdu_prescription_list .text-bg-success,
+.o_cdu_prescription_list .badge-success {
+    border-color: #bde1cb;
+    color: var(--cdu-success) !important;
+    background: var(--cdu-success-soft) !important;
+}
+
+.o_cdu_prescription_list .text-bg-warning,
+.o_cdu_prescription_list .badge-warning {
+    border-color: #efd19f;
+    color: var(--cdu-warning) !important;
+    background: var(--cdu-warning-soft) !important;
+}
+
+.o_cdu_prescription_list .text-bg-danger,
+.o_cdu_prescription_list .badge-danger {
+    border-color: #edc4c4;
+    color: var(--cdu-danger) !important;
+    background: var(--cdu-danger-soft) !important;
+}
+
+.o_cdu_prescription_list .text-bg-info,
+.o_cdu_prescription_list .badge-info {
+    border-color: #bedee5;
+    color: var(--cdu-primary-dark) !important;
+    background: var(--cdu-primary-soft) !important;
+}
+
+@media (max-width: 992px) {
+    .o_cdu_prescription_form .o_form_sheet_bg {
+        padding: 12px;
+    }
+
+    .o_cdu_prescription_form .o_cdu_summary_grid,
+    .o_cdu_prescription_form .o_cdu_section_grid {
+        grid-template-columns: 1fr;
+    }
+
+    .o_cdu_prescription_form .o_cdu_record_hero {
+        margin: -4px -4px 18px;
+        padding: 18px 18px 17px 22px;
+    }
+}
+
+@media (max-width: 576px) {
+    .o_cdu_prescription_form .o_form_sheet_bg {
+        padding: 0;
+    }
+
+    .o_cdu_prescription_form .o_form_sheet {
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .o_cdu_prescription_form .o_cdu_notebook > .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+
+    .o_cdu_prescription_form .o_cdu_notebook > .nav-tabs .nav-link {
+        white-space: nowrap;
+    }
+}

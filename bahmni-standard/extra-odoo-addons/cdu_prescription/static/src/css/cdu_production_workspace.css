@@ -1,0 +1,313 @@
+.o_cdu_batch_form,
+.o_cdu_production_list {
+    --cdu-stage: #147f97;
+    --cdu-stage-dark: #0f6278;
+    --cdu-stage-soft: #e8f4f6;
+    --cdu-production-ink: #203247;
+    --cdu-production-muted: #687a8d;
+    --cdu-production-border: #dce5eb;
+    --cdu-production-canvas: #f3f6f8;
+    --cdu-production-surface: #ffffff;
+    --cdu-production-shadow: 0 10px 30px rgba(30, 55, 75, 0.08);
+}
+
+.o_cdu_stage_batching {
+    --cdu-stage: #7256a8;
+    --cdu-stage-dark: #594286;
+    --cdu-stage-soft: #f0ebfa;
+}
+
+.o_cdu_stage_dispensing {
+    --cdu-stage: #246a9a;
+    --cdu-stage-dark: #1b5278;
+    --cdu-stage-soft: #e9f2f8;
+}
+
+.o_cdu_stage_qa {
+    --cdu-stage: #28724f;
+    --cdu-stage-dark: #276849;
+    --cdu-stage-soft: #e7f5ee;
+}
+
+.o_cdu_stage_boxing {
+    --cdu-stage: #b46b12;
+    --cdu-stage-dark: #8c520d;
+    --cdu-stage-soft: #fff2df;
+}
+
+.o_cdu_batch_form {
+    color: var(--cdu-production-ink);
+    background:
+        radial-gradient(circle at 96% 0%, color-mix(in srgb, var(--cdu-stage) 8%, transparent), transparent 27%),
+        var(--cdu-production-canvas);
+}
+
+.o_cdu_batch_form .o_form_sheet_bg {
+    padding: 24px;
+    background: transparent;
+}
+
+.o_cdu_batch_form .o_form_sheet {
+    max-width: 1540px;
+    border: 1px solid var(--cdu-production-border);
+    border-radius: 16px;
+    background: var(--cdu-production-surface);
+    box-shadow: var(--cdu-production-shadow);
+}
+
+.o_cdu_batch_form .oe_title.o_cdu_workspace_hero {
+    position: relative;
+    margin: -8px -8px 22px;
+    padding: 20px 24px 19px 28px;
+    border: 1px solid var(--cdu-production-border);
+    border-radius: 12px;
+    overflow: hidden;
+    background:
+        linear-gradient(115deg, var(--cdu-stage-soft), rgba(255, 255, 255, 0) 62%),
+        #f9fbfc;
+}
+
+.o_cdu_batch_form .oe_title.o_cdu_workspace_hero::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--cdu-stage);
+    content: "";
+}
+
+.o_cdu_batch_form .o_cdu_workspace_eyebrow {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--cdu-stage-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.o_cdu_batch_form .o_cdu_workspace_hero h1 {
+    margin: 0;
+    color: var(--cdu-production-ink);
+    font-size: clamp(24px, 2.2vw, 34px);
+    font-weight: 750;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+}
+
+.o_cdu_batch_form .o_cdu_workspace_subtitle {
+    margin: 7px 0 0;
+    color: var(--cdu-production-muted);
+    font-size: 13px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_dashboard {
+    gap: 16px;
+    margin: 0 0 18px;
+    padding: 0 0 18px;
+    border-bottom-color: var(--cdu-production-border);
+    grid-template-columns: repeat(auto-fit, minmax(265px, 1fr));
+}
+
+.o_cdu_batch_form .o_cdu_batch_card {
+    position: relative;
+    min-height: 128px;
+    padding: 16px 18px;
+    border: 1px solid var(--cdu-production-border);
+    border-radius: 13px;
+    overflow: hidden;
+    background: #fbfcfd;
+    box-shadow: 0 4px 14px rgba(30, 55, 75, 0.055);
+}
+
+.o_cdu_batch_form .o_cdu_batch_card::before {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background: var(--cdu-stage);
+    content: "";
+    opacity: 0.78;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card h3 {
+    margin: 0 0 13px;
+    padding: 0 0 9px;
+    border-bottom-color: var(--cdu-production-border);
+    color: var(--cdu-stage-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_fields {
+    gap: 9px 14px;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card_fields > label,
+.o_cdu_batch_form .o_cdu_batch_card_fields > .o_cdu_card_label {
+    color: var(--cdu-production-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.o_cdu_batch_form .o_cdu_batch_card .o_field_widget {
+    color: var(--cdu-production-ink);
+    font-weight: 600;
+}
+
+.o_cdu_batch_form .o_cdu_batch_count_badge,
+.o_cdu_batch_form .o_cdu_batch_status_pill,
+.o_cdu_batch_form .o_cdu_batch_readiness_badge {
+    border-radius: 999px;
+    box-shadow: 0 2px 7px rgba(30, 55, 75, 0.05);
+}
+
+.o_cdu_batch_form .o_cdu_repeat_control_panel,
+.o_cdu_batch_form .o_cdu_qa_scan_panel {
+    border-color: color-mix(in srgb, var(--cdu-stage) 28%, white);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--cdu-stage-soft) 62%, white);
+}
+
+.o_cdu_batch_form .o_cdu_workspace_notebook > .nav-tabs {
+    gap: 4px;
+    padding: 0 6px;
+    border-bottom-color: var(--cdu-production-border);
+}
+
+.o_cdu_batch_form .o_cdu_workspace_notebook > .nav-tabs .nav-link {
+    margin: 0;
+    padding: 11px 16px;
+    border: 0;
+    border-radius: 9px 9px 0 0;
+    color: var(--cdu-production-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.o_cdu_batch_form .o_cdu_workspace_notebook > .nav-tabs .nav-link:hover {
+    color: var(--cdu-stage-dark);
+    background: var(--cdu-stage-soft);
+}
+
+.o_cdu_batch_form .o_cdu_workspace_notebook > .nav-tabs .nav-link.active {
+    color: var(--cdu-stage-dark);
+    background: var(--cdu-stage-soft);
+    box-shadow: inset 0 -3px 0 var(--cdu-stage);
+}
+
+.o_cdu_batch_form .o_cdu_workspace_notebook > .tab-content > .tab-pane {
+    padding-top: 20px;
+}
+
+.o_cdu_batch_form .alert {
+    padding: 13px 16px;
+    border-radius: 10px;
+    line-height: 1.45;
+}
+
+.o_cdu_batch_form .alert-info {
+    border-color: #bcdde4;
+    color: #28586a;
+    background: #edf7f8;
+}
+
+.o_cdu_production_list {
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--cdu-production-ink);
+}
+
+.o_cdu_production_list thead th {
+    height: 44px;
+    padding: 9px 12px;
+    border-bottom: 1px solid #c8d6df;
+    color: #4d6072;
+    background: #edf2f5;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.o_cdu_production_list tbody td {
+    height: 48px;
+    padding: 9px 12px;
+    border-bottom-color: #e9eef2;
+    vertical-align: middle;
+}
+
+.o_cdu_production_list tbody tr.o_data_row:nth-child(even):not(.o_selected_row) {
+    background: #fbfcfd;
+}
+
+.o_cdu_production_list tbody tr.o_data_row:hover {
+    background: #eef7f8;
+    box-shadow: inset 3px 0 0 #147f97;
+}
+
+.o_cdu_production_list .o_field_badge {
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.o_cdu_production_list .text-bg-success,
+.o_cdu_production_list .badge-success {
+    border-color: #bde1cb;
+    color: #28724f !important;
+    background: #e7f5ee !important;
+}
+
+.o_cdu_production_list .text-bg-warning,
+.o_cdu_production_list .badge-warning {
+    border-color: #efd19f;
+    color: #8b530f !important;
+    background: #fff2df !important;
+}
+
+.o_cdu_production_list .text-bg-danger,
+.o_cdu_production_list .badge-danger {
+    border-color: #edc4c4;
+    color: #a43b3b !important;
+    background: #fceaea !important;
+}
+
+.o_cdu_production_list .text-bg-info,
+.o_cdu_production_list .badge-info {
+    border-color: #bedee5;
+    color: #0f6278 !important;
+    background: #e8f4f6 !important;
+}
+
+@media (max-width: 992px) {
+    .o_cdu_batch_form .o_form_sheet_bg {
+        padding: 12px;
+    }
+
+    .o_cdu_batch_form .oe_title.o_cdu_workspace_hero {
+        margin: -4px -4px 18px;
+        padding: 18px 18px 17px 22px;
+    }
+}
+
+@media (max-width: 576px) {
+    .o_cdu_batch_form .o_form_sheet_bg {
+        padding: 0;
+    }
+
+    .o_cdu_batch_form .o_form_sheet {
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .o_cdu_batch_form .o_cdu_workspace_notebook > .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+}

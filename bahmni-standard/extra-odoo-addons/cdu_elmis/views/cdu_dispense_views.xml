@@ -20,7 +20,8 @@
         <field name="name">cdu.dispense.tree</field>
         <field name="model">cdu.dispense</field>
         <field name="arch" type="xml">
-            <tree default_order="next_drug_pickup_date asc, patient_name asc"
+            <tree class="o_cdu_production_list"
+                  default_order="next_drug_pickup_date asc, patient_name asc"
                   decoration-success="state == 'confirmed'">
                 <field name="name"/>
                 <field name="patient_name"/>
@@ -29,7 +30,10 @@
                 <field name="next_drug_pickup_date"/>
                 <field name="batch_id"/>
                 <field name="production_stock_refreshed_at"/>
-                <field name="state"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'confirmed'"/>
             </tree>
         </field>
     </record>
@@ -38,7 +42,7 @@
         <field name="name">cdu.dispense.form</field>
         <field name="model">cdu.dispense</field>
         <field name="arch" type="xml">
-            <form class="o_cdu_prescription_form o_cdu_batch_form">
+            <form class="o_cdu_prescription_form o_cdu_batch_form o_cdu_stage_dispensing">
                 <header>
                     <button name="action_confirm_dispensing"
                             string="Confirm Dispensing"
@@ -80,9 +84,12 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
-                        <label for="name"/>
+                    <div class="oe_title o_cdu_workspace_hero">
+                        <span class="o_cdu_workspace_eyebrow">Dispensing workspace</span>
                         <h1><field name="name"/></h1>
+                        <p class="o_cdu_workspace_subtitle">
+                            Confirm stock, quantities, dosing instructions, and labels for this prescription.
+                        </p>
                     </div>
 
                     <div class="o_cdu_batch_dashboard">
@@ -136,7 +143,7 @@
                         <field name="dispensing_readiness_message" readonly="1" nolabel="1"/>
                     </div>
 
-                    <notebook>
+                    <notebook class="o_cdu_workspace_notebook">
                         <page string="Dispense Selections">
                             <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
                                 Selections are prefilled from the batch picking lines. Production Floor stock refreshes automatically when dispensing starts and when this page is loaded. Confirm or adjust the exact product, batch, quantity, and dosing instructions.
