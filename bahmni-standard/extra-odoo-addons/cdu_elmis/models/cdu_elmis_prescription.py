@@ -5,6 +5,15 @@ from odoo.exceptions import UserError
 class CduPrescription(models.Model):
     _inherit = "cdu.prescription"
 
+    _POST_DISPENSING_STATES = frozenset(
+        (
+            "awaiting_bagging_qa",
+            "awaiting_boxing",
+            "awaiting_dispatch",
+            "dispatched",
+        )
+    )
+
     def action_open_dispensing(self):
         self.ensure_one()
         self._ensure_cdu_groups(
@@ -57,3 +66,21 @@ class CduPrescription(models.Model):
                 }
             )
         return qa._action_open()
+
+    def action_reprint_dispensing_labels(self):
+        self.ensure_one()
+        self._ensure_cdu_groups(
+            "cdu_prescription.group_cdu_dispensing_officer",
+            "cdu_prescription.group_cdu_admin",
+        )
+        if self.state not in self._POST_DISPENSING_STATES:
+            raise UserError(
+                _("Labels can only be reprinted after dispensing has been confirmed.")
+            )
+        dispense = self.env["cdu.dispense"].search(
+            [("prescription_id", "=", self.id)],
+            limit=1,
+        )
+        if not dispense or dispense.state != "confirmed":
+            raise UserError(_("This prescription has no confirmed dispensing record."))
+        return dispense.action_print_labels()

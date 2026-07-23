@@ -403,6 +403,7 @@ class CduDispense(models.Model):
                 selection.stock_option_id = option.id
 
     def action_confirm_dispensing(self):
+        self.ensure_one()
         self._ensure_dispensing_access()
         for dispense in self:
             if dispense.state == "confirmed":
@@ -417,7 +418,23 @@ class CduDispense(models.Model):
             )
             if dispense.prescription_id.state == "awaiting_dispensing":
                 dispense.prescription_id.write({"state": "awaiting_bagging_qa"})
-        return self.with_context(cdu_label_layout="all")._action_generate_labels()
+        report_action = self.with_context(
+            cdu_label_layout="all"
+        )._action_generate_labels()
+        return {
+            "type": "ir.actions.client",
+            "tag": "cdu_print_dispensing_labels_and_continue",
+            "params": {
+                "report_action": report_action,
+                "title": _("Dispensing confirmed"),
+                "message": _(
+                    "Labels were generated. Continuing the dispensing workflow."
+                ),
+                "notification_type": "success",
+                "sticky": False,
+                "next": self._get_next_dispensing_action(),
+            },
+        }
 
     def action_reject_to_call_center(self):
         self.ensure_one()
@@ -482,34 +499,32 @@ class CduDispense(models.Model):
             config=False,
         )
 
+    def _get_next_dispensing_action(self):
+        self.ensure_one()
+        if self.batch_id:
+            next_prescription = self.env["cdu.prescription"].search(
+                [
+                    ("batch_id", "=", self.batch_id.id),
+                    ("state", "=", "awaiting_dispensing"),
+                ],
+                order="next_drug_pickup_date asc, patient_first_name asc, id asc",
+                limit=1,
+            )
+            if next_prescription:
+                return next_prescription.action_open_dispensing()
+
+        action = self.env.ref(
+            "cdu_elmis.action_cdu_dispensing_work_queue"
+        ).read()[0]
+        action["views"] = [(False, "tree"), (False, "form")]
+        return action
+
     def action_open_next_dispensing_task(self):
         self.ensure_one()
         self._ensure_dispensing_access()
         if self.state != "confirmed" or not self.labels_printed:
             raise UserError(_("Print labels before moving to the next dispensing task."))
-        if not self.batch_id:
-            raise UserError(_("This dispense record is not linked to a workload batch."))
-
-        next_prescription = self.env["cdu.prescription"].search(
-            [
-                ("batch_id", "=", self.batch_id.id),
-                ("state", "=", "awaiting_dispensing"),
-            ],
-            order="next_drug_pickup_date asc, patient_first_name asc, id asc",
-            limit=1,
-        )
-        if not next_prescription:
-            return {
-                "type": "ir.actions.client",
-                "tag": "display_notification",
-                "params": {
-                    "title": _("Batch dispensing complete"),
-                    "message": _("There are no more dispensing tasks in this batch."),
-                    "type": "success",
-                    "sticky": False,
-                },
-            }
-        return next_prescription.action_open_dispensing()
+        return self._get_next_dispensing_action()
 
     def get_barcode_url(self, value, barcode_type="Code128", width=580, height=160):
         query = urls.url_encode(

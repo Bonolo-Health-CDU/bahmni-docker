@@ -12,6 +12,12 @@
                         class="oe_highlight"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', '!=', 'awaiting_dispensing')]}"/>
+                <button name="action_reprint_dispensing_labels"
+                        string="Reprint Labels"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('awaiting_bagging_qa', 'awaiting_boxing', 'awaiting_dispatch', 'dispatched'))]}"/>
             </xpath>
         </field>
     </record>
@@ -69,12 +75,6 @@
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
-                    <button name="action_open_next_dispensing_task"
-                            string="Next"
-                            type="object"
-                            class="btn-primary"
-                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            attrs="{'invisible': ['|', ('state', '!=', 'confirmed'), ('labels_printed', '=', False)]}"/>
                     <button name="action_mark_labels_printed"
                             string="Mark Labels Printed"
                             type="object"
@@ -158,7 +158,14 @@
                                     <field name="selected_lot" readonly="1"/>
                                     <field name="selected_lot_expiry" readonly="1"/>
                                     <field name="selected_stock_on_hand" string="Available Packs" readonly="1"/>
-                                    <field name="quantity_dispensed" string="Dispensed Packs"/>
+                                    <field name="quantity_dispensed"
+                                           string="Dispensed Packs"
+                                           widget="cdu_no_trailing_zeros_float"
+                                           optional="hide"/>
+                                    <field name="dispensed_units"
+                                           string="Dispensed Units"
+                                           widget="cdu_no_trailing_zeros_float"
+                                           readonly="1"/>
                                     <field name="dosage_instructions"/>
                                     <field name="selected_orderable_code" optional="hide"/>
                                     <field name="selected_orderable_id" optional="hide"/>

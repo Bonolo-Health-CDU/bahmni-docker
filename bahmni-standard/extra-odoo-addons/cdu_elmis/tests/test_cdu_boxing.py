@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from lxml import etree
+
 from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
@@ -109,3 +111,38 @@ class TestCduBoxingWorkflow(TransactionCase):
                 "group_created_day",
             ):
                 self.assertIn('name="%s"' % filter_name, search_view.arch_db)
+
+    def test_dispensed_units_are_computed_and_packs_are_hidden_by_default(self):
+        selection = self.env["cdu.dispense.stock.selection"].create(
+            {
+                "dispense_id": self.dispense.id,
+                "openmrs_drug_name": "TEST-BOXING-REGIMEN",
+                "selected_pack_size": 30,
+                "quantity_dispensed": 3,
+            }
+        )
+        self.assertEqual(selection.dispensed_units, 90)
+
+        selection.quantity_dispensed = 2.5
+        self.assertEqual(selection.dispensed_units, 75)
+
+        view = self.env.ref("cdu_elmis.view_cdu_dispense_form")
+        arch = etree.fromstring(view.arch_db.encode())
+        packs_field = arch.xpath(
+            ".//field[@name='stock_selection_ids']/tree"
+            "/field[@name='quantity_dispensed']"
+        )
+        units_field = arch.xpath(
+            ".//field[@name='stock_selection_ids']/tree"
+            "/field[@name='dispensed_units']"
+        )
+        self.assertEqual(packs_field[0].get("optional"), "hide")
+        self.assertEqual(
+            packs_field[0].get("widget"),
+            "cdu_no_trailing_zeros_float",
+        )
+        self.assertTrue(units_field)
+        self.assertEqual(
+            units_field[0].get("widget"),
+            "cdu_no_trailing_zeros_float",
+        )

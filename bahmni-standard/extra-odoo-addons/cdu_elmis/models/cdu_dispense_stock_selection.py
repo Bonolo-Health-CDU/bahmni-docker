@@ -47,12 +47,27 @@ class CduDispenseStockSelection(models.Model):
     selected_lot_expiry = fields.Date(string="Expiry")
     selected_stock_on_hand = fields.Integer(string="Available Packs", readonly=True)
     quantity_dispensed = fields.Float(string="Dispensed Packs")
+    dispensed_units = fields.Float(
+        string="Dispensed Units",
+        compute="_compute_dispensed_units",
+        store=True,
+        readonly=True,
+        help="Pack size multiplied by the number of dispensed packs.",
+    )
     dosage_instructions = fields.Text(
         string="Dosing / Instructions",
         related="prescription_id.dosage_instructions",
         readonly=False,
         store=True,
     )
+
+    @api.depends("selected_pack_size", "quantity_dispensed")
+    def _compute_dispensed_units(self):
+        for line in self:
+            line.dispensed_units = (
+                (line.selected_pack_size or 0)
+                * (line.quantity_dispensed or 0)
+            )
 
     def init(self):
         if not self._table_exists("cdu_dispense_stock_option"):
