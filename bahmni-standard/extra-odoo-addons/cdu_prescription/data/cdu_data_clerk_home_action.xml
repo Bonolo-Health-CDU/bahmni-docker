@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <function
+        model="res.users"
+        name="_sync_all_cdu_home_actions"
+    />
+</odoo>

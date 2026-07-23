@@ -1,0 +1,242 @@
+.o_cdu_dashboard {
+    min-height: 100%;
+    overflow: auto;
+    padding: 32px;
+    color: #203247;
+    background:
+        radial-gradient(circle at 90% 0%, rgba(20, 127, 151, 0.12), transparent 30%),
+        #f3f6f8;
+}
+
+.o_cdu_dashboard_loading,
+.o_cdu_dashboard_empty {
+    min-height: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: #687a8d;
+}
+
+.o_cdu_dashboard_loading .fa,
+.o_cdu_dashboard_empty .fa {
+    font-size: 32px;
+    color: #147f97;
+}
+
+.o_cdu_dashboard_welcome {
+    max-width: 1440px;
+    margin: 0 auto 24px;
+    color: #5f7183;
+    font-size: 15px;
+}
+
+.o_cdu_dashboard_welcome strong {
+    color: #203247;
+}
+
+.o_cdu_dashboard_warning_eyebrow {
+    display: block;
+    margin-bottom: 5px;
+    color: #a56a21;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.o_cdu_dashboard_content {
+    max-width: 1440px;
+    margin: 0 auto;
+}
+
+.o_cdu_dashboard_section {
+    margin-bottom: 30px;
+}
+
+.o_cdu_dashboard_section_heading {
+    margin-bottom: 13px;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.o_cdu_dashboard_section_heading h2 {
+    margin: 0;
+    color: #24384b;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.o_cdu_dashboard_section_heading > span {
+    color: #8190a0;
+    font-size: 12px;
+}
+
+.o_cdu_dashboard_cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.o_cdu_dashboard_card {
+    position: relative;
+    min-height: 122px;
+    padding: 20px;
+    border: 1px solid #dce5eb;
+    border-radius: 14px;
+    display: grid;
+    grid-template-columns: 46px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    text-align: left;
+    color: inherit;
+    background: #fff;
+    box-shadow: 0 5px 15px rgba(30, 55, 75, 0.05);
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.o_cdu_dashboard_card:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: #a9c9d3;
+    box-shadow: 0 12px 24px rgba(30, 55, 75, 0.1);
+}
+
+.o_cdu_dashboard_card_icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #147f97;
+    background: #e8f4f6;
+    font-size: 20px;
+}
+
+.o_cdu_dashboard_card_body,
+.o_cdu_dashboard_card_title,
+.o_cdu_dashboard_card_description {
+    display: block;
+}
+
+.o_cdu_dashboard_card_title {
+    margin-bottom: 5px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.o_cdu_dashboard_card_description {
+    color: #728294;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.o_cdu_dashboard_card_count {
+    min-width: 44px;
+    color: #17364a;
+    font-size: 28px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.o_cdu_dashboard_card_arrow {
+    position: absolute;
+    right: 14px;
+    bottom: 12px;
+    color: #b3c0ca;
+    font-size: 10px;
+}
+
+.o_cdu_dashboard_card_orange .o_cdu_dashboard_card_icon {
+    color: #b46b12;
+    background: #fff2df;
+}
+
+.o_cdu_dashboard_card_red .o_cdu_dashboard_card_icon {
+    color: #b94747;
+    background: #fceaea;
+}
+
+.o_cdu_dashboard_card_purple .o_cdu_dashboard_card_icon {
+    color: #7256a8;
+    background: #f0ebfa;
+}
+
+.o_cdu_dashboard_card_green .o_cdu_dashboard_card_icon {
+    color: #31825d;
+    background: #e7f5ee;
+}
+
+.o_cdu_dashboard_warnings {
+    margin: 6px 0 30px;
+    padding: 22px;
+    border: 1px solid #eadac1;
+    border-radius: 15px;
+    background: #fffaf2;
+}
+
+.o_cdu_dashboard_warning_list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+}
+
+.o_cdu_dashboard_warning {
+    padding: 13px 15px;
+    border: 1px solid #eadac1;
+    border-radius: 10px;
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    color: #614c31;
+    background: #fff;
+}
+
+.o_cdu_dashboard_warning > .fa {
+    color: #c17c26;
+    font-size: 18px;
+}
+
+.o_cdu_dashboard_warning span,
+.o_cdu_dashboard_warning strong,
+.o_cdu_dashboard_warning small {
+    display: block;
+}
+
+.o_cdu_dashboard_warning small {
+    margin-top: 2px;
+    color: #96836c;
+}
+
+.o_cdu_dashboard_warning b {
+    font-size: 22px;
+}
+
+.o_cdu_dashboard_all_clear {
+    padding: 16px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #2f7656;
+    background: #edf8f2;
+}
+
+.o_cdu_dashboard_all_clear .fa {
+    font-size: 20px;
+}
+
+@media (max-width: 768px) {
+    .o_cdu_dashboard {
+        padding: 16px;
+    }
+
+    .o_cdu_dashboard_cards {
+        grid-template-columns: 1fr;
+    }
+}

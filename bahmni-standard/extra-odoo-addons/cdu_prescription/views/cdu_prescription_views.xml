@@ -5,10 +5,11 @@
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
             <tree default_order="next_drug_pickup_date asc, patient_first_name asc" decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')" decoration-muted="state == 'cancelled'">
-                <field name="name"/>
+                <field name="name" string="Prescription ID" optional="hide"/>
+                <field name="patient_first_name" optional="show"/>
                 <field name="facility_name"/>
                 <field name="patient_identifier"/>
-                <field name="patient_first_name" optional="hide"/>
+                <field name="rejection_reason" string="Rejection Reasons" optional="show"/>
                 <field name="prescription_date"/>
                 <field name="next_drug_pickup_date"/>
                 <field name="facility_days_supply" optional="show"/>
@@ -28,12 +29,17 @@
         <field name="arch" type="xml">
             <form class="o_cdu_prescription_form">
                 <header>
-                    <button name="action_mark_patient_verified" string="Verify" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
-                    <button name="action_mark_medicine_validated" string="Validate" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
+                    <button name="action_mark_patient_verified" string="Verify" type="object" class="oe_highlight" confirm="Are you sure you want to verify this prescription?" groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
+                    <button name="action_mark_medicine_validated" string="Validate" type="object" class="oe_highlight" confirm="Are you sure you want to validate this prescription?" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
                     <button name="action_reject_to_call_center" string="Reject to Call Center" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_data_clerk" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
                     <button name="action_reject_to_call_center" string="Reject to Call Center" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
-                    <button name="action_return_to_verification" string="Back to Awaiting Verification" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
-                    <button name="action_return_to_validation" string="Back to Awaiting Validation" type="object" class="oe_highlight" groups="cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'rejected_to_call_center')]}"/>
+                    <button name="action_return_to_previous_stage"
+                            string="Return to Previous Stage"
+                            type="object"
+                            class="oe_highlight"
+                            confirm="Are you sure the rejected-prescription work is complete and you want to return it to its previous stage?"
+                            groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_call_agent,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', 'not in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_data_clerk" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
                     <button name="action_remap_regimens" string="Remap Regimen" type="object" class="btn-secondary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
@@ -92,6 +98,10 @@
                             <field name="verified_at"/>
                             <field name="validated_by"/>
                             <field name="validated_at"/>
+                            <field name="rejection_destination"
+                                   attrs="{'invisible': [('state', 'not in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
+                            <field name="rejection_reason" string="Rejection Reasons"
+                                   attrs="{'invisible': [('state', 'not in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
                         </group>
                     </group>
                     <notebook>
@@ -119,8 +129,8 @@
                                     <field name="hiv_diagnosis_date"/>
                                     <field name="new_or_revisit"/>
                                     <field name="next_clinical_visit_date"/>
-                                    <field name="allergies"/>
                                     <field name="has_allergies"/>
+                                    <field name="allergies"/>
                                 </group>
                                 <group string="Viral Load">
                                     <field name="latest_vl_collection_date"/>
@@ -147,6 +157,21 @@
                         </page>
                         <page string="Comments">
                             <field name="validation_notes"/>
+                        </page>
+                        <page string="Rejection History">
+                            <field name="rejection_history_ids" readonly="1">
+                                <tree create="0" edit="0" delete="0"
+                                      decoration-warning="is_active">
+                                    <field name="stage"/>
+                                    <field name="destination"/>
+                                    <field name="reason_ids" widget="many2many_tags"/>
+                                    <field name="rejected_by"/>
+                                    <field name="rejected_at"/>
+                                    <field name="returned_by"/>
+                                    <field name="returned_at"/>
+                                    <field name="is_active"/>
+                                </tree>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>

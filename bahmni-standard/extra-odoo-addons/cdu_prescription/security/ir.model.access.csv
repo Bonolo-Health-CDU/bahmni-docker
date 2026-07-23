@@ -1,13 +1,24 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_cdu_prescription_data_clerk,cdu.prescription data clerk,model_cdu_prescription,cdu_prescription.group_cdu_data_clerk,1,1,0,0
+access_cdu_prescription_data_clerk,cdu.prescription data clerk,model_cdu_prescription,cdu_prescription.group_cdu_data_clerk,1,1,1,0
 access_cdu_prescription_call_agent,cdu.prescription call agent,model_cdu_prescription,cdu_prescription.group_cdu_call_agent,1,1,0,0
 access_cdu_prescription_dispensing_officer,cdu.prescription dispensing officer,model_cdu_prescription,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0
 access_cdu_prescription_admin,cdu.prescription admin,model_cdu_prescription,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_prescription_rejection_data_clerk,cdu.prescription.rejection data clerk,model_cdu_prescription_rejection,cdu_prescription.group_cdu_data_clerk,1,1,1,0
+access_cdu_prescription_rejection_call_agent,cdu.prescription.rejection call agent,model_cdu_prescription_rejection,cdu_prescription.group_cdu_call_agent,1,1,0,0
+access_cdu_prescription_rejection_dispensing_officer,cdu.prescription.rejection dispensing officer,model_cdu_prescription_rejection,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0
+access_cdu_prescription_rejection_admin,cdu.prescription.rejection admin,model_cdu_prescription_rejection,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_prescription_reject_wizard_data_clerk,cdu.prescription.reject.wizard data clerk,model_cdu_prescription_reject_wizard,cdu_prescription.group_cdu_data_clerk,1,1,1,1
+access_cdu_prescription_reject_wizard_dispensing_officer,cdu.prescription.reject.wizard dispensing officer,model_cdu_prescription_reject_wizard,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
+access_cdu_prescription_reject_wizard_admin,cdu.prescription.reject.wizard admin,model_cdu_prescription_reject_wizard,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_rejection_reason_data_clerk,cdu.rejection.reason data clerk,model_cdu_rejection_reason,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_rejection_reason_call_agent,cdu.rejection.reason call agent,model_cdu_rejection_reason,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_rejection_reason_dispensing_officer,cdu.rejection.reason dispensing officer,model_cdu_rejection_reason,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_rejection_reason_admin,cdu.rejection.reason admin,model_cdu_rejection_reason,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_batch_dispensing_officer,cdu.batch dispensing officer,model_cdu_batch,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0
 access_cdu_batch_admin,cdu.batch admin,model_cdu_batch,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_batch_regimen_repeat_line_dispensing_officer,cdu.batch.regimen.repeat.line dispensing officer,model_cdu_batch_regimen_repeat_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
 access_cdu_batch_regimen_repeat_line_admin,cdu.batch.regimen.repeat.line admin,model_cdu_batch_regimen_repeat_line,cdu_prescription.group_cdu_admin,1,1,1,1
-access_cdu_facility_data_clerk,cdu.facility data clerk,model_cdu_facility,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_facility_data_clerk,cdu.facility data clerk,model_cdu_facility,cdu_prescription.group_cdu_data_clerk,1,0,1,0
 access_cdu_facility_call_agent,cdu.facility call agent,model_cdu_facility,cdu_prescription.group_cdu_call_agent,1,0,0,0
 access_cdu_facility_dispensing_officer,cdu.facility dispensing officer,model_cdu_facility,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
 access_cdu_facility_admin,cdu.facility admin,model_cdu_facility,cdu_prescription.group_cdu_admin,1,1,1,1
@@ -27,16 +38,18 @@ access_cdu_batch_picking_line_dispensing_officer,cdu.batch.picking.line dispensi
 access_cdu_batch_picking_line_admin,cdu.batch.picking.line admin,model_cdu_batch_picking_line,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_batch_patient_line_dispensing_officer,cdu.batch.patient.line dispensing officer,model_cdu_batch_patient_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
 access_cdu_batch_patient_line_admin,cdu.batch.patient.line admin,model_cdu_batch_patient_line,cdu_prescription.group_cdu_admin,1,1,1,1
-access_cdu_report_run_user,cdu.report.run CDU user,model_cdu_report_run,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_report_run_user,cdu.report.run CDU user,model_cdu_report_run,cdu_prescription.group_cdu_data_clerk,1,1,1,0
 access_cdu_report_run_call_agent,cdu.report.run call agent,model_cdu_report_run,cdu_prescription.group_cdu_call_agent,1,0,0,0
 access_cdu_report_run_dispensing_officer,cdu.report.run dispensing officer,model_cdu_report_run,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
 access_cdu_report_run_admin,cdu.report.run admin,model_cdu_report_run,cdu_prescription.group_cdu_admin,1,1,1,1
-access_cdu_report_row_user,cdu.report.row CDU user,model_cdu_report_row,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_report_row_user,cdu.report.row CDU user,model_cdu_report_row,cdu_prescription.group_cdu_data_clerk,1,1,1,0
 access_cdu_report_row_call_agent,cdu.report.row call agent,model_cdu_report_row,cdu_prescription.group_cdu_call_agent,1,0,0,0
 access_cdu_report_row_dispensing_officer,cdu.report.row dispensing officer,model_cdu_report_row,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
 access_cdu_report_row_admin,cdu.report.row admin,model_cdu_report_row,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_report_bulk_import_wizard_admin,cdu.report.bulk.import.wizard admin,model_cdu_report_bulk_import_wizard,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_report_bulk_import_wizard_line_admin,cdu.report.bulk.import.wizard.line admin,model_cdu_report_bulk_import_wizard_line,cdu_prescription.group_cdu_admin,1,1,1,1
+access_cdu_report_bulk_import_wizard_data_clerk,cdu.report.bulk.import.wizard data clerk,model_cdu_report_bulk_import_wizard,cdu_prescription.group_cdu_data_clerk,1,1,1,1
+access_cdu_report_bulk_import_wizard_line_data_clerk,cdu.report.bulk.import.wizard.line data clerk,model_cdu_report_bulk_import_wizard_line,cdu_prescription.group_cdu_data_clerk,1,1,1,1
 access_res_partner_data_clerk,res.partner data clerk,base.model_res_partner,cdu_prescription.group_cdu_data_clerk,1,1,1,0
 access_res_partner_call_agent,res.partner call agent,base.model_res_partner,cdu_prescription.group_cdu_call_agent,1,1,1,0
 access_res_partner_dispensing_officer,res.partner dispensing officer,base.model_res_partner,cdu_prescription.group_cdu_dispensing_officer,1,1,1,0

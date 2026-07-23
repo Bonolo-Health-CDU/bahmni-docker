@@ -20,6 +20,13 @@ class CduBox(models.Model):
     max_parcels = fields.Integer(default=20, required=True, tracking=True)
     line_ids = fields.One2many("cdu.box.line", "box_id", string="Parcels")
     parcel_count = fields.Integer(compute="_compute_parcel_count", store=True)
+    bag_label_scan_input = fields.Text(
+        string="Scan Bag Label Barcode",
+        compute="_compute_bag_label_scan_input",
+        inverse="_inverse_bag_label_scan_input",
+        store=False,
+        help="Scan the prescription barcode printed on a completed bag label.",
+    )
     state = fields.Selection(
         [
             ("draft", "Draft"),
@@ -126,6 +133,13 @@ class CduBox(models.Model):
     def _compute_parcel_count(self):
         for box in self:
             box.parcel_count = len(box.line_ids)
+
+    def _compute_bag_label_scan_input(self):
+        for box in self:
+            box.bag_label_scan_input = False
+
+    def _inverse_bag_label_scan_input(self):
+        return
 
     def _ensure_boxing_access(self):
         if not (
@@ -270,6 +284,66 @@ class CduBox(models.Model):
         if isinstance(parcel_value, str):
             parcel_value = int(parcel_value) if parcel_value.isdigit() else False
         return parcel_value if isinstance(parcel_value, int) else False
+
+    def _find_parcel_from_bag_label(self, scanned_value):
+        values = [
+            value.strip()
+            for value in str(scanned_value or "").replace("\r\n", "\n").split("\n")
+            if value.strip()
+        ]
+        if not values:
+            raise UserError(_("Scan a bag label first."))
+
+        BaggingQa = self.env["cdu.bagging.qa"]
+        if len(values) == 1:
+            parcel = BaggingQa.search(
+                [
+                    "|",
+                    "|",
+                    ("prescription_id.name", "=", values[0]),
+                    ("parcel_reference", "=", values[0]),
+                    ("name", "=", values[0]),
+                ],
+                limit=1,
+            )
+        elif len(values) == 2:
+            scanned_patient, scanned_prescription = values
+            candidates = BaggingQa.search(
+                [("prescription_id.name", "=", scanned_prescription)]
+            )
+            normalize = lambda value: " ".join((value or "").split()).casefold()
+            parcel = candidates.filtered(
+                lambda candidate: normalize(candidate.patient_name)
+                == normalize(scanned_patient)
+            )[:1]
+        else:
+            parcel = BaggingQa
+
+        if not parcel:
+            raise UserError(
+                _(
+                    "This bag-label barcode does not match an eligible parcel. "
+                    "Check that the bag passed QA and scan the barcode again."
+                )
+            )
+        return parcel
+
+    def action_scan_bag_label(self, scanned_value):
+        self._ensure_boxing_access()
+        self.ensure_one()
+        parcel = self._find_parcel_from_bag_label(scanned_value)
+        return self.action_scan_parcel(parcel.id)
+
+    @api.model
+    def action_scan_bag_label_in_new_box(self, scanned_value, max_parcels=False):
+        self._ensure_boxing_access()
+        values = {}
+        if isinstance(max_parcels, str):
+            max_parcels = int(max_parcels) if max_parcels.isdigit() else False
+        if isinstance(max_parcels, int) and max_parcels > 0:
+            values["max_parcels"] = max_parcels
+        box = self.create(values)
+        return box.action_scan_bag_label(scanned_value)
 
     @api.model
     def action_scan_parcel_in_new_box(self, parcel_id, max_parcels=False):

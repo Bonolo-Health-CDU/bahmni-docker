@@ -1,5 +1,7 @@
 from . import cdu_patient
 from . import cdu_user
+from . import cdu_dashboard
+from . import cdu_rejection
 from . import cdu_menu
 from . import cdu_collection_point
 from . import cdu_collection_point_sync

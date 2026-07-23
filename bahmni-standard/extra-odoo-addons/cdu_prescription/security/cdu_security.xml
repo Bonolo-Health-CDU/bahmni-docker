@@ -81,6 +81,50 @@
         <field name="perm_unlink" eval="1"/>
     </record>
 
+    <record id="rule_cdu_rejection_data_clerk" model="ir.rule">
+        <field name="name">CDU rejection history: data clerk queue</field>
+        <field name="model_id" ref="model_cdu_prescription_rejection"/>
+        <field name="domain_force">[('prescription_id.state', 'in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center', 'rejected_to_facility'))]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_data_clerk'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_cdu_rejection_call_agent" model="ir.rule">
+        <field name="name">CDU rejection history: call agent queue</field>
+        <field name="model_id" ref="model_cdu_prescription_rejection"/>
+        <field name="domain_force">[('prescription_id.state', 'in', ('rejected_to_call_center', 'awaiting_verification', 'awaiting_validation'))]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_call_agent'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_cdu_rejection_dispensing_officer" model="ir.rule">
+        <field name="name">CDU rejection history: dispensing officer</field>
+        <field name="model_id" ref="model_cdu_prescription_rejection"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_dispensing_officer'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="rule_cdu_rejection_admin" model="ir.rule">
+        <field name="name">CDU rejection history: admin all</field>
+        <field name="model_id" ref="model_cdu_prescription_rejection"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_cdu_admin'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+    </record>
+
     <record id="base.user_admin" model="res.users">
         <field name="groups_id" eval="[(4, ref('group_cdu_admin'))]"/>
     </record>

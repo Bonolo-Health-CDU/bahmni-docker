@@ -121,6 +121,41 @@ class CduPrescription(models.Model):
         required=True,
         tracking=True,
     )
+    rejected_from_state = fields.Selection(
+        [
+            ("awaiting_verification", "Verification"),
+            ("awaiting_validation", "Validation"),
+            ("awaiting_dispensing", "Dispensing"),
+        ],
+        string="Rejected From",
+        readonly=True,
+        copy=False,
+        tracking=True,
+    )
+    rejection_history_ids = fields.One2many(
+        "cdu.prescription.rejection",
+        "prescription_id",
+        string="Rejection History",
+        readonly=True,
+    )
+    active_rejection_id = fields.Many2one(
+        "cdu.prescription.rejection",
+        string="Active Rejection",
+        readonly=True,
+        copy=False,
+    )
+    rejection_reason = fields.Char(
+        related="active_rejection_id.reason_display",
+        string="Rejection Reasons",
+        store=True,
+        readonly=True,
+    )
+    rejection_destination = fields.Selection(
+        related="active_rejection_id.destination",
+        string="Rejected To",
+        store=True,
+        readonly=True,
+    )
     verified_by = fields.Many2one("res.users", readonly=True)
     verified_at = fields.Datetime(readonly=True)
     validated_by = fields.Many2one("res.users", readonly=True)
@@ -319,6 +354,9 @@ class CduPrescription(models.Model):
         if invalid:
             raise ValidationError(_("This action is not allowed for the current prescription status."))
 
+    def _action_open_prescription_queue(self, action_xml_id):
+        return self.env["ir.actions.actions"]._for_xml_id(action_xml_id)
+
     def action_mark_patient_verified(self):
         self._ensure_cdu_groups("cdu_prescription.group_cdu_data_clerk")
         self._ensure_states(("awaiting_verification",))
@@ -327,6 +365,9 @@ class CduPrescription(models.Model):
             "verified_by": self.env.user.id,
             "verified_at": fields.Datetime.now(),
         })
+        return self._action_open_prescription_queue(
+            "cdu_prescription.action_cdu_prescription_awaiting_verification"
+        )
 
     def action_mark_medicine_validated(self):
         self._ensure_cdu_groups("cdu_prescription.group_cdu_dispensing_officer")
@@ -348,32 +389,146 @@ class CduPrescription(models.Model):
             "validated_by": self.env.user.id,
             "validated_at": fields.Datetime.now(),
         })
+        return self._action_open_prescription_queue(
+            "cdu_prescription.action_cdu_prescription_awaiting_validation"
+        )
 
     def action_reject_to_call_center(self):
-        self._ensure_cdu_groups(
-            "cdu_prescription.group_cdu_data_clerk",
-            "cdu_prescription.group_cdu_dispensing_officer",
-        )
-        self._ensure_states(("awaiting_verification", "awaiting_validation"))
-        self.write({"state": "rejected_to_call_center"})
+        return self._action_open_rejection_wizard("call_center")
 
     def action_reject_to_facility(self):
+        return self._action_open_rejection_wizard("facility")
+
+    def _action_open_rejection_wizard(self, destination):
+        self.ensure_one()
         self._ensure_cdu_groups(
             "cdu_prescription.group_cdu_data_clerk",
             "cdu_prescription.group_cdu_dispensing_officer",
         )
-        self._ensure_states(("awaiting_verification", "awaiting_validation"))
-        self.write({"state": "rejected_to_facility"})
+        self._ensure_states(
+            ("awaiting_verification", "awaiting_validation", "awaiting_dispensing")
+        )
+        wizard_view = self.env.ref(
+            "cdu_prescription.view_cdu_prescription_reject_wizard_form"
+        )
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Reject Prescription"),
+            "res_model": "cdu.prescription.reject.wizard",
+            "view_mode": "form",
+            "views": [(wizard_view.id, "form")],
+            "target": "new",
+            "context": {
+                "default_prescription_id": self.id,
+                "default_stage": self.state,
+                "default_destination": destination,
+            },
+        }
 
-    def action_return_to_verification(self):
-        self._ensure_cdu_groups("cdu_prescription.group_cdu_call_agent")
-        self._ensure_states(("rejected_to_call_center",))
-        self.write({"state": "awaiting_verification"})
+    def _perform_rejection(self, destination, reason_codes):
+        self.ensure_one()
+        self._ensure_cdu_groups(
+            "cdu_prescription.group_cdu_data_clerk",
+            "cdu_prescription.group_cdu_dispensing_officer",
+        )
+        self._ensure_states(
+            ("awaiting_verification", "awaiting_validation", "awaiting_dispensing")
+        )
+        if destination not in ("call_center", "facility"):
+            raise ValidationError(_("Select a valid rejection destination."))
+        if isinstance(reason_codes, str):
+            reason_codes = [reason_codes]
+        reason_codes = list(dict.fromkeys(reason_codes or []))
+        if not reason_codes:
+            raise ValidationError(_("Select at least one rejection reason."))
+        reasons = self.env["cdu.rejection.reason"].search(
+            [("code", "in", reason_codes), ("active", "=", True)]
+        )
+        if len(reasons) != len(reason_codes):
+            raise ValidationError(_("One or more rejection reasons are invalid."))
+        if self.state != "awaiting_dispensing" and any(reasons.mapped("dispensing_only")):
+            raise ValidationError(_("Out of Stock is only available during Dispensing."))
+        source_state = self.state
+        rejected_state = (
+            "rejected_to_call_center"
+            if destination == "call_center"
+            else "rejected_to_facility"
+        )
+        rejection = self.env["cdu.prescription.rejection"].create(
+            {
+                "prescription_id": self.id,
+                "stage": source_state,
+                "destination": destination,
+                "reason_ids": [(6, 0, reasons.ids)],
+                "rejected_by": self.env.user.id,
+                "rejected_at": fields.Datetime.now(),
+            }
+        )
+        self.write(
+            {
+                "state": rejected_state,
+                "rejected_from_state": source_state,
+                "active_rejection_id": rejection.id,
+            }
+        )
+        action_xml_id = (
+            "cdu_prescription.action_cdu_prescription_awaiting_verification"
+            if source_state == "awaiting_verification"
+            else (
+                "cdu_prescription.action_cdu_prescription_awaiting_validation"
+                if source_state == "awaiting_validation"
+                else "cdu_elmis.action_cdu_dispensing_work_queue"
+            )
+        )
+        return self._action_open_prescription_queue(action_xml_id)
 
-    def action_return_to_validation(self):
-        self._ensure_cdu_groups("cdu_prescription.group_cdu_call_agent")
-        self._ensure_states(("rejected_to_call_center",))
-        self.write({"state": "awaiting_validation"})
+    def action_return_to_previous_stage(self):
+        self._ensure_cdu_groups(
+            "cdu_prescription.group_cdu_data_clerk",
+            "cdu_prescription.group_cdu_call_agent",
+            "cdu_prescription.group_cdu_dispensing_officer",
+        )
+        self._ensure_states(("rejected_to_call_center", "rejected_to_facility"))
+
+        destination_states = set()
+        for prescription in self:
+            destination_state = prescription.rejected_from_state
+            if not destination_state:
+                # Compatibility for prescriptions rejected before origin tracking existed.
+                destination_state = (
+                    "awaiting_validation"
+                    if prescription.verified_at
+                    else "awaiting_verification"
+                )
+            active_rejection = prescription.active_rejection_id
+            if active_rejection:
+                active_rejection.write(
+                    {
+                        "is_active": False,
+                        "returned_by": self.env.user.id,
+                        "returned_at": fields.Datetime.now(),
+                    }
+                )
+            prescription.write(
+                {
+                    "state": destination_state,
+                    "active_rejection_id": False,
+                }
+            )
+            destination_states.add(destination_state)
+
+        if destination_states == {"awaiting_validation"}:
+            action_xml_id = "cdu_prescription.action_cdu_prescription_awaiting_validation"
+        elif destination_states == {"awaiting_dispensing"} and (
+            self.env.user.has_group("cdu_prescription.group_cdu_dispensing_officer")
+            or self.env.user.has_group("cdu_prescription.group_cdu_admin")
+        ):
+            action_xml_id = "cdu_elmis.action_cdu_dispensing_work_queue"
+        elif destination_states == {"awaiting_dispensing"}:
+            action_xml_id = "cdu_prescription.action_cdu_dashboard"
+        else:
+            action_xml_id = "cdu_prescription.action_cdu_prescription_awaiting_verification"
+        return self._action_open_prescription_queue(action_xml_id)
 
     def action_cancel(self):
         self._ensure_cdu_groups("cdu_prescription.group_cdu_admin")

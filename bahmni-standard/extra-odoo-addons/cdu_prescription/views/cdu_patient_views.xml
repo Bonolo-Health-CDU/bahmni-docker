@@ -75,7 +75,7 @@
                         <page string="Prescriptions">
                             <field name="cdu_prescription_ids" readonly="1">
                                 <tree string="CDU Prescriptions">
-                                    <field name="name"/>
+                                    <field name="name" string="Prescription ID" optional="hide"/>
                                     <field name="prescription_date"/>
                                     <field name="state"/>
                                     <field name="regimen_prescribed_raw"/>

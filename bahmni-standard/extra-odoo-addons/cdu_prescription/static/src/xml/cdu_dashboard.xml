@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="cdu_prescription.CduDashboard" owl="1">
+        <div class="o_cdu_dashboard">
+            <div t-if="state.loading" class="o_cdu_dashboard_loading">
+                <i class="fa fa-spinner fa-spin"/>
+                <span>Loading CDU dashboard…</span>
+            </div>
+            <t t-else="">
+                <p class="o_cdu_dashboard_welcome">
+                    Welcome, <strong t-esc="state.data.user_name"/>.
+                    Your operational workspace is ready.
+                </p>
+
+                <div t-if="!state.data.role" class="o_cdu_dashboard_empty">
+                    <i class="fa fa-lock"/>
+                    <h2>No CDU role assigned</h2>
+                    <p>Ask an administrator to assign a Central Dispensing Unit role.</p>
+                </div>
+
+                <main t-else="" class="o_cdu_dashboard_content">
+                    <section t-foreach="state.data.sections" t-as="section" t-key="section.key"
+                             class="o_cdu_dashboard_section">
+                        <div class="o_cdu_dashboard_section_heading">
+                            <h2 t-esc="section.title"/>
+                            <span t-esc="section.cards.length + ' work areas'"/>
+                        </div>
+                        <div class="o_cdu_dashboard_cards">
+                            <button t-foreach="section.cards" t-as="card" t-key="card.title"
+                                    type="button"
+                                    t-att-class="'o_cdu_dashboard_card o_cdu_dashboard_card_' + card.tone"
+                                    t-att-disabled="!card.action"
+                                    t-on-click="() => this.openAction(card.action)">
+                                <span class="o_cdu_dashboard_card_icon">
+                                    <i t-att-class="'fa ' + card.icon"/>
+                                </span>
+                                <span class="o_cdu_dashboard_card_body">
+                                    <span class="o_cdu_dashboard_card_title" t-esc="card.title"/>
+                                    <span class="o_cdu_dashboard_card_description" t-esc="card.description"/>
+                                </span>
+                                <span class="o_cdu_dashboard_card_count" t-esc="card.count"/>
+                                <i class="fa fa-chevron-right o_cdu_dashboard_card_arrow"/>
+                            </button>
+                        </div>
+                    </section>
+
+                    <section t-if="state.data.role === 'admin'" class="o_cdu_dashboard_warnings">
+                        <div class="o_cdu_dashboard_section_heading">
+                            <div>
+                                <span class="o_cdu_dashboard_warning_eyebrow">Last 7 days</span>
+                                <h2>Integration warnings</h2>
+                            </div>
+                            <span>Administrator only</span>
+                        </div>
+                        <div t-if="state.data.warnings.length" class="o_cdu_dashboard_warning_list">
+                            <button t-foreach="state.data.warnings" t-as="warning" t-key="warning.title"
+                                    type="button"
+                                    class="o_cdu_dashboard_warning"
+                                    t-on-click="() => this.openAction(warning.action)">
+                                <i t-att-class="'fa ' + warning.icon"/>
+                                <span>
+                                    <strong t-esc="warning.title"/>
+                                    <small t-esc="'Latest: ' + warning.latest_at"/>
+                                </span>
+                                <b t-esc="warning.count"/>
+                            </button>
+                        </div>
+                        <div t-else="" class="o_cdu_dashboard_all_clear">
+                            <i class="fa fa-check-circle"/>
+                            <span>No recent integration warnings.</span>
+                        </div>
+                    </section>
+                </main>
+            </t>
+        </div>
+    </t>
+</templates>
