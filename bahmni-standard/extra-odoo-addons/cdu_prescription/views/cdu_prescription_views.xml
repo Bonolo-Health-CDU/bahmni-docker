@@ -206,6 +206,20 @@
                 <field name="patient_first_name"/>
                 <field name="facility_name"/>
                 <field name="collection_point_id"/>
+                <separator/>
+                <filter string="Created Today"
+                        name="created_today"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Waiting 2+ Days"
+                        name="waiting_two_days"
+                        domain="[('create_date', '&lt;', (context_today() - relativedelta(days=2)).strftime('%Y-%m-%d')), ('state', 'not in', ('dispatched', 'cancelled'))]"/>
+                <filter string="Pickup Within 7 Days"
+                        name="pickup_next_seven_days"
+                        domain="[('next_drug_pickup_date', '&gt;=', context_today()), ('next_drug_pickup_date', '&lt;=', context_today() + relativedelta(days=7))]"/>
+                <filter string="Needs Attention"
+                        name="needs_attention"
+                        domain="[('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]"/>
+                <separator/>
                 <filter string="Awaiting Verification" name="awaiting_verification" domain="[('state', '=', 'awaiting_verification')]"/>
                 <filter string="Awaiting Validation" name="awaiting_validation" domain="[('state', '=', 'awaiting_validation')]"/>
                 <filter string="Awaiting Batching" name="awaiting_batching" domain="[('state', '=', 'awaiting_batching')]"/>
@@ -222,6 +236,7 @@
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
                     <filter string="Facility" name="group_facility" context="{'group_by': 'facility_id'}"/>
                     <filter string="Prescription Date" name="group_prescription_date" context="{'group_by': 'prescription_date'}"/>
+                    <filter string="Created Day" name="group_created_day" context="{'group_by': 'create_date:day'}"/>
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                 </group>
             </search>

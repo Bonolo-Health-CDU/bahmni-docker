@@ -16,6 +16,9 @@ async function printBoxDocuments(env, action) {
                 title: params.title || _t("Box documents ready"),
                 type: params.notification_type || "success",
                 sticky: Boolean(params.sticky),
+                className:
+                    "o_cdu_scan_notification o_cdu_scan_notification_" +
+                    (params.notification_type || "success"),
             });
         }
         if (params.next) {
@@ -29,6 +32,8 @@ async function printBoxDocuments(env, action) {
         env.services.notification.add(message, {
             title: _t("Box document printing"),
             type: "danger",
+            className:
+                "o_cdu_scan_notification o_cdu_scan_notification_danger",
         });
     }
 }

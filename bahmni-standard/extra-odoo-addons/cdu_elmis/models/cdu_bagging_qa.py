@@ -300,6 +300,10 @@ class CduBaggingQa(models.Model):
                 "message": _("Prescription moved to Awaiting Boxing."),
                 "type": "success",
                 "sticky": False,
+                "className": (
+                    "o_cdu_scan_notification "
+                    "o_cdu_scan_notification_success"
+                ),
                 "next": self[:1]._get_next_bagging_qa_action() if len(self) == 1 else False,
             },
         }
@@ -390,6 +394,10 @@ class CduBaggingQa(models.Model):
                 "message": next_message % {"patient": expected_patient},
                 "type": "success",
                 "sticky": False,
+                "className": (
+                    "o_cdu_scan_notification "
+                    "o_cdu_scan_notification_success"
+                ),
                 "next": next_action,
             },
         }

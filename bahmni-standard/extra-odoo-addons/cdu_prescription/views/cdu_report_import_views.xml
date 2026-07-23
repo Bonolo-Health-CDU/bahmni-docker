@@ -111,9 +111,43 @@
         </field>
     </record>
 
+    <record id="view_cdu_report_run_search" model="ir.ui.view">
+        <field name="name">cdu.report.run.search</field>
+        <field name="model">cdu.report.run</field>
+        <field name="arch" type="xml">
+            <search string="Report Imports">
+                <field name="name"/>
+                <field name="source_file_name"/>
+                <field name="source_facility_id"/>
+                <filter string="Created Today"
+                        name="created_today"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Needs Attention"
+                        name="needs_attention"
+                        domain="[('state', 'in', ('completed_with_errors', 'failed', 'duplicate'))]"/>
+                <filter string="Failed"
+                        name="failed"
+                        domain="[('state', '=', 'failed')]"/>
+                <filter string="Manual"
+                        name="manual"
+                        domain="[('ingestion_channel', '=', 'manual')]"/>
+                <filter string="OneDrive"
+                        name="onedrive"
+                        domain="[('ingestion_channel', '=', 'onedrive')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Facility" name="group_facility" context="{'group_by': 'source_facility_id'}"/>
+                    <filter string="Channel" name="group_channel" context="{'group_by': 'ingestion_channel'}"/>
+                    <filter string="Created Day" name="group_created_day" context="{'group_by': 'create_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_cdu_report_run" model="ir.actions.act_window">
         <field name="name">Report Imports</field>
         <field name="res_model">cdu.report.run</field>
         <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_report_run_search"/>
     </record>
 </odoo>

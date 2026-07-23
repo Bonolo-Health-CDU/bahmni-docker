@@ -422,22 +422,27 @@ class CduBox(models.Model):
             title = _("Box closed, new box opened")
             message = _(
                 "%(closed_box)s was closed. %(new_box)s was opened for %(location)s, "
-                "and parcel %(parcel)s was added."
+                "and parcel %(parcel)s was added. Bag count: %(count)s of %(max)s."
             ) % {
                 "closed_box": closed_box.name,
                 "new_box": current_box.name,
                 "location": parcel.collection_point_id.display_name,
                 "parcel": parcel.parcel_reference,
+                "count": current_box.parcel_count,
+                "max": current_box.max_parcels,
             }
             notification_type = "warning"
         else:
             title = _("Parcel added")
             message = _(
-                "%(parcel)s was added to %(box)s for %(location)s."
+                "%(parcel)s was added to %(box)s for %(location)s. "
+                "Bag count: %(count)s of %(max)s."
             ) % {
                 "parcel": parcel.parcel_reference,
                 "box": current_box.name,
                 "location": parcel.collection_point_id.display_name,
+                "count": current_box.parcel_count,
+                "max": current_box.max_parcels,
             }
             notification_type = "success"
 
@@ -467,6 +472,10 @@ class CduBox(models.Model):
                 "message": message,
                 "type": notification_type,
                 "sticky": bool(closed_box),
+                "className": (
+                    "o_cdu_scan_notification "
+                    "o_cdu_scan_notification_%s" % notification_type
+                ),
                 "next": next_action,
             },
         }

@@ -228,6 +228,13 @@
                 <field name="name"/>
                 <field name="collection_point_id"/>
                 <field name="next_drug_pickup_date"/>
+                <filter string="Created Today"
+                        name="created_today"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Pickup Within 7 Days"
+                        name="pickup_next_seven_days"
+                        domain="[('next_drug_pickup_date', '&gt;=', context_today()), ('next_drug_pickup_date', '&lt;=', context_today() + relativedelta(days=7))]"/>
+                <separator/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
                 <filter string="Pending Dispatch" name="pending_dispatch" domain="[('state', '=', 'confirmed'), ('dispatch_status', '=', 'pending')]"/>
@@ -240,6 +247,7 @@
                     <filter string="Collect-and-Go Status" name="group_collect_go_status" context="{'group_by': 'collect_go_status'}"/>
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
                     <filter string="Pickup Date" name="group_pickup_date" context="{'group_by': 'next_drug_pickup_date'}"/>
+                    <filter string="Created Day" name="group_created_day" context="{'group_by': 'create_date:day'}"/>
                 </group>
             </search>
         </field>

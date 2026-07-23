@@ -261,6 +261,13 @@
                 <field name="patient_phone"/>
                 <field name="regimen_prescribed_raw"/>
                 <field name="batch_id"/>
+                <filter string="Created Today"
+                        name="created_today"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Pickup Within 7 Days"
+                        name="pickup_next_seven_days"
+                        domain="[('next_drug_pickup_date', '&gt;=', context_today()), ('next_drug_pickup_date', '&lt;=', context_today() + relativedelta(days=7))]"/>
+                <separator/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
                 <filter string="Needs Attention" name="needs_attention" domain="[('qa_ready', '=', False)]"/>
@@ -268,6 +275,7 @@
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                     <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>
                     <filter string="Pickup Date" name="group_pickup_date" context="{'group_by': 'next_drug_pickup_date'}"/>
+                    <filter string="Created Day" name="group_created_day" context="{'group_by': 'create_date:day'}"/>
                 </group>
             </search>
         </field>
