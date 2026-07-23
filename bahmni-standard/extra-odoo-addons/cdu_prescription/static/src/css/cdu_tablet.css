@@ -288,90 +288,6 @@
     }
 
     /*
-     * Lists retain every field and scroll horizontally. The selector and the
-     * first business column remain visible where Odoo renders a selector.
-     */
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) {
-        min-width: 920px;
-    }
-
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) thead th {
-        height: 50px;
-        padding: 10px 13px;
-    }
-
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) tbody td {
-        height: 56px;
-        padding: 10px 13px;
-    }
-
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) .o_list_record_selector {
-        position: sticky;
-        left: 0;
-        z-index: 6;
-        width: 46px;
-        min-width: 46px;
-        background: inherit;
-    }
-
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) .o_list_record_selector + :is(th, td) {
-        position: sticky;
-        left: 46px;
-        z-index: 5;
-        min-width: 180px;
-        border-right: 1px solid #dce5eb;
-        background: #fff;
-        box-shadow: 5px 0 10px rgba(30, 55, 75, 0.04);
-    }
-
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) thead .o_list_record_selector + th {
-        z-index: 7;
-        background: #edf2f5;
-    }
-
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) input[type="checkbox"] {
-        width: 24px;
-        height: 24px;
-        min-width: 24px;
-        min-height: 24px;
-    }
-
-    /*
      * Dialogs and on-screen keyboard accommodation
      */
     .modal-content:has(
@@ -445,12 +361,4 @@
         background: #f4fafb;
     }
 
-    :is(
-        .o_cdu_prescription_list,
-        .o_cdu_production_list,
-        .o_cdu_intake_list,
-        .o_cdu_admin_list
-    ) tbody tr.o_data_row:hover {
-        box-shadow: none;
-    }
 }

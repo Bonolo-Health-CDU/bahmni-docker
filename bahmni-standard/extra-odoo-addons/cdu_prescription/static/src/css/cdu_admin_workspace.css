@@ -129,41 +129,6 @@
     white-space: pre-wrap;
 }
 
-.o_cdu_admin_list {
-    border-collapse: separate;
-    border-spacing: 0;
-    color: var(--cdu-admin-ink);
-}
-
-.o_cdu_admin_list thead th {
-    height: 44px;
-    padding: 9px 12px;
-    border-bottom: 1px solid #c8d6df;
-    color: #4d6072;
-    background: #edf2f5;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.035em;
-    text-transform: uppercase;
-    vertical-align: middle;
-}
-
-.o_cdu_admin_list tbody td {
-    height: 47px;
-    padding: 9px 12px;
-    border-bottom-color: #e9eef2;
-    vertical-align: middle;
-}
-
-.o_cdu_admin_list tbody tr.o_data_row:nth-child(even):not(.o_selected_row) {
-    background: #fbfcfd;
-}
-
-.o_cdu_admin_list tbody tr.o_data_row:hover {
-    background: #f0f5f7;
-    box-shadow: inset 3px 0 0 var(--cdu-admin);
-}
-
 .o_cdu_admin_list .o_field_badge {
     padding: 5px 10px;
     border: 1px solid transparent;
