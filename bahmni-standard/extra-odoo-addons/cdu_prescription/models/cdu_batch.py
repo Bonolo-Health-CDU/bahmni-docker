@@ -51,6 +51,15 @@ class CduBatch(models.Model):
         compute="_compute_prescription_count",
         string="Prescription Count",
     )
+    batching_completed_count = fields.Integer(compute="_compute_production_journey")
+    picking_completed_count = fields.Integer(compute="_compute_production_journey")
+    dispensing_completed_count = fields.Integer(compute="_compute_production_journey")
+    qa_completed_count = fields.Integer(compute="_compute_production_journey")
+    boxing_completed_count = fields.Integer(compute="_compute_production_journey")
+    production_progress_percent = fields.Float(
+        string="Overall Production Progress",
+        compute="_compute_production_journey",
+    )
 
     picking_line_ids = fields.One2many(
         "cdu.batch.picking.line",
@@ -79,6 +88,59 @@ class CduBatch(models.Model):
     def _compute_prescription_count(self):
         for batch in self:
             batch.prescription_count = len(batch.prescription_ids)
+
+    @api.depends(
+        "state",
+        "prescription_ids.state",
+        "prescription_ids.dispensing_sequence",
+        "prescription_ids.qa_sequence",
+    )
+    def _compute_production_journey(self):
+        picked_or_later_states = {
+            "awaiting_dispensing",
+            "awaiting_bagging_qa",
+            "awaiting_boxing",
+            "awaiting_dispatch",
+            "dispatched",
+        }
+        boxed_or_later_states = {"awaiting_dispatch", "dispatched"}
+        for batch in self:
+            prescriptions = batch.prescription_ids
+            total = len(prescriptions)
+            batch.batching_completed_count = total if batch.state != "draft" else 0
+            batch.picking_completed_count = len(
+                prescriptions.filtered(lambda record: record.state in picked_or_later_states)
+            )
+            batch.dispensing_completed_count = len(
+                prescriptions.filtered("dispensing_sequence")
+            )
+            batch.qa_completed_count = len(prescriptions.filtered("qa_sequence"))
+            batch.boxing_completed_count = len(
+                prescriptions.filtered(lambda record: record.state in boxed_or_later_states)
+            )
+            completed_steps = (
+                batch.batching_completed_count
+                + batch.picking_completed_count
+                + batch.dispensing_completed_count
+                + batch.qa_completed_count
+                + batch.boxing_completed_count
+            )
+            batch.production_progress_percent = (
+                completed_steps * 100.0 / (total * 5) if total else 0.0
+            )
+
+    def _ensure_draft_prescription_sequences(self):
+        for batch in self.filtered(lambda record: record.state == "draft"):
+            ordered = batch.prescription_ids.sorted(
+                key=lambda prescription: (
+                    0 if prescription.batch_sequence else 1,
+                    prescription.batch_sequence or 0,
+                    prescription.id,
+                )
+            )
+            for position, prescription in enumerate(ordered, start=1):
+                if prescription.batch_sequence != position:
+                    prescription.batch_sequence = position
 
     def _normalize_repeat_regimen_text(self, regimen):
         return (regimen or "").strip()
@@ -192,12 +254,14 @@ class CduBatch(models.Model):
         batch = super().create(vals)
         if "prescription_ids" in vals and "repeat_apply_line_ids" not in vals:
             batch._set_single_default_repeat_apply_line()
+            batch._ensure_draft_prescription_sequences()
         return batch
 
     def write(self, vals):
         result = super().write(vals)
         if "prescription_ids" in vals and "repeat_apply_line_ids" not in vals:
             self._set_single_default_repeat_apply_line()
+            self._ensure_draft_prescription_sequences()
         return result
 
     @api.onchange(
@@ -224,6 +288,8 @@ class CduBatch(models.Model):
             )
             prescriptions._sync_repeat_days_from_cdu_days()
             batch.prescription_ids = [(6, 0, prescriptions.ids)]
+            for position, prescription in enumerate(batch.prescription_ids, start=1):
+                prescription.batch_sequence = position
             batch._set_single_default_repeat_apply_line()
 
     @api.constrains(
@@ -275,6 +341,14 @@ class CduBatch(models.Model):
             batch._check_pickup_date_filters()
             if not batch.prescription_ids:
                 raise ValidationError(_("Add at least one prescription before confirming the batch."))
+            ordered_prescriptions = batch.prescription_ids.sorted(
+                key=lambda prescription: (
+                    prescription.batch_sequence or 10**9,
+                    prescription.id,
+                )
+            )
+            for position, prescription in enumerate(ordered_prescriptions, start=1):
+                prescription.batch_sequence = position
             batch._sync_selected_prescription_repeat_days_defaults()
             batch._validate_selected_prescription_repeat_days()
             batch.prescription_ids.write({"state": "awaiting_picking"})
@@ -531,7 +605,9 @@ class CduBatch(models.Model):
         self._sync_selected_prescription_repeat_days_defaults()
         self._validate_selected_prescription_repeat_days()
 
-        for prescription in self.prescription_ids:
+        for prescription in self.prescription_ids.sorted(
+            key=lambda record: (record.batch_sequence or 10**9, record.id)
+        ):
 
             # -------------------------------------------------
             # DAYS SUPPLY

@@ -30,6 +30,36 @@ class CduBaggingQa(models.Model):
         store=True,
         readonly=True,
     )
+    batch_sequence = fields.Integer(
+        related="prescription_id.batch_sequence",
+        string="Planned Position",
+        store=True,
+        readonly=True,
+    )
+    dispensing_sequence = fields.Integer(
+        related="prescription_id.dispensing_sequence",
+        string="Dispensing Position",
+        store=True,
+        readonly=True,
+    )
+    qa_sequence = fields.Integer(
+        related="prescription_id.qa_sequence",
+        string="QA Position",
+        store=True,
+        readonly=True,
+    )
+    qa_deferred = fields.Boolean(
+        related="prescription_id.qa_deferred",
+        string="QA Skipped for Now",
+        store=True,
+        readonly=True,
+    )
+    boxing_deferred = fields.Boolean(
+        related="prescription_id.boxing_deferred",
+        string="Boxing Skipped for Now",
+        store=True,
+        readonly=True,
+    )
     patient_id = fields.Many2one(
         "res.partner",
         related="prescription_id.patient_id",
@@ -242,6 +272,7 @@ class CduBaggingQa(models.Model):
         if self.state == "confirmed":
             raise UserError(_("Bagging / QA has already been confirmed for %s.") % self.name)
         self._ensure_qa_ready()
+        self.prescription_id._assign_production_completion_sequence("bagging_qa")
         now = fields.Datetime.now()
         self.write(
             {
@@ -273,7 +304,7 @@ class CduBaggingQa(models.Model):
 
         next_prescription = self.env["cdu.prescription"].search(
             domain,
-            order="next_drug_pickup_date asc, patient_first_name asc, id asc",
+            order="qa_deferred asc, dispensing_sequence asc, batch_sequence asc, id asc",
             limit=1,
         )
         if next_prescription:
@@ -307,6 +338,20 @@ class CduBaggingQa(models.Model):
                 "next": self[:1]._get_next_bagging_qa_action() if len(self) == 1 else False,
             },
         }
+
+    def action_skip_for_now(self):
+        self.ensure_one()
+        self._ensure_bagging_qa_access()
+        if self.state != "draft" or self.prescription_id.state != "awaiting_bagging_qa":
+            raise UserError(_("Only an active Bagging / QA task can be skipped."))
+        return self.prescription_id.action_open_production_skip_wizard("bagging_qa")
+
+    def action_skip_boxing_for_now(self):
+        self.ensure_one()
+        self._ensure_bagging_qa_access()
+        if self.state != "confirmed" or self.prescription_id.state != "awaiting_boxing":
+            raise UserError(_("Only a parcel awaiting boxing can be skipped."))
+        return self.prescription_id.action_open_production_skip_wizard("boxing")
 
     def action_print_labels(self):
         self._ensure_bagging_qa_access()

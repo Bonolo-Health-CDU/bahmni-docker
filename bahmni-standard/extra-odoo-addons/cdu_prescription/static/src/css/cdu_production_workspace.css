@@ -161,6 +161,118 @@
     box-shadow: 0 2px 7px rgba(30, 55, 75, 0.05);
 }
 
+.o_cdu_production_journey {
+    margin: 0 0 20px;
+    padding: 20px;
+    border: 1px solid color-mix(in srgb, var(--cdu-stage) 24%, white);
+    border-radius: 15px;
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--cdu-stage-soft) 78%, white), transparent 42%),
+        linear-gradient(145deg, #ffffff, #f7fafb);
+    box-shadow: 0 9px 24px rgba(30, 55, 75, 0.07);
+}
+
+.o_cdu_journey_heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 18px;
+}
+
+.o_cdu_journey_heading h2 {
+    margin: 3px 0 4px;
+    color: var(--cdu-production-ink);
+    font-size: 19px;
+    font-weight: 800;
+}
+
+.o_cdu_journey_heading p,
+.o_cdu_journey_overall > span {
+    margin: 0;
+    color: var(--cdu-production-muted);
+    font-size: 12px;
+}
+
+.o_cdu_journey_overall {
+    min-width: 220px;
+}
+
+.o_cdu_journey_overall .o_progressbar {
+    margin-top: 6px;
+}
+
+.o_cdu_journey_steps {
+    display: grid;
+    grid-template-columns: minmax(125px, 1fr) auto minmax(125px, 1fr) auto minmax(125px, 1fr) auto minmax(125px, 1fr) auto minmax(125px, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+
+.o_cdu_journey_step {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    align-items: center;
+    gap: 2px 9px;
+    min-height: 68px;
+    padding: 11px;
+    border: 1px solid #dbe5ea;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.o_cdu_journey_number {
+    display: grid;
+    grid-row: 1 / span 2;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--cdu-stage);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.o_cdu_journey_step strong {
+    color: var(--cdu-production-ink);
+    font-size: 12px;
+}
+
+.o_cdu_journey_step > span:last-child {
+    color: var(--cdu-production-muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.o_cdu_journey_connector {
+    color: color-mix(in srgb, var(--cdu-stage) 70%, #7b8a97);
+    font-size: 18px;
+    font-weight: 800;
+}
+
+@media (max-width: 1200px) {
+    .o_cdu_journey_steps {
+        grid-template-columns: repeat(5, minmax(120px, 1fr));
+        overflow-x: auto;
+    }
+
+    .o_cdu_journey_connector {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .o_cdu_journey_heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .o_cdu_journey_overall {
+        min-width: 0;
+    }
+}
+
 .o_cdu_batch_form .o_cdu_repeat_control_panel,
 .o_cdu_batch_form .o_cdu_qa_scan_panel {
     border-color: color-mix(in srgb, var(--cdu-stage) 28%, white);

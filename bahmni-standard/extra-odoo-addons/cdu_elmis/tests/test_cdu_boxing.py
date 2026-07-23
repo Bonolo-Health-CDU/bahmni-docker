@@ -75,6 +75,7 @@ class TestCduBoxingWorkflow(TransactionCase):
         box.invalidate_recordset()
 
         self.assertEqual(box.parcel_count, 1)
+        self.assertEqual(box.line_ids.sequence, 1)
         self.assertEqual(box.line_ids.bagging_qa_id, self.parcel)
         self.assertEqual(box.collection_point_id, self.collection_point)
         self.assertEqual(

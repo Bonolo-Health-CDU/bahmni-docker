@@ -102,6 +102,7 @@
                       groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin">
                     <div class="o_cdu_patient_pick_table">
                         <div class="o_cdu_patient_pick_header">
+                            <span>Position</span>
                             <span>Patient</span>
                             <span>Medication</span>
                             <span>Daily dose</span>
@@ -115,6 +116,7 @@
                                readonly="1"
                                class="o_cdu_patient_pick_lines">
                             <kanban create="0" delete="0" edit="0" class="o_cdu_patient_pick_kanban">
+                                <field name="batch_sequence"/>
                                 <field name="patient_id" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>
                                 <field name="medication_display"/>
                                 <field name="regimen_code_display"/>
@@ -137,6 +139,9 @@
                                     <t t-name="kanban-box">
                                         <details class="o_cdu_patient_pick_record">
                                             <summary class="o_cdu_patient_pick_summary">
+                                                <span class="o_cdu_patient_pick_cell o_cdu_patient_pick_position">
+                                                    <strong>#<field name="batch_sequence"/></strong>
+                                                </span>
                                                 <span class="o_cdu_patient_pick_cell o_cdu_patient_pick_patient">
                                                     <field name="patient_id" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>
                                                 </span>

@@ -35,6 +35,7 @@ class CduBatchPickingLine(models.Model):
 class CduBatchPatientLine(models.Model):
     _name = "cdu.batch.patient.line"
     _description = "CDU Patient Picking Line"
+    _order = "batch_id, batch_sequence, prescription_id, id"
 
     batch_id = fields.Many2one(
         "cdu.batch",
@@ -45,6 +46,12 @@ class CduBatchPatientLine(models.Model):
     prescription_id = fields.Many2one(
         "cdu.prescription",
         required=True,
+    )
+    batch_sequence = fields.Integer(
+        related="prescription_id.batch_sequence",
+        string="Position",
+        store=True,
+        readonly=True,
     )
 
     patient_id = fields.Many2one(

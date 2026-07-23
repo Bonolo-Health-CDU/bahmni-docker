@@ -240,7 +240,10 @@ class CduBox(models.Model):
             ]
             eligible = BaggingQa.search(
                 domain,
-                order="parcel_reference asc, patient_name asc, id asc",
+                order=(
+                    "boxing_deferred asc, batch_id asc, qa_sequence asc, "
+                    "batch_sequence asc, id asc"
+                ),
                 limit=remaining_capacity,
             )
             existing_ids = set(box.line_ids.mapped("bagging_qa_id").ids)
@@ -417,6 +420,7 @@ class CduBox(models.Model):
                 "bagging_qa_id": parcel.id,
             }
         )
+        parcel.prescription_id._resolve_production_skip("boxing")
 
         if closed_box:
             title = _("Box closed, new box opened")
@@ -847,8 +851,14 @@ class CduBox(models.Model):
 class CduBoxLine(models.Model):
     _name = "cdu.box.line"
     _description = "CDU Box Parcel Line"
-    _order = "box_id, parcel_reference, id"
+    _order = "box_id, sequence, id"
 
+    sequence = fields.Integer(
+        string="Scan Position",
+        readonly=True,
+        copy=False,
+        index=True,
+    )
     box_id = fields.Many2one(
         "cdu.box",
         required=True,
@@ -864,6 +874,24 @@ class CduBoxLine(models.Model):
     prescription_id = fields.Many2one(
         "cdu.prescription",
         related="bagging_qa_id.prescription_id",
+        store=True,
+        readonly=True,
+    )
+    batch_id = fields.Many2one(
+        "cdu.batch",
+        related="prescription_id.batch_id",
+        store=True,
+        readonly=True,
+    )
+    batch_sequence = fields.Integer(
+        related="prescription_id.batch_sequence",
+        string="Planned Position",
+        store=True,
+        readonly=True,
+    )
+    qa_sequence = fields.Integer(
+        related="prescription_id.qa_sequence",
+        string="QA Position",
         store=True,
         readonly=True,
     )
@@ -925,6 +953,23 @@ class CduBoxLine(models.Model):
     def init(self):
         self.env.cr.execute(
             """
+            WITH ranked AS (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY box_id
+                           ORDER BY create_date, id
+                       ) AS position
+                  FROM cdu_box_line
+            )
+            UPDATE cdu_box_line AS line
+               SET sequence = ranked.position
+              FROM ranked
+             WHERE line.id = ranked.id
+               AND COALESCE(line.sequence, 0) = 0
+            """
+        )
+        self.env.cr.execute(
+            """
             ALTER TABLE cdu_box_line
             DROP CONSTRAINT IF EXISTS cdu_box_line_unique_bagging_qa_box_line
             """
@@ -952,10 +997,34 @@ class CduBoxLine(models.Model):
         if self.env["cdu.box"].browse(box_ids).filtered(lambda box: box.state == "confirmed"):
             raise UserError(_("Parcels cannot be added to a confirmed box."))
         self._validate_create_values_unique_parcels(vals_list)
+        next_sequence_by_box = {}
+        for vals in vals_list:
+            box_id = vals.get("box_id")
+            if not box_id or vals.get("sequence"):
+                continue
+            if box_id not in next_sequence_by_box:
+                self.env.cr.execute(
+                    "SELECT id FROM cdu_box WHERE id = %s FOR UPDATE",
+                    (box_id,),
+                )
+                self.env["cdu.box.line"].flush_model(["box_id", "sequence"])
+                self.env.cr.execute(
+                    """
+                    SELECT COALESCE(MAX(sequence), 0) + 1
+                      FROM cdu_box_line
+                     WHERE box_id = %s
+                    """,
+                    (box_id,),
+                )
+                next_sequence_by_box[box_id] = self.env.cr.fetchone()[0]
+            vals["sequence"] = next_sequence_by_box[box_id]
+            next_sequence_by_box[box_id] += 1
         records = super().create(vals_list)
         records.mapped("box_id")._sync_from_lines()
         records.mapped("box_id")._validate_unique_parcels()
         records._validate_box_rule_matches()
+        for prescription in records.mapped("prescription_id"):
+            prescription._resolve_production_skip("boxing")
         return records
 
     def write(self, vals):

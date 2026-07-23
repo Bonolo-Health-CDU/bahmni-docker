@@ -21,14 +21,16 @@
         <field name="model">cdu.dispense</field>
         <field name="arch" type="xml">
             <tree class="o_cdu_production_list"
-                  default_order="next_drug_pickup_date asc, patient_name asc"
+                  default_order="batch_id asc, dispensing_deferred asc, batch_sequence asc, id asc"
                   decoration-success="state == 'confirmed'">
+                <field name="batch_sequence" string="Position"/>
                 <field name="name"/>
                 <field name="patient_name"/>
                 <field name="patient_identifier"/>
                 <field name="regimen_prescribed_raw"/>
                 <field name="next_drug_pickup_date"/>
                 <field name="batch_id"/>
+                <field name="dispensing_deferred" invisible="1"/>
                 <field name="production_stock_refreshed_at"/>
                 <field name="state"
                        widget="badge"
@@ -61,6 +63,13 @@
                             string="Reject to Facility"
                             type="object"
                             class="btn-danger"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_skip_for_now"
+                            string="Skip for Now"
+                            type="object"
+                            class="btn-secondary"
+                            icon="fa-forward"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_print_labels"
@@ -312,10 +321,36 @@
         <field name="search_view_id" ref="view_cdu_dispense_search"/>
     </record>
 
+    <record id="view_cdu_prescription_dispensing_queue_tree" model="ir.ui.view">
+        <field name="name">cdu.prescription.dispensing.queue.tree</field>
+        <field name="model">cdu.prescription</field>
+        <field name="arch" type="xml">
+            <tree class="o_cdu_production_list"
+                  default_order="batch_id asc, dispensing_deferred asc, batch_sequence asc, id asc"
+                  decoration-warning="dispensing_deferred">
+                <field name="batch_sequence" string="Position"/>
+                <field name="patient_first_name"/>
+                <field name="name" string="Prescription ID" optional="hide"/>
+                <field name="patient_identifier"/>
+                <field name="regimen_prescribed_raw"/>
+                <field name="next_drug_pickup_date"/>
+                <field name="collection_point_id"/>
+                <field name="batch_id"/>
+                <field name="production_position_display" string="Flow Position"/>
+                <field name="dispensing_deferred"
+                       string="Skipped"
+                       widget="boolean_toggle"
+                       readonly="1"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+
     <record id="action_cdu_dispensing_work_queue" model="ir.actions.act_window">
         <field name="name">Dispensing Work Queue</field>
         <field name="res_model">cdu.prescription</field>
         <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_cdu_prescription_dispensing_queue_tree"/>
         <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_dispensing')]</field>
         <field name="context">{'search_default_group_batch': 1, 'search_default_group_collection_point': 1}</field>

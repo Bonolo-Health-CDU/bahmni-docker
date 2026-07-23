@@ -21,8 +21,10 @@
         <field name="model">cdu.bagging.qa</field>
         <field name="arch" type="xml">
             <tree class="o_cdu_production_list"
-                  default_order="next_drug_pickup_date asc, patient_name asc"
+                  default_order="batch_id asc, boxing_deferred asc, qa_sequence asc, qa_deferred asc, dispensing_sequence asc, batch_sequence asc, id asc"
                   decoration-success="state == 'confirmed'">
+                <field name="dispensing_sequence" string="Position"/>
+                <field name="qa_sequence" string="QA #"/>
                 <field name="name"/>
                 <field name="patient_name"/>
                 <field name="patient_phone"/>
@@ -30,12 +32,20 @@
                 <field name="regimen_prescribed_raw"/>
                 <field name="next_drug_pickup_date"/>
                 <field name="batch_id"/>
+                <field name="batch_sequence" optional="hide"/>
+                <field name="qa_deferred" invisible="1"/>
+                <field name="boxing_deferred" invisible="1"/>
                 <field name="labels_printed"/>
                 <field name="qa_ready"/>
                 <field name="state"
                        widget="badge"
                        decoration-info="state == 'draft'"
                        decoration-success="state == 'confirmed'"/>
+                <button name="action_skip_boxing_for_now"
+                        string="Skip for Now"
+                        type="object"
+                        icon="fa-forward"
+                        attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
             </tree>
         </field>
     </record>
@@ -58,6 +68,13 @@
                             class="btn-secondary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('labels_printed', '=', False)]}"/>
+                    <button name="action_skip_for_now"
+                            string="Skip for Now"
+                            type="object"
+                            class="btn-secondary"
+                            icon="fa-forward"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
                 </header>
                 <sheet>
@@ -288,10 +305,36 @@
         <field name="search_view_id" ref="view_cdu_bagging_qa_search"/>
     </record>
 
+    <record id="view_cdu_prescription_bagging_qa_queue_tree" model="ir.ui.view">
+        <field name="name">cdu.prescription.bagging.qa.queue.tree</field>
+        <field name="model">cdu.prescription</field>
+        <field name="arch" type="xml">
+            <tree class="o_cdu_production_list"
+                  default_order="batch_id asc, qa_deferred asc, dispensing_sequence asc, batch_sequence asc, id asc"
+                  decoration-warning="qa_deferred">
+                <field name="dispensing_sequence" string="Position"/>
+                <field name="patient_first_name"/>
+                <field name="name" string="Prescription ID" optional="hide"/>
+                <field name="patient_identifier"/>
+                <field name="regimen_prescribed_raw"/>
+                <field name="next_drug_pickup_date"/>
+                <field name="collection_point_id"/>
+                <field name="batch_id"/>
+                <field name="production_position_display" string="Flow Position"/>
+                <field name="qa_deferred"
+                       string="Skipped"
+                       widget="boolean_toggle"
+                       readonly="1"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+
     <record id="action_cdu_bagging_qa_work_queue" model="ir.actions.act_window">
         <field name="name">Bagging / QA Work Queue</field>
         <field name="res_model">cdu.prescription</field>
         <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_cdu_prescription_bagging_qa_queue_tree"/>
         <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_bagging_qa')]</field>
         <field name="context">{'search_default_group_batch': 1}</field>
