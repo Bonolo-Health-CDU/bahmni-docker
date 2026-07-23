@@ -638,9 +638,7 @@ class CduBatch(models.Model):
                     available_units = max(available_units - required_quantity, 0)
                     remaining_units = max(remaining_units - picked_bottle_quantity, 0)
 
-            for prescription in batch.prescription_ids.sorted(
-                key=lambda record: (record.batch_sequence or 10**9, record.id)
-            ):
+            for prescription in batch.prescription_ids:
                 lines = batch.patient_picking_line_ids.filtered(
                     lambda line: line.prescription_id == prescription
                 )

@@ -68,54 +68,6 @@
                             <span>prescriptions selected</span>
                         </span>
                     </div>
-                    <section class="o_cdu_production_journey"
-                             attrs="{'invisible': [('state', '=', 'draft')]}">
-                        <div class="o_cdu_journey_heading">
-                            <div>
-                                <span class="o_cdu_workspace_eyebrow">Production journey</span>
-                                <h2>One batch, one ordered flow</h2>
-                                <p>Each completed stage sets the working order for the next stage.</p>
-                            </div>
-                            <div class="o_cdu_journey_overall">
-                                <span>Overall progress</span>
-                                <field name="production_progress_percent"
-                                       widget="progressbar"
-                                       nolabel="1"
-                                       readonly="1"/>
-                            </div>
-                        </div>
-                        <div class="o_cdu_journey_steps">
-                            <div class="o_cdu_journey_step">
-                                <span class="o_cdu_journey_number">1</span>
-                                <strong>Batching</strong>
-                                <span><field name="batching_completed_count" nolabel="1" readonly="1"/> / <field name="prescription_count" nolabel="1" readonly="1"/></span>
-                            </div>
-                            <span class="o_cdu_journey_connector">→</span>
-                            <div class="o_cdu_journey_step">
-                                <span class="o_cdu_journey_number">2</span>
-                                <strong>Picking</strong>
-                                <span><field name="picking_completed_count" nolabel="1" readonly="1"/> / <field name="prescription_count" nolabel="1" readonly="1"/></span>
-                            </div>
-                            <span class="o_cdu_journey_connector">→</span>
-                            <div class="o_cdu_journey_step">
-                                <span class="o_cdu_journey_number">3</span>
-                                <strong>Dispensing</strong>
-                                <span><field name="dispensing_completed_count" nolabel="1" readonly="1"/> / <field name="prescription_count" nolabel="1" readonly="1"/></span>
-                            </div>
-                            <span class="o_cdu_journey_connector">→</span>
-                            <div class="o_cdu_journey_step">
-                                <span class="o_cdu_journey_number">4</span>
-                                <strong>Bagging / QA</strong>
-                                <span><field name="qa_completed_count" nolabel="1" readonly="1"/> / <field name="prescription_count" nolabel="1" readonly="1"/></span>
-                            </div>
-                            <span class="o_cdu_journey_connector">→</span>
-                            <div class="o_cdu_journey_step">
-                                <span class="o_cdu_journey_number">5</span>
-                                <strong>Boxing</strong>
-                                <span><field name="boxing_completed_count" nolabel="1" readonly="1"/> / <field name="prescription_count" nolabel="1" readonly="1"/></span>
-                            </div>
-                        </div>
-                    </section>
                     <div class="o_cdu_repeat_control_panel">
                         <div class="o_cdu_repeat_control_title">REGIMEN REPEAT DAYS</div>
                         <field name="repeat_apply_regimen_domain_ids" invisible="1"/>
@@ -147,19 +99,12 @@
                         </div>
                     </div>
                     <notebook class="o_cdu_workspace_notebook">
-                        <page string="Batch Manifest">
+                        <page string="Selected Prescriptions">
                             <div class="alert alert-info" role="alert" attrs="{'invisible': [('state', '!=', 'draft')]}">
-                                Drag prescriptions into the required production order. Remove any prescription that should not be included before confirming the batch.
+                                All prescriptions matching the filters are selected by default. Remove any prescription that should not be included before confirming the batch.
                             </div>
                             <field name="prescription_ids" attrs="{'readonly': [('state', '!=', 'draft')]}">
-                                <tree create="false"
-                                      delete="true"
-                                      editable="bottom"
-                                      default_order="batch_sequence asc, id asc"
-                                      decoration-warning="dispensing_deferred or qa_deferred or boxing_deferred">
-                                    <field name="batch_sequence"
-                                           string="Position"
-                                           widget="handle"/>
+                                <tree create="false" delete="true" editable="bottom">
                                     <field name="name" readonly="1"/>
                                     <field name="patient_identifier" optional="hide" readonly="1"/>
                                     <field name="patient_first_name" readonly="1"/>
@@ -171,24 +116,7 @@
                                     <field name="e_locker_district" readonly="1"/>
                                     <field name="collection_point_id" readonly="1"/>
                                     <field name="hiv_program_id" optional="hide" readonly="1"/>
-                                    <field name="dispensing_sequence"
-                                           string="Dispensed #"
-                                           optional="show"
-                                           readonly="1"/>
-                                    <field name="qa_sequence"
-                                           string="QA #"
-                                           optional="show"
-                                           readonly="1"/>
-                                    <field name="production_position_display"
-                                           string="Current Position"
-                                           optional="show"
-                                           readonly="1"/>
-                                    <field name="dispensing_deferred" invisible="1"/>
-                                    <field name="qa_deferred" invisible="1"/>
-                                    <field name="boxing_deferred" invisible="1"/>
-                                    <field name="state"
-                                           widget="badge"
-                                           readonly="1"/>
+                                    <field name="state" readonly="1"/>
                                 </tree>
                             </field>
                         </page>
@@ -233,7 +161,6 @@
                             >
 
                                 <tree editable="bottom" create="0" delete="0">
-                                    <field name="batch_sequence" string="Position" readonly="1"/>
 
                                     <!-- PATIENT -->
                                     <field name="patient_id" string="Patient" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>

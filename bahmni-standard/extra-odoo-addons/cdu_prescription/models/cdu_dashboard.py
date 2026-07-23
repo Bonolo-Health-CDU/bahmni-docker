@@ -134,7 +134,7 @@ class ResUsers(models.Model):
                 "tone": "purple",
             },
             "awaiting_validation": {
-                "section": "intake",
+                "section": "production",
                 "title": _("Awaiting Validation"),
                 "description": _("Complete the clinical and medicine review."),
                 "model": "cdu.prescription",

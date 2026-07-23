@@ -676,7 +676,7 @@
 }
 
 .o_cdu_patient_pick_table {
-    --cdu-patient-pick-grid: 64px 150px 275px 95px 135px 125px 160px 24px;
+    --cdu-patient-pick-grid: 150px 275px 95px 135px 125px 160px 24px;
     border-top: 1px solid #d8dde3;
     color: #1f2933;
     overflow-x: auto;
@@ -836,7 +836,7 @@
 
 @media (max-width: 900px) {
     .o_cdu_patient_pick_table {
-        --cdu-patient-pick-grid: 56px 130px 180px 82px 118px 105px 120px 24px;
+        --cdu-patient-pick-grid: 130px 180px 82px 118px 105px 120px 24px;
     }
 
     .o_cdu_patient_pick_detail {

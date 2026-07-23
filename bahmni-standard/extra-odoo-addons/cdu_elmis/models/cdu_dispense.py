@@ -27,18 +27,6 @@ class CduDispense(models.Model):
         store=True,
         readonly=True,
     )
-    batch_sequence = fields.Integer(
-        related="prescription_id.batch_sequence",
-        string="Planned Position",
-        store=True,
-        readonly=True,
-    )
-    dispensing_deferred = fields.Boolean(
-        related="prescription_id.dispensing_deferred",
-        string="Skipped for Now",
-        store=True,
-        readonly=True,
-    )
     patient_id = fields.Many2one(
         "res.partner",
         related="prescription_id.patient_id",
@@ -420,9 +408,6 @@ class CduDispense(models.Model):
             if dispense.state == "confirmed":
                 raise UserError(_("Dispensing has already been confirmed for %s.") % dispense.name)
             dispense._ensure_dispensing_ready()
-            dispense.prescription_id._assign_production_completion_sequence(
-                "dispensing"
-            )
             dispense.write(
                 {
                     "state": "confirmed",
@@ -447,13 +432,6 @@ class CduDispense(models.Model):
         if self.state != "draft":
             raise UserError(_("Only an active dispensing task can be rejected."))
         return self.prescription_id.action_reject_to_facility()
-
-    def action_skip_for_now(self):
-        self.ensure_one()
-        self._ensure_dispensing_access()
-        if self.state != "draft" or self.prescription_id.state != "awaiting_dispensing":
-            raise UserError(_("Only an active dispensing task can be skipped."))
-        return self.prescription_id.action_open_production_skip_wizard("dispensing")
 
     def action_mark_labels_printed(self):
         self._ensure_dispensing_access()
@@ -517,7 +495,7 @@ class CduDispense(models.Model):
                 ("batch_id", "=", self.batch_id.id),
                 ("state", "=", "awaiting_dispensing"),
             ],
-            order="dispensing_deferred asc, batch_sequence asc, id asc",
+            order="next_drug_pickup_date asc, patient_first_name asc, id asc",
             limit=1,
         )
         if not next_prescription:

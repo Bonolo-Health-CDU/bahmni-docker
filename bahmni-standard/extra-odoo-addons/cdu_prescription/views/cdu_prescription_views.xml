@@ -106,8 +106,6 @@
                         </group>
                         <group string="Workflow" class="o_cdu_section_card">
                             <field name="batch_id" readonly="1"/>
-                            <field name="batch_sequence" readonly="1"/>
-                            <field name="production_position_display" readonly="1"/>
                             <field name="verified_by"/>
                             <field name="verified_at"/>
                             <field name="validated_by"/>
@@ -184,22 +182,6 @@
                                     <field name="returned_by"/>
                                     <field name="returned_at"/>
                                     <field name="is_active"/>
-                                </tree>
-                            </field>
-                        </page>
-                        <page string="Production Skip History"
-                              attrs="{'invisible': [('batch_id', '=', False)]}">
-                            <field name="production_skip_history_ids" readonly="1">
-                                <tree create="0" edit="0" delete="0"
-                                      decoration-warning="active"
-                                      default_order="skipped_at desc, id desc">
-                                    <field name="stage"/>
-                                    <field name="reason"/>
-                                    <field name="skipped_by"/>
-                                    <field name="skipped_at"/>
-                                    <field name="resolved_by"/>
-                                    <field name="resolved_at"/>
-                                    <field name="active" widget="boolean_toggle"/>
                                 </tree>
                             </field>
                         </page>
@@ -293,36 +275,10 @@
         <field name="domain">[('state', '=', 'awaiting_batching')]</field>
     </record>
 
-    <record id="view_cdu_prescription_awaiting_dispensing_tree" model="ir.ui.view">
-        <field name="name">cdu.prescription.awaiting.dispensing.tree</field>
-        <field name="model">cdu.prescription</field>
-        <field name="arch" type="xml">
-            <tree class="o_cdu_production_list"
-                  default_order="batch_id asc, dispensing_deferred asc, batch_sequence asc, id asc"
-                  decoration-warning="dispensing_deferred">
-                <field name="batch_sequence" string="Position"/>
-                <field name="patient_first_name"/>
-                <field name="name" string="Prescription ID" optional="hide"/>
-                <field name="patient_identifier"/>
-                <field name="regimen_prescribed_raw"/>
-                <field name="next_drug_pickup_date"/>
-                <field name="collection_point_id"/>
-                <field name="batch_id"/>
-                <field name="production_position_display" string="Flow Position"/>
-                <field name="dispensing_deferred"
-                       string="Skipped"
-                       widget="boolean_toggle"
-                       readonly="1"/>
-                <field name="state" widget="badge"/>
-            </tree>
-        </field>
-    </record>
-
     <record id="action_cdu_prescription_awaiting_dispensing" model="ir.actions.act_window">
         <field name="name">Awaiting Dispensing</field>
         <field name="res_model">cdu.prescription</field>
         <field name="view_mode">tree,form</field>
-        <field name="view_id" ref="view_cdu_prescription_awaiting_dispensing_tree"/>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_dispensing')]</field>
         <field name="context">{'search_default_group_batch': 1, 'search_default_group_collection_point': 1}</field>

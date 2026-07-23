@@ -137,28 +137,6 @@ class TestCduPrescriptionWorkflow(TransactionCase):
             self.assertEqual(len(cards), expected_cards)
             self.assertTrue(all(card["action"] for card in cards))
 
-    def test_validation_is_review_and_batching_starts_production(self):
-        dashboard = self.env["res.users"].with_user(
-            self.dispensing_officer
-        ).get_cdu_dashboard_data()
-        sections = {
-            section["key"]: section["cards"]
-            for section in dashboard["sections"]
-        }
-
-        self.assertIn(
-            "Awaiting Validation",
-            [card["title"] for card in sections["intake"]],
-        )
-        self.assertNotIn(
-            "Awaiting Validation",
-            [card["title"] for card in sections["production"]],
-        )
-        self.assertEqual(
-            sections["production"][0]["title"],
-            "Awaiting Batching",
-        )
-
     def test_operational_prescription_filters_are_registered(self):
         search_view = self.env.ref("cdu_prescription.view_cdu_prescription_search")
         for filter_name in (
@@ -180,58 +158,3 @@ class TestCduPrescriptionWorkflow(TransactionCase):
             "group_created_day",
         ):
             self.assertIn('name="%s"' % filter_name, report_search_view.arch_db)
-
-    def test_batch_manifest_order_is_frozen_and_completion_order_flows_downstream(self):
-        pickup_date = fields.Date.today() + timedelta(days=30)
-        prescriptions = self.env["cdu.prescription"]
-        for index in range(3):
-            prescriptions |= self._create_prescription(
-                patient_identifier="TEST-ORDER-%s" % index,
-                patient_first_name="Order Patient %s" % index,
-                next_drug_pickup_date=pickup_date,
-                state="awaiting_batching",
-            )
-
-        batch = self.env["cdu.batch"].create(
-            {
-                "filter_next_drug_pickup_date_from": pickup_date,
-                "filter_next_drug_pickup_date_to": pickup_date,
-                "prescription_ids": [(6, 0, prescriptions.ids)],
-            }
-        )
-        prescriptions[0].batch_sequence = 30
-        prescriptions[1].batch_sequence = 10
-        prescriptions[2].batch_sequence = 20
-
-        batch.with_user(self.dispensing_officer).action_confirm_batch()
-        prescriptions.invalidate_recordset()
-
-        self.assertEqual(prescriptions[1].batch_sequence, 1)
-        self.assertEqual(prescriptions[2].batch_sequence, 2)
-        self.assertEqual(prescriptions[0].batch_sequence, 3)
-
-        prescriptions[0].with_user(
-            self.dispensing_officer
-        )._assign_production_completion_sequence("dispensing")
-        prescriptions[2].with_user(
-            self.dispensing_officer
-        )._assign_production_completion_sequence("dispensing")
-        self.assertEqual(prescriptions[0].dispensing_sequence, 1)
-        self.assertEqual(prescriptions[2].dispensing_sequence, 2)
-
-        prescriptions[1].write({"state": "awaiting_dispensing"})
-        prescriptions[1].with_user(self.dispensing_officer)._defer_production_stage(
-            "dispensing",
-            "Medicine tote is temporarily unavailable.",
-        )
-        self.assertTrue(prescriptions[1].dispensing_deferred)
-        self.assertTrue(prescriptions[1].production_skip_history_ids.active)
-
-        prescriptions[1].with_user(
-            self.dispensing_officer
-        )._assign_production_completion_sequence("dispensing")
-        prescriptions[1].invalidate_recordset()
-        self.assertEqual(prescriptions[1].dispensing_sequence, 3)
-        self.assertFalse(prescriptions[1].dispensing_deferred)
-        self.assertFalse(prescriptions[1].production_skip_history_ids.active)
-        self.assertIn("planned #1", prescriptions[1].production_position_display)

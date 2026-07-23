@@ -159,10 +159,7 @@
                                        nolabel="1"/>
                             </div>
                             <field name="line_ids" attrs="{'readonly': [('state', '=', 'confirmed')]}">
-                                <tree editable="bottom" default_order="sequence asc, id asc">
-                                    <field name="sequence" string="Scan #"/>
-                                    <field name="batch_id" readonly="1"/>
-                                    <field name="qa_sequence" string="QA #" readonly="1"/>
+                                <tree editable="bottom" default_order="parcel_reference asc">
                                     <field name="bagging_qa_id"
                                            domain="[('state', '=', 'confirmed'), ('prescription_id.state', '=', 'awaiting_boxing')]"
                                            options="{'no_create': True, 'no_open': True}"/>
@@ -175,7 +172,6 @@
                                     <field name="collect_go_status_received_at" optional="hide" readonly="1"/>
                                     <field name="collect_go_status_date" optional="hide" readonly="1"/>
                                     <field name="prescription_id" optional="hide" readonly="1"/>
-                                    <field name="batch_sequence" optional="hide" readonly="1"/>
                                 </tree>
                             </field>
                         </page>
