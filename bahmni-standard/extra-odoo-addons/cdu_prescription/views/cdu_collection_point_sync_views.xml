@@ -4,7 +4,7 @@
         <field name="name">cdu.collection.point.sync.config.tree</field>
         <field name="model">cdu.collection.point.sync.config</field>
         <field name="arch" type="xml">
-            <tree decoration-muted="not enabled">
+            <tree class="o_cdu_admin_list" decoration-muted="not enabled">
                 <field name="name"/>
                 <field name="enabled"/>
                 <field name="request_endpoint"/>
@@ -19,7 +19,7 @@
         <field name="name">cdu.collection.point.sync.config.form</field>
         <field name="model">cdu.collection.point.sync.config</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_cdu_admin_form">
                 <header>
                     <button name="action_sync_now" string="Sync Pickup Points" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_admin"/>
                     <field name="enabled"/>
@@ -87,7 +87,7 @@
         <field name="name">cdu.collection.point.sync.log.tree</field>
         <field name="model">cdu.collection.point.sync.log</field>
         <field name="arch" type="xml">
-            <tree decoration-danger="state == 'failed'">
+            <tree class="o_cdu_admin_list" decoration-danger="state == 'failed'">
                 <field name="name"/>
                 <field name="requested_at"/>
                 <field name="trigger_mode"/>
@@ -95,7 +95,11 @@
                 <field name="fetched_count"/>
                 <field name="created_count"/>
                 <field name="updated_count"/>
-                <field name="state"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state == 'requested'"
+                       decoration-success="state == 'completed'"
+                       decoration-danger="state == 'failed'"/>
             </tree>
         </field>
     </record>
@@ -104,7 +108,7 @@
         <field name="name">cdu.collection.point.sync.log.form</field>
         <field name="model">cdu.collection.point.sync.log</field>
         <field name="arch" type="xml">
-            <form>
+            <form class="o_cdu_admin_form">
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="requested,completed,failed"/>
                 </header>

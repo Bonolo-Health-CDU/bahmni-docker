@@ -4,7 +4,7 @@
         <field name="name">cdu.patient.tree</field>
         <field name="model">res.partner</field>
         <field name="arch" type="xml">
-            <tree string="CDU Patients">
+            <tree string="CDU Patients" class="o_cdu_intake_list">
                 <field name="name"/>
                 <field name="cdu_eregister_id"/>
                 <field name="cdu_hiv_program_id"/>
@@ -23,30 +23,33 @@
         <field name="name">cdu.patient.form</field>
         <field name="model">res.partner</field>
         <field name="arch" type="xml">
-            <form string="CDU Patient">
+            <form string="CDU Patient" class="o_cdu_intake_form o_cdu_patient_form">
                 <sheet>
                     <div name="button_box" class="oe_button_box">
                         <button name="action_view_cdu_prescriptions" type="object" class="oe_stat_button" icon="fa-medkit">
                             <field name="cdu_prescription_count" widget="statinfo" string="Prescriptions"/>
                         </button>
                     </div>
-                    <div class="oe_title">
-                        <label for="name"/>
+                    <div class="oe_title o_cdu_intake_hero">
+                        <span class="o_cdu_intake_eyebrow">CDU patient</span>
                         <h1><field name="name" placeholder="Patient name"/></h1>
+                        <p class="o_cdu_intake_subtitle">
+                            Identity, contact details, source information, and prescription history.
+                        </p>
                     </div>
-                    <group>
-                        <group string="eRegister Identity">
+                    <group class="o_cdu_patient_summary_grid">
+                        <group string="eRegister Identity" class="o_cdu_intake_card">
                             <field name="customer_rank" invisible="1"/>
                             <field name="cdu_eregister_id"/>
                             <field name="cdu_hiv_program_id"/>
                             <field name="cdu_national_id"/>
                         </group>
-                        <group string="Demographics">
+                        <group string="Demographics" class="o_cdu_intake_card">
                             <field name="cdu_gender"/>
                             <field name="cdu_date_of_birth"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_cdu_intake_notebook">
                         <page string="Contact &amp; Address">
                             <group>
                                 <group string="Contact">
@@ -74,10 +77,15 @@
                         </page>
                         <page string="Prescriptions">
                             <field name="cdu_prescription_ids" readonly="1">
-                                <tree string="CDU Prescriptions">
+                                <tree string="CDU Prescriptions" class="o_cdu_intake_list">
                                     <field name="name" string="Prescription ID" optional="hide"/>
                                     <field name="prescription_date"/>
-                                    <field name="state"/>
+                                    <field name="state"
+                                           widget="badge"
+                                           decoration-info="state not in ('rejected_to_call_center', 'rejected_to_facility', 'dispatched', 'cancelled')"
+                                           decoration-success="state == 'dispatched'"
+                                           decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')"
+                                           decoration-muted="state == 'cancelled'"/>
                                     <field name="regimen_prescribed_raw"/>
                                     <field name="drug_pickup_point_raw"/>
                                     <field name="facility_name"/>

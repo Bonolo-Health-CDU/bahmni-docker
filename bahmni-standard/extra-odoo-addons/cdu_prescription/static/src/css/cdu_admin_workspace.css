@@ -1,0 +1,270 @@
+.o_cdu_admin_form,
+.o_cdu_admin_list {
+    --cdu-admin: #536f82;
+    --cdu-admin-dark: #344f62;
+    --cdu-admin-soft: #edf2f5;
+    --cdu-admin-ink: #203247;
+    --cdu-admin-muted: #687a8d;
+    --cdu-admin-border: #dce5eb;
+    --cdu-admin-canvas: #f3f6f8;
+}
+
+.o_cdu_admin_form {
+    color: var(--cdu-admin-ink);
+    background:
+        radial-gradient(circle at 96% 0%, rgba(83, 111, 130, 0.08), transparent 27%),
+        var(--cdu-admin-canvas);
+}
+
+.o_cdu_admin_form .o_form_sheet_bg {
+    padding: 24px;
+    background: transparent;
+}
+
+.o_cdu_admin_form .o_form_sheet {
+    max-width: 1480px;
+    border: 1px solid var(--cdu-admin-border);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 10px 30px rgba(30, 55, 75, 0.08);
+}
+
+.o_cdu_admin_form .oe_title {
+    position: relative;
+    margin: -6px -6px 22px;
+    padding: 19px 22px 18px 26px;
+    border: 1px solid var(--cdu-admin-border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(115deg, #edf2f5, rgba(255, 255, 255, 0) 68%);
+}
+
+.o_cdu_admin_form .oe_title::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--cdu-admin);
+    content: "";
+}
+
+.o_cdu_admin_form .oe_title h1 {
+    margin: 0;
+    color: var(--cdu-admin-ink);
+    font-size: clamp(23px, 2.1vw, 32px);
+    font-weight: 750;
+    letter-spacing: -0.02em;
+}
+
+.o_cdu_admin_form .o_group {
+    gap: 16px;
+}
+
+.o_cdu_admin_form .o_inner_group {
+    margin-bottom: 16px;
+    padding: 16px 18px;
+    border: 1px solid var(--cdu-admin-border);
+    border-radius: 11px;
+    background: #f9fbfc;
+}
+
+.o_cdu_admin_form .o_inner_group .o_horizontal_separator,
+.o_cdu_admin_form .o_form_sheet > .o_horizontal_separator {
+    margin: 0 0 13px;
+    padding: 0 0 9px;
+    border-bottom: 1px solid var(--cdu-admin-border);
+    color: var(--cdu-admin-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.o_cdu_admin_form label {
+    color: var(--cdu-admin-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.o_cdu_admin_form .o_notebook > .nav-tabs {
+    gap: 4px;
+    padding: 0 6px;
+    border-bottom-color: var(--cdu-admin-border);
+}
+
+.o_cdu_admin_form .o_notebook > .nav-tabs .nav-link {
+    margin: 0;
+    padding: 11px 16px;
+    border: 0;
+    border-radius: 9px 9px 0 0;
+    color: var(--cdu-admin-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.o_cdu_admin_form .o_notebook > .nav-tabs .nav-link:hover,
+.o_cdu_admin_form .o_notebook > .nav-tabs .nav-link.active {
+    color: var(--cdu-admin-dark);
+    background: var(--cdu-admin-soft);
+}
+
+.o_cdu_admin_form .o_notebook > .nav-tabs .nav-link.active {
+    box-shadow: inset 0 -3px 0 var(--cdu-admin);
+}
+
+.o_cdu_admin_form .o_notebook > .tab-content > .tab-pane {
+    padding-top: 20px;
+}
+
+.o_cdu_admin_form .o_notebook textarea[readonly],
+.o_cdu_admin_form .o_notebook .o_field_text.o_readonly_modifier {
+    min-height: 180px;
+    padding: 12px;
+    border: 1px solid #d4dfe6;
+    border-radius: 9px;
+    color: #31495b;
+    background: #f7f9fa;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.o_cdu_admin_list {
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--cdu-admin-ink);
+}
+
+.o_cdu_admin_list thead th {
+    height: 44px;
+    padding: 9px 12px;
+    border-bottom: 1px solid #c8d6df;
+    color: #4d6072;
+    background: #edf2f5;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.o_cdu_admin_list tbody td {
+    height: 47px;
+    padding: 9px 12px;
+    border-bottom-color: #e9eef2;
+    vertical-align: middle;
+}
+
+.o_cdu_admin_list tbody tr.o_data_row:nth-child(even):not(.o_selected_row) {
+    background: #fbfcfd;
+}
+
+.o_cdu_admin_list tbody tr.o_data_row:hover {
+    background: #f0f5f7;
+    box-shadow: inset 3px 0 0 var(--cdu-admin);
+}
+
+.o_cdu_admin_list .o_field_badge {
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.o_cdu_admin_list .text-bg-success,
+.o_cdu_admin_list .badge-success {
+    border-color: #bde1cb;
+    color: #28724f !important;
+    background: #e7f5ee !important;
+}
+
+.o_cdu_admin_list .text-bg-warning,
+.o_cdu_admin_list .badge-warning {
+    border-color: #efd19f;
+    color: #8b530f !important;
+    background: #fff2df !important;
+}
+
+.o_cdu_admin_list .text-bg-danger,
+.o_cdu_admin_list .badge-danger {
+    border-color: #edc4c4;
+    color: #a43b3b !important;
+    background: #fceaea !important;
+}
+
+.o_cdu_admin_list .text-bg-info,
+.o_cdu_admin_list .badge-info {
+    border-color: #bedee5;
+    color: #0f6278 !important;
+    background: #e8f4f6 !important;
+}
+
+.o_cdu_admin_form .o_form_statusbar .btn,
+.o_cdu_admin_form .o_form_statusbar button {
+    min-height: 34px;
+    border-radius: 7px;
+    font-weight: 700;
+}
+
+.o_cdu_admin_form .o_view_nocontent,
+.o_cdu_admin_list + .o_view_nocontent,
+.o_cdu_intake_list + .o_view_nocontent,
+.o_cdu_production_list + .o_view_nocontent,
+.o_cdu_prescription_list + .o_view_nocontent {
+    padding: 42px 24px;
+    color: var(--cdu-admin-muted, #687a8d);
+}
+
+.o_cdu_prescription_form :focus-visible,
+.o_cdu_batch_form :focus-visible,
+.o_cdu_intake_form :focus-visible,
+.o_cdu_admin_form :focus-visible,
+.o_cdu_intake_wizard :focus-visible,
+.o_cdu_rejection_wizard :focus-visible,
+.o_cdu_dashboard :focus-visible {
+    outline: 3px solid rgba(20, 127, 151, 0.3) !important;
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .o_cdu_dashboard *,
+    .o_cdu_prescription_form *,
+    .o_cdu_batch_form *,
+    .o_cdu_intake_form *,
+    .o_cdu_admin_form *,
+    .o_cdu_prescription_list *,
+    .o_cdu_production_list *,
+    .o_cdu_intake_list *,
+    .o_cdu_admin_list * {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
+@media (max-width: 992px) {
+    .o_cdu_admin_form .o_form_sheet_bg {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 576px) {
+    .o_cdu_admin_form .o_form_sheet_bg {
+        padding: 0;
+    }
+
+    .o_cdu_admin_form .o_form_sheet {
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .o_cdu_admin_form .o_notebook > .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+}

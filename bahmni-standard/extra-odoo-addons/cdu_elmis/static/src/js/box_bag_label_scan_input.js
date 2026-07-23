@@ -86,6 +86,9 @@ export class BoxBagLabelScanInputField extends TextField {
                 title: params.title || _t("Parcel added"),
                 type: params.type || "success",
                 sticky: Boolean(params.sticky),
+                className:
+                    params.className ||
+                    "o_cdu_scan_notification o_cdu_scan_notification_success",
             });
             if (params.next) {
                 return this.action.doAction(params.next);
@@ -137,6 +140,8 @@ export class BoxBagLabelScanInputField extends TextField {
             this.notification.add(message, {
                 title: _t("Scan Bag Label Barcode"),
                 type: "danger",
+                className:
+                    "o_cdu_scan_notification o_cdu_scan_notification_danger",
             });
             await this._clearAndFocus();
         } finally {

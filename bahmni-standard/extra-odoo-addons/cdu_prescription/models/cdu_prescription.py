@@ -2,6 +2,8 @@ import re
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
+from .constants import E_LOCKER_DISTRICT_SELECTION
+
 
 class CduPrescription(models.Model):
     _name = "cdu.prescription"
@@ -70,7 +72,11 @@ class CduPrescription(models.Model):
     )
     next_drug_pickup_date = fields.Date(string="Next Drug Pickup Date")
     drug_pickup_point_raw = fields.Char(string="Drug Pickup Point")
-    e_locker_district = fields.Char(string="E-locker District")
+    e_locker_district = fields.Selection(
+        E_LOCKER_DISTRICT_SELECTION,
+        string="E-locker District",
+        tracking=True,
+    )
     collection_point_id = fields.Many2one("cdu.collection.point",
         tracking=True,
     )

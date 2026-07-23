@@ -1,0 +1,330 @@
+.o_cdu_intake_form,
+.o_cdu_intake_list,
+.o_cdu_intake_wizard,
+.o_cdu_rejection_wizard {
+    --cdu-intake: #147f97;
+    --cdu-intake-dark: #0f6278;
+    --cdu-intake-soft: #e8f4f6;
+    --cdu-intake-ink: #203247;
+    --cdu-intake-muted: #687a8d;
+    --cdu-intake-border: #dce5eb;
+    --cdu-intake-canvas: #f3f6f8;
+    --cdu-intake-surface: #ffffff;
+}
+
+.o_cdu_patient_form {
+    --cdu-intake: #7256a8;
+    --cdu-intake-dark: #594286;
+    --cdu-intake-soft: #f0ebfa;
+}
+
+.o_cdu_intake_form {
+    color: var(--cdu-intake-ink);
+    background:
+        radial-gradient(circle at 96% 0%, rgba(20, 127, 151, 0.07), transparent 27%),
+        var(--cdu-intake-canvas);
+}
+
+.o_cdu_intake_form .o_form_sheet_bg {
+    padding: 24px;
+    background: transparent;
+}
+
+.o_cdu_intake_form .o_form_sheet {
+    max-width: 1480px;
+    border: 1px solid var(--cdu-intake-border);
+    border-radius: 16px;
+    background: var(--cdu-intake-surface);
+    box-shadow: 0 10px 30px rgba(30, 55, 75, 0.08);
+}
+
+.o_cdu_intake_form .oe_title.o_cdu_intake_hero,
+.o_cdu_intake_wizard .oe_title.o_cdu_intake_hero {
+    position: relative;
+    margin: -8px -8px 22px;
+    padding: 20px 24px 19px 28px;
+    border: 1px solid var(--cdu-intake-border);
+    border-radius: 12px;
+    overflow: hidden;
+    background:
+        linear-gradient(115deg, var(--cdu-intake-soft), rgba(255, 255, 255, 0) 62%),
+        #f9fbfc;
+}
+
+.o_cdu_intake_form .oe_title.o_cdu_intake_hero::before,
+.o_cdu_intake_wizard .oe_title.o_cdu_intake_hero::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--cdu-intake);
+    content: "";
+}
+
+.o_cdu_intake_eyebrow {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--cdu-intake-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.o_cdu_intake_form .o_cdu_intake_hero h1,
+.o_cdu_intake_wizard .o_cdu_intake_hero h1 {
+    margin: 0;
+    color: var(--cdu-intake-ink);
+    font-size: clamp(24px, 2.2vw, 34px);
+    font-weight: 750;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+}
+
+.o_cdu_intake_subtitle {
+    margin: 7px 0 0;
+    color: var(--cdu-intake-muted);
+    font-size: 13px;
+}
+
+.o_cdu_intake_form .o_cdu_intake_summary_grid,
+.o_cdu_intake_form .o_cdu_patient_summary_grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 20px;
+}
+
+.o_cdu_intake_form .o_cdu_intake_card {
+    height: 100%;
+    margin: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--cdu-intake-border);
+    border-radius: 12px;
+    background: #f9fbfc;
+    box-shadow: 0 4px 14px rgba(30, 55, 75, 0.05);
+}
+
+.o_cdu_intake_form .o_cdu_intake_card .o_horizontal_separator {
+    margin: 0 0 13px;
+    padding: 0 0 9px;
+    border-bottom: 1px solid var(--cdu-intake-border);
+    color: var(--cdu-intake-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.o_cdu_intake_form .o_cdu_intake_card label {
+    color: var(--cdu-intake-muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.o_cdu_intake_form .o_cdu_import_summary {
+    margin: 0 0 20px;
+    padding: 16px 18px;
+    border: 1px solid #bedee5;
+    border-radius: 12px;
+    background: #f2f9fa;
+}
+
+.o_cdu_intake_form .o_cdu_import_summary .o_horizontal_separator {
+    color: var(--cdu-intake-dark);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.o_cdu_intake_form .o_cdu_intake_notebook > .nav-tabs {
+    gap: 4px;
+    padding: 0 6px;
+    border-bottom-color: var(--cdu-intake-border);
+}
+
+.o_cdu_intake_form .o_cdu_intake_notebook > .nav-tabs .nav-link {
+    margin: 0;
+    padding: 11px 16px;
+    border: 0;
+    border-radius: 9px 9px 0 0;
+    color: var(--cdu-intake-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.o_cdu_intake_form .o_cdu_intake_notebook > .nav-tabs .nav-link:hover,
+.o_cdu_intake_form .o_cdu_intake_notebook > .nav-tabs .nav-link.active {
+    color: var(--cdu-intake-dark);
+    background: var(--cdu-intake-soft);
+}
+
+.o_cdu_intake_form .o_cdu_intake_notebook > .nav-tabs .nav-link.active {
+    box-shadow: inset 0 -3px 0 var(--cdu-intake);
+}
+
+.o_cdu_intake_form .o_cdu_intake_notebook > .tab-content > .tab-pane {
+    padding-top: 20px;
+}
+
+.o_cdu_intake_form .oe_stat_button {
+    border: 1px solid var(--cdu-intake-border);
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 3px 10px rgba(30, 55, 75, 0.05);
+}
+
+.o_cdu_intake_form .oe_stat_button:hover {
+    border-color: var(--cdu-intake);
+    background: var(--cdu-intake-soft);
+}
+
+.o_cdu_intake_list {
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--cdu-intake-ink);
+}
+
+.o_cdu_intake_list thead th {
+    height: 44px;
+    padding: 9px 12px;
+    border-bottom: 1px solid #c8d6df;
+    color: #4d6072;
+    background: #edf2f5;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.o_cdu_intake_list tbody td {
+    height: 48px;
+    padding: 9px 12px;
+    border-bottom-color: #e9eef2;
+    vertical-align: middle;
+}
+
+.o_cdu_intake_list tbody tr.o_data_row:nth-child(even):not(.o_selected_row) {
+    background: #fbfcfd;
+}
+
+.o_cdu_intake_list tbody tr.o_data_row:hover {
+    background: #eef7f8;
+    box-shadow: inset 3px 0 0 var(--cdu-intake);
+}
+
+.o_cdu_intake_list .o_field_badge {
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.o_cdu_intake_list .text-bg-success,
+.o_cdu_intake_list .badge-success {
+    border-color: #bde1cb;
+    color: #28724f !important;
+    background: #e7f5ee !important;
+}
+
+.o_cdu_intake_list .text-bg-warning,
+.o_cdu_intake_list .badge-warning {
+    border-color: #efd19f;
+    color: #8b530f !important;
+    background: #fff2df !important;
+}
+
+.o_cdu_intake_list .text-bg-danger,
+.o_cdu_intake_list .badge-danger {
+    border-color: #edc4c4;
+    color: #a43b3b !important;
+    background: #fceaea !important;
+}
+
+.o_cdu_intake_list .text-bg-info,
+.o_cdu_intake_list .badge-info {
+    border-color: #bedee5;
+    color: #0f6278 !important;
+    background: #e8f4f6 !important;
+}
+
+.o_cdu_intake_wizard .o_form_sheet {
+    min-width: min(900px, 86vw);
+    padding: 24px;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.o_cdu_intake_wizard .alert,
+.o_cdu_rejection_wizard .alert {
+    padding: 13px 16px;
+    border-radius: 10px;
+    line-height: 1.45;
+}
+
+.o_cdu_intake_wizard .o_cdu_bulk_status {
+    gap: 12px;
+}
+
+.o_cdu_intake_wizard .o_cdu_bulk_status_card {
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(30, 55, 75, 0.055);
+}
+
+.o_cdu_intake_wizard .o_group,
+.o_cdu_rejection_wizard .o_cdu_rejection_details {
+    padding: 14px 16px;
+    border: 1px solid var(--cdu-intake-border);
+    border-radius: 11px;
+    background: #f9fbfc;
+}
+
+.o_cdu_rejection_wizard .o_form_sheet {
+    min-width: min(700px, 82vw);
+    padding: 22px;
+}
+
+.o_cdu_rejection_wizard .o_cdu_rejection_details .o_field_many2manytags {
+    min-height: 42px;
+    padding: 5px;
+    border: 1px solid #c8d6df;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.o_cdu_rejection_wizard .o_tag {
+    border-radius: 999px;
+}
+
+@media (max-width: 992px) {
+    .o_cdu_intake_form .o_form_sheet_bg {
+        padding: 12px;
+    }
+
+    .o_cdu_intake_form .o_cdu_intake_summary_grid,
+    .o_cdu_intake_form .o_cdu_patient_summary_grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 576px) {
+    .o_cdu_intake_form .o_form_sheet_bg {
+        padding: 0;
+    }
+
+    .o_cdu_intake_form .o_form_sheet {
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .o_cdu_intake_wizard .o_form_sheet,
+    .o_cdu_rejection_wizard .o_form_sheet {
+        min-width: 0;
+        padding: 14px;
+    }
+}

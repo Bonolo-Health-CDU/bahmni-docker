@@ -4,11 +4,15 @@
         <field name="name">cdu.report.bulk.import.wizard.form</field>
         <field name="model">cdu.report.bulk.import.wizard</field>
         <field name="arch" type="xml">
-            <form string="Import Multiple Reports" class="o_cdu_bulk_import_wizard">
+            <form string="Import Multiple Reports" class="o_cdu_bulk_import_wizard o_cdu_intake_wizard">
                 <sheet>
                     <field name="state" invisible="1"/>
-                    <div class="oe_title">
+                    <div class="oe_title o_cdu_intake_hero">
+                        <span class="o_cdu_intake_eyebrow">Bulk report intake</span>
                         <h1>Import Multiple eRegister Reports</h1>
+                        <p class="o_cdu_intake_subtitle">
+                            Process several facility reports together and review their outcomes in one place.
+                        </p>
                     </div>
 
                     <div attrs="{'invisible': [('state', '!=', 'upload')]}">
@@ -64,7 +68,8 @@
 
                         <separator string="File Results"/>
                         <field name="result_line_ids" readonly="1" nolabel="1">
-                            <tree decoration-success="state == 'completed'"
+                            <tree class="o_cdu_intake_list"
+                                  decoration-success="state == 'completed'"
                                   decoration-warning="state in ('completed_with_errors', 'duplicate')"
                                   decoration-danger="state == 'failed'"
                               create="0"
@@ -72,7 +77,11 @@
                                 <field name="sequence" string="#"/>
                                 <field name="file_name"/>
                                 <field name="location_summary"/>
-                                <field name="state"/>
+                                <field name="state"
+                                       widget="badge"
+                                       decoration-success="state == 'completed'"
+                                       decoration-warning="state in ('completed_with_errors', 'duplicate')"
+                                       decoration-danger="state == 'failed'"/>
                                 <field name="total_rows"/>
                                 <field name="imported_rows"/>
                                 <field name="updated_rows"/>

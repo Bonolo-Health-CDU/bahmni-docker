@@ -13,6 +13,8 @@ async function scanBaggingQaQr(env, action) {
         env.services.notification.add(_t("The Bagging / QA record could not be identified."), {
             title: _t("Scan QR Code"),
             type: "danger",
+            className:
+                "o_cdu_scan_notification o_cdu_scan_notification_danger",
         });
         return;
     }
@@ -22,6 +24,8 @@ async function scanBaggingQaQr(env, action) {
             {
                 title: _t("Camera unavailable"),
                 type: "warning",
+                className:
+                    "o_cdu_scan_notification o_cdu_scan_notification_warning",
             }
         );
         return;
@@ -49,6 +53,8 @@ async function scanBaggingQaQr(env, action) {
         env.services.notification.add(message, {
             title: _t("Scan QR Code"),
             type: "danger",
+            className:
+                "o_cdu_scan_notification o_cdu_scan_notification_danger",
         });
     }
 }

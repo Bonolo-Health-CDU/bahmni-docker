@@ -4,7 +4,10 @@
         <field name="name">cdu.prescription.tree</field>
         <field name="model">cdu.prescription</field>
         <field name="arch" type="xml">
-            <tree default_order="next_drug_pickup_date asc, patient_first_name asc" decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')" decoration-muted="state == 'cancelled'">
+            <tree class="o_cdu_prescription_list"
+                  default_order="next_drug_pickup_date asc, patient_first_name asc"
+                  decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')"
+                  decoration-muted="state == 'cancelled'">
                 <field name="name" string="Prescription ID" optional="hide"/>
                 <field name="patient_first_name" optional="show"/>
                 <field name="facility_name"/>
@@ -18,7 +21,13 @@
                 <field name="regimen_prescribed_raw"/>
                 <field name="collection_point_id"/>
                 <field name="batch_id"/>
-                <field name="state"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state in ('awaiting_verification', 'awaiting_validation', 'awaiting_batching', 'awaiting_picking', 'awaiting_dispensing', 'awaiting_bagging_qa', 'awaiting_boxing')"
+                       decoration-warning="state == 'awaiting_dispatch'"
+                       decoration-success="state == 'dispatched'"
+                       decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')"
+                       decoration-muted="state == 'cancelled'"/>
             </tree>
         </field>
     </record>
@@ -77,13 +86,16 @@
                            statusbar_visible="awaiting_dispatch,dispatched"
                            attrs="{'invisible': [('state', '!=', 'dispatched')]}"/>
                 </header>
-                <sheet>
-                    <div class="oe_title">
-                        <label for="name"/>
+                <sheet class="o_cdu_prescription_sheet">
+                    <div class="oe_title o_cdu_record_hero">
+                        <span class="o_cdu_record_eyebrow">Prescription record</span>
                         <h1><field name="name"/></h1>
+                        <p class="o_cdu_record_subtitle">
+                            Patient, clinical, medicine, and collection information in one operational record.
+                        </p>
                     </div>
-                    <group>
-                        <group string="Source">
+                    <group class="o_cdu_summary_grid">
+                        <group string="Source" class="o_cdu_section_card">
                             <field name="report_run_id"/>
                             <field name="source_file_name"/>
                             <field name="source_row_number"/>
@@ -92,7 +104,7 @@
                             <field name="facility_code" readonly="1"/>
                             <field name="prescription_date"/>
                         </group>
-                        <group string="Workflow">
+                        <group string="Workflow" class="o_cdu_section_card">
                             <field name="batch_id" readonly="1"/>
                             <field name="verified_by"/>
                             <field name="verified_at"/>
@@ -104,17 +116,17 @@
                                    attrs="{'invisible': [('state', 'not in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
                         </group>
                     </group>
-                    <notebook>
+                    <notebook class="o_cdu_notebook">
                         <page string="Patient">
-                            <group>
-                                <group>
+                            <group class="o_cdu_section_grid">
+                                <group string="Identity" class="o_cdu_section_card">
                                     <field name="patient_id" context="{'default_customer_rank': 1, 'cdu_open_patient_action': True}"/>
                                     <field name="patient_identifier" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                     <field name="patient_first_name" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                     <field name="hiv_program_id" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                     <field name="national_id" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                 </group>
-                                <group>
+                                <group string="Contact &amp; Demographics" class="o_cdu_section_card">
                                     <field name="patient_date_of_birth" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                     <field name="patient_gender" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
                                     <field name="patient_phone" attrs="{'readonly': [('patient_id', '!=', False)]}"/>
@@ -124,30 +136,30 @@
                             </group>
                         </page>
                         <page string="Clinical">
-                            <group>
-                                <group string="Clinical Details">
+                            <group class="o_cdu_section_grid">
+                                <group string="Clinical Details" class="o_cdu_section_card">
                                     <field name="hiv_diagnosis_date"/>
                                     <field name="new_or_revisit"/>
                                     <field name="next_clinical_visit_date"/>
                                     <field name="has_allergies"/>
                                     <field name="allergies"/>
                                 </group>
-                                <group string="Viral Load">
+                                <group string="Viral Load" class="o_cdu_section_card">
                                     <field name="latest_vl_collection_date"/>
                                     <field name="latest_vl_result"/>
                                 </group>
                             </group>
                         </page>
                         <page string="Prescription">
-                            <group>
-                                <group>
+                            <group class="o_cdu_section_grid">
+                                <group string="Medicine" class="o_cdu_section_card">
                                     <field name="regimen_prescribed_raw"/>
                                     <field name="dosage_instructions"/>
                                     <field name="prescriber_name"/>
                                     <field name="next_drug_pickup_date" required="1"/>
                                     <field name="regimen_id"/>
                                 </group>
-                                <group>
+                                <group string="Collection &amp; Supply" class="o_cdu_section_card">
                                     <field name="collection_point_id"/>
                                     <field name="e_locker_district"/>
                                     <field name="facility_days_supply" readonly="1"/>
@@ -194,6 +206,20 @@
                 <field name="patient_first_name"/>
                 <field name="facility_name"/>
                 <field name="collection_point_id"/>
+                <separator/>
+                <filter string="Created Today"
+                        name="created_today"
+                        domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Waiting 2+ Days"
+                        name="waiting_two_days"
+                        domain="[('create_date', '&lt;', (context_today() - relativedelta(days=2)).strftime('%Y-%m-%d')), ('state', 'not in', ('dispatched', 'cancelled'))]"/>
+                <filter string="Pickup Within 7 Days"
+                        name="pickup_next_seven_days"
+                        domain="[('next_drug_pickup_date', '&gt;=', context_today()), ('next_drug_pickup_date', '&lt;=', context_today() + relativedelta(days=7))]"/>
+                <filter string="Needs Attention"
+                        name="needs_attention"
+                        domain="[('state', 'in', ('rejected_to_call_center', 'rejected_to_facility'))]"/>
+                <separator/>
                 <filter string="Awaiting Verification" name="awaiting_verification" domain="[('state', '=', 'awaiting_verification')]"/>
                 <filter string="Awaiting Validation" name="awaiting_validation" domain="[('state', '=', 'awaiting_validation')]"/>
                 <filter string="Awaiting Batching" name="awaiting_batching" domain="[('state', '=', 'awaiting_batching')]"/>
@@ -210,6 +236,7 @@
                     <filter string="Collection Point" name="group_collection_point" context="{'group_by': 'collection_point_id'}"/>
                     <filter string="Facility" name="group_facility" context="{'group_by': 'facility_id'}"/>
                     <filter string="Prescription Date" name="group_prescription_date" context="{'group_by': 'prescription_date'}"/>
+                    <filter string="Created Day" name="group_created_day" context="{'group_by': 'create_date:day'}"/>
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                 </group>
             </search>

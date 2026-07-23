@@ -4,14 +4,20 @@
         <field name="name">cdu.batch.tree</field>
         <field name="model">cdu.batch</field>
         <field name="arch" type="xml">
-            <tree decoration-info="state == 'draft'" decoration-success="state == 'done'">
+            <tree class="o_cdu_production_list"
+                  decoration-info="state == 'draft'"
+                  decoration-success="state == 'done'">
                 <field name="name"/>
                 <field name="filter_next_drug_pickup_date_from"/>
                 <field name="filter_next_drug_pickup_date_to"/>
                 <field name="filter_e_locker_district"/>
                 <field name="filter_collection_point_id"/>
                 <field name="prescription_count"/>
-                <field name="state"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state in ('draft', 'confirmed', 'picking_generated')"
+                       decoration-warning="state == 'printed'"
+                       decoration-success="state == 'done'"/>
             </tree>
         </field>
     </record>
@@ -20,7 +26,7 @@
         <field name="name">cdu.batch.form</field>
         <field name="model">cdu.batch</field>
         <field name="arch" type="xml">
-            <form class="o_cdu_batch_form">
+            <form class="o_cdu_batch_form o_cdu_stage_batching">
                 <header>
                     <button name="action_confirm_batch" string="Confirm Batch" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_generate_picking_list" string="Generate Picking List" type="object" class="btn-primary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
@@ -29,8 +35,12 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,picking_generated,printed,done"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
+                    <div class="oe_title o_cdu_workspace_hero">
+                        <span class="o_cdu_workspace_eyebrow">Batching workspace</span>
                         <h1><field name="name"/></h1>
+                        <p class="o_cdu_workspace_subtitle">
+                            Define the workload, review selected prescriptions, and prepare picking.
+                        </p>
                     </div>
                     <div class="o_cdu_batch_dashboard">
                         <div class="o_cdu_batch_card">
@@ -88,7 +98,7 @@
                                     class="btn-primary o_cdu_repeat_apply_button"/>
                         </div>
                     </div>
-                    <notebook>
+                    <notebook class="o_cdu_workspace_notebook">
                         <page string="Selected Prescriptions">
                             <div class="alert alert-info" role="alert" attrs="{'invisible': [('state', '!=', 'draft')]}">
                                 All prescriptions matching the filters are selected by default. Remove any prescription that should not be included before confirming the batch.

@@ -3,22 +3,19 @@
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 
-async function printBoxDocuments(env, action) {
+async function printDispensingLabelsAndContinue(env, action) {
     const params = action.params || {};
-    const reports = params.report_actions || [];
+    const reportAction = params.report_action;
 
     try {
-        for (const reportAction of reports) {
+        if (reportAction) {
             await env.services.action.doAction(reportAction);
         }
         if (params.message) {
             env.services.notification.add(params.message, {
-                title: params.title || _t("Box documents ready"),
+                title: params.title || _t("Dispensing confirmed"),
                 type: params.notification_type || "success",
                 sticky: Boolean(params.sticky),
-                className:
-                    "o_cdu_scan_notification o_cdu_scan_notification_" +
-                    (params.notification_type || "success"),
             });
         }
         if (params.next) {
@@ -28,14 +25,15 @@ async function printBoxDocuments(env, action) {
         const message =
             (error && error.data && error.data.message) ||
             (error && error.message) ||
-            _t("The box documents could not be generated.");
+            _t("The dispensing labels could not be generated.");
         env.services.notification.add(message, {
-            title: _t("Box document printing"),
+            title: _t("Dispensing label printing"),
             type: "danger",
-            className:
-                "o_cdu_scan_notification o_cdu_scan_notification_danger",
         });
     }
 }
 
-registry.category("actions").add("cdu_print_box_documents", printBoxDocuments);
+registry.category("actions").add(
+    "cdu_print_dispensing_labels_and_continue",
+    printDispensingLabelsAndContinue
+);

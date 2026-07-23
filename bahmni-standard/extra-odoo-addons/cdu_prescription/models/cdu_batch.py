@@ -5,19 +5,7 @@ from typing import Any
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
-
-E_LOCKER_DISTRICT_SELECTION = [
-    ("Butha-Buthe", "Butha-Buthe"),
-    ("Leribe", "Leribe"),
-    ("Berea", "Berea"),
-    ("Maseru", "Maseru"),
-    ("Mafeteng", "Mafeteng"),
-    ("Mohaleshoek", "Mohaleshoek"),
-    ("Quthing", "Quthing"),
-    ("Qacha's Nek", "Qacha's Nek"),
-    ("Thaba-Tseka", "Thaba-Tseka"),
-    ("Mokhotlong", "Mokhotlong"),
-]
+from .constants import E_LOCKER_DISTRICT_SELECTION
 
 
 class CduBatch(models.Model):

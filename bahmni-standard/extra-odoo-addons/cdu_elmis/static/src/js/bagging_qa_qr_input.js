@@ -108,6 +108,9 @@ export class BaggingQaQrInputField extends TextField {
                     title: params.title || _t("QA Passed"),
                     type: params.type || "success",
                     sticky: Boolean(params.sticky),
+                    className:
+                        params.className ||
+                        "o_cdu_scan_notification o_cdu_scan_notification_success",
                 }
             );
 
@@ -152,6 +155,8 @@ export class BaggingQaQrInputField extends TextField {
             this.notification.add(message, {
                 title: _t("Scan Bag Label QR"),
                 type: "danger",
+                className:
+                    "o_cdu_scan_notification o_cdu_scan_notification_danger",
             });
             await this._clearScanInput();
         } finally {
