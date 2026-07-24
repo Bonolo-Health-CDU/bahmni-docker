@@ -51,7 +51,6 @@
                             attrs="{'invisible': [('state', 'not in', ('rejected_to_call_center', 'rejected_to_facility'))]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_data_clerk" attrs="{'invisible': [('state', '!=', 'awaiting_verification')]}"/>
                     <button name="action_reject_to_facility" string="Reject to Facility" type="object" class="btn-danger" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '!=', 'awaiting_validation')]}"/>
-                    <button name="action_remap_regimens" string="Remap Regimen" type="object" class="btn-secondary" groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-secondary" groups="cdu_prescription.group_cdu_admin" attrs="{'invisible': [('state', '=', 'cancelled')]}"/>
                     <field name="state"
                            widget="statusbar"
@@ -157,7 +156,6 @@
                                     <field name="dosage_instructions"/>
                                     <field name="prescriber_name"/>
                                     <field name="next_drug_pickup_date" required="1"/>
-                                    <field name="regimen_id"/>
                                 </group>
                                 <group string="Collection &amp; Supply" class="o_cdu_section_card">
                                     <field name="collection_point_id"/>

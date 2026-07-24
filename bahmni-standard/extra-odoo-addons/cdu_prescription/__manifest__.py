@@ -1,7 +1,7 @@
 {
     "name": "CDU Prescription",
     "summary": "Central Dispensing Unit prescription capture and workflow foundation",
-    "version": "16.0.1.0.0",
+    "version": "16.0.1.1.0",
     "category": "Healthcare",
     "author": "Ministry of Health",
     "license": "LGPL-3",
@@ -37,7 +37,6 @@
         "views/cdu_prescription_views.xml",
         "views/cdu_dashboard_views.xml",
         "views/cdu_product_template_views.xml",
-        "views/cdu_regimen_views.xml",
         "views/cdu_menus.xml",
         "data/cdu_data_clerk_home_action.xml",
     ],

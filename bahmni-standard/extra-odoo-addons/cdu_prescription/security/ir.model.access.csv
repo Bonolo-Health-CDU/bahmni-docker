@@ -26,14 +26,6 @@ access_cdu_collection_point_data_clerk,cdu.collection.point data clerk,model_cdu
 access_cdu_collection_point_call_agent,cdu.collection.point call agent,model_cdu_collection_point,cdu_prescription.group_cdu_call_agent,1,0,0,0
 access_cdu_collection_point_dispensing_officer,cdu.collection.point dispensing officer,model_cdu_collection_point,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
 access_cdu_collection_point_admin,cdu.collection.point admin,model_cdu_collection_point,cdu_prescription.group_cdu_admin,1,1,0,0
-access_cdu_regimen_data_clerk,cdu.regimen data clerk,model_cdu_regimen,cdu_prescription.group_cdu_data_clerk,1,0,0,0
-access_cdu_regimen_call_agent,cdu.regimen call agent,model_cdu_regimen,cdu_prescription.group_cdu_call_agent,1,0,0,0
-access_cdu_regimen_dispensing_officer,cdu.regimen dispensing officer,model_cdu_regimen,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
-access_cdu_regimen_admin,cdu.regimen admin,model_cdu_regimen,cdu_prescription.group_cdu_admin,1,1,1,1
-access_cdu_regimen_line_data_clerk,cdu.regimen.line data clerk,model_cdu_regimen_line,cdu_prescription.group_cdu_data_clerk,1,0,0,0
-access_cdu_regimen_line_call_agent,cdu.regimen.line call agent,model_cdu_regimen_line,cdu_prescription.group_cdu_call_agent,1,0,0,0
-access_cdu_regimen_line_dispensing_officer,cdu.regimen.line dispensing officer,model_cdu_regimen_line,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
-access_cdu_regimen_line_admin,cdu.regimen.line admin,model_cdu_regimen_line,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_batch_picking_line_dispensing_officer,cdu.batch.picking.line dispensing officer,model_cdu_batch_picking_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1
 access_cdu_batch_picking_line_admin,cdu.batch.picking.line admin,model_cdu_batch_picking_line,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_batch_patient_line_dispensing_officer,cdu.batch.patient.line dispensing officer,model_cdu_batch_patient_line,cdu_prescription.group_cdu_dispensing_officer,1,1,1,1

@@ -184,11 +184,4 @@
         sequence="40"
         groups="cdu_prescription.group_cdu_admin"/>
 
-    <menuitem
-        id="menu_cdu_regimen"
-        name="Regimens"
-        parent="menu_cdu_configuration"
-        action="action_cdu_regimen"
-        sequence="50"
-        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 </odoo>

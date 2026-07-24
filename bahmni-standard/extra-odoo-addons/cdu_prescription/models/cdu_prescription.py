@@ -1,4 +1,3 @@
-import re
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
@@ -61,11 +60,6 @@ class CduPrescription(models.Model):
     latest_vl_result = fields.Char(string="Latest VL Result")
     regimen_prescribed_raw = fields.Char(string="Regimen Prescribed")
     dosage_instructions = fields.Text(string="Dosage Instructions")
-    regimen_id = fields.Many2one(
-        "cdu.regimen",
-        string="Mapped Regimen",
-        tracking=True,
-    )
     new_or_revisit = fields.Selection(
         [("new", "New"), ("revisit", "Revisit"), ("restarted", "Restarted")],
         string="New or Revisit",
@@ -209,11 +203,6 @@ class CduPrescription(models.Model):
         if vals.get("patient_id"):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
 
-        if vals.get("regimen_prescribed_raw"):
-            regimen = self._find_matching_regimen(vals.get("regimen_prescribed_raw"))
-            if regimen:
-                vals["regimen_id"] = regimen.id
-
         prescription = super().create(vals)
         prescription._sync_repeat_days_from_cdu_days()
         prescription._check_required_next_drug_pickup_date()
@@ -229,9 +218,6 @@ class CduPrescription(models.Model):
         if vals.get("patient_id"):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
 
-        if "regimen_prescribed_raw" in vals:
-            regimen = self._find_matching_regimen(vals.get("regimen_prescribed_raw"))
-            vals["regimen_id"] = (regimen.id if regimen else False )
         result = super().write(vals)
 
         duration_fields = {
@@ -251,50 +237,6 @@ class CduPrescription(models.Model):
             if not prescription.next_drug_pickup_date:
                 raise ValidationError(_("Next Drug Pickup Date is required."))
     
-    def _find_matching_regimen(self, raw_value):
-           
-        code = self._extract_regimen_code(raw_value)
-
-        if not code:
-            return False
-
-        return self.env["cdu.regimen"].search(
-            [("code", "=ilike", code)],
-            limit=1,
-        )
-
-    def _extract_regimen_code(self, raw_value):
-        if not raw_value:
-            return False
-        prefix = str(raw_value).split('=')[0].strip().lower()
-        # Match everything before the first space or equal sign, allowing slashes and hyphens
-        match = re.match(r"([^=\s]+)", prefix)
-        return match.group(1) if match else False
-    
-    def action_remap_regimens(self):
-        mapping_data = {}
-        for record in self:
-            # code = self._extract_code(record.regimen_prescribed_raw)
-            code = self._extract_regimen_code(record.regimen_prescribed_raw)
-            if code:
-                mapping_data[record.id] = code.lower()
-
-        if not mapping_data:
-            self.write({'regimen_id': False})
-            return
-
-        unique_codes = list(set(mapping_data.values()))
-        regimens = self.env["cdu.regimen"].search([
-            ("code", "in", unique_codes)
-        ])
-        
-        regimen_lookup = {r.code.lower(): r.id for r in regimens}
-
-        for record in self:
-            code = mapping_data.get(record.id)
-            regimen_id = regimen_lookup.get(code) if code else False
-            record.regimen_id = regimen_id
-          
     def _patient_snapshot_values(self, patient_id, existing_vals=None):
         patient = self.env["res.partner"].browse(patient_id).exists()
         if not patient:
