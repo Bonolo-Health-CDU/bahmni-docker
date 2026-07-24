@@ -279,7 +279,9 @@ class CduBaggingQa(models.Model):
         if next_prescription:
             return next_prescription.action_open_bagging_qa()
 
-        action = self.env.ref("cdu_elmis.action_cdu_bagging_qa_work_queue").read()[0]
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "cdu_elmis.action_cdu_bagging_qa_work_queue"
+        )
         action["views"] = [(False, "tree"), (False, "form")]
         if self.batch_id:
             action["domain"] = [

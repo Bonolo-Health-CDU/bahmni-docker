@@ -5,7 +5,7 @@
         <field name="model">cdu.prescription</field>
         <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//header/button[@name='action_remap_regimens']" position="before">
+            <xpath expr="//header/button[@name='action_cancel']" position="before">
                 <button name="action_open_dispensing"
                         string="Start Dispensing"
                         type="object"

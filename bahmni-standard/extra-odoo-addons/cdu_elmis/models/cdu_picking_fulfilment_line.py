@@ -108,9 +108,20 @@ class CduPickingFulfilmentLine(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
+        for record, values in zip(records, vals_list):
+            if not values.get("selected_stock_option_id"):
+                continue
+            record._sync_selected_stock_option(
+                reset_quantity=(
+                    "quantity_picked" not in values
+                    and not self.env.context.get(
+                        "cdu_sync_from_patient_allocations"
+                    )
+                )
+            )
         if any(values.get("selected_stock_option_id") for values in vals_list):
-            records._sync_selected_stock_option(reset_quantity=True)
-            records.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
+            if not self.env.context.get("cdu_sync_from_patient_allocations"):
+                records.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return records
 
     @api.onchange("picking_line_id")
@@ -129,8 +140,13 @@ class CduPickingFulfilmentLine(models.Model):
     def write(self, vals):
         result = super().write(vals)
         if "selected_stock_option_id" in vals:
-            self._sync_selected_stock_option(reset_quantity=True)
-            self.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
+            self._sync_selected_stock_option(
+                reset_quantity=not self.env.context.get(
+                    "cdu_sync_from_patient_allocations"
+                )
+            )
+            if not self.env.context.get("cdu_sync_from_patient_allocations"):
+                self.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return result
 
             # def _sync_selected_stock_option(self):

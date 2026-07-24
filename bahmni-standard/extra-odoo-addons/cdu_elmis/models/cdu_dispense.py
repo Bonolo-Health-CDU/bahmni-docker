@@ -156,6 +156,54 @@ class CduDispense(models.Model):
             if not batch:
                 continue
 
+            exact_allocations = batch.patient_allocation_ids.filtered(
+                lambda allocation, prescription=prescription: (
+                    allocation.prescription_id == prescription
+                    and allocation.quantity_packs > 0
+                )
+            )
+            if exact_allocations:
+                for allocation in exact_allocations:
+                    fulfilment = batch.elmis_picking_fulfilment_line_ids.filtered(
+                        lambda line, allocation=allocation: (
+                            line.picking_line_id == allocation.picking_line_id
+                            and line.selected_stock_option_id
+                            == allocation.stock_option_id
+                        )
+                    )[:1]
+                    self.env["cdu.dispense.stock.selection"].create(
+                        {
+                            "dispense_id": dispense.id,
+                            "picking_fulfilment_line_id": (
+                                fulfilment.id if fulfilment else False
+                            ),
+                            "openmrs_drug_name": (
+                                allocation.picking_line_id.openmrs_drug_name
+                            ),
+                            "openmrs_drug_uuid": (
+                                allocation.picking_line_id.openmrs_drug_uuid
+                            ),
+                            "selected_orderable_code": (
+                                allocation.selected_orderable_code
+                            ),
+                            "selected_orderable_id": allocation.selected_orderable_id,
+                            "selected_orderable_name": (
+                                allocation.selected_orderable_name
+                            ),
+                            "selected_pack_size": allocation.selected_pack_size,
+                            "selected_lot": allocation.selected_lot,
+                            "selected_lot_id": allocation.selected_lot_id,
+                            "selected_lot_expiry": (
+                                allocation.selected_lot_expiry
+                            ),
+                            "selected_stock_on_hand": (
+                                allocation.selected_stock_on_hand
+                            ),
+                            "quantity_dispensed": allocation.quantity_packs,
+                        }
+                    )
+                continue
+
             all_fulfilment_lines = batch.elmis_picking_fulfilment_line_ids
             fulfilment_lines = all_fulfilment_lines
             prescription_product_ids = batch.patient_picking_line_ids.filtered(
@@ -191,12 +239,13 @@ class CduDispense(models.Model):
                         picking_line.prescription_id == prescription
                     )
                 )[:1]
-                quantity = (
-                    patient_line.packs_to_pick
-                    or patient_line.cdu_bottles_required
-                    or patient_line.bottles_required
-                )
-                if not quantity:
+                if patient_line:
+                    quantity = line.picking_line_id._get_patient_fulfilment_allocations(
+                        patient_line
+                    ).get(line.id, 0.0)
+                    if quantity <= 0:
+                        continue
+                else:
                     prescription_count = line.picking_line_id.prescription_count or 1
                     quantity = (
                         line.quantity_picked / prescription_count
@@ -217,7 +266,7 @@ class CduDispense(models.Model):
                         "selected_lot_id": line.selected_lot_id,
                         "selected_lot_expiry": line.selected_lot_expiry,
                         "selected_stock_on_hand": line.selected_stock_on_hand,
-                        "quantity_dispensed": quantity or 1,
+                        "quantity_dispensed": quantity,
                     }
                 )
 
@@ -513,9 +562,9 @@ class CduDispense(models.Model):
             if next_prescription:
                 return next_prescription.action_open_dispensing()
 
-        action = self.env.ref(
+        action = self.env["ir.actions.actions"]._for_xml_id(
             "cdu_elmis.action_cdu_dispensing_work_queue"
-        ).read()[0]
+        )
         action["views"] = [(False, "tree"), (False, "form")]
         return action
 

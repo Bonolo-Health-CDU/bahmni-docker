@@ -53,6 +53,21 @@ class CduBatch(models.Model):
         "batch_id",
         string="eLMIS Picking Fulfilment Lines",
     )
+    picking_resolution_ids = fields.One2many(
+        "cdu.picking.patient.resolution",
+        "batch_id",
+        string="Prescription Picking Resolutions",
+    )
+    patient_allocation_ids = fields.One2many(
+        "cdu.picking.patient.allocation",
+        "batch_id",
+        string="Exact Prescription Allocations",
+    )
+    picking_bulk_group_ids = fields.One2many(
+        "cdu.picking.bulk.group",
+        "batch_id",
+        string="Bulk Picking Groups",
+    )
     elmis_stock_option_ids = fields.One2many(
         "cdu.elmis.stock.option",
         "batch_id",
@@ -91,9 +106,15 @@ class CduBatch(models.Model):
             raise UserError(_("Add prescriptions to this batch before generating a picking list."))
         if not self.elmis_picking_line_ids:
             self._generate_elmis_picking_lines()
-        if refresh_stock:
+        self.elmis_picking_line_ids._ensure_patient_resolutions()
+        if refresh_stock and not self.picking_confirmed_at:
             self._refresh_store_stock_options()
-        wizard = self.env["cdu.elmis.picking.wizard"].create({"batch_id": self.id})
+        wizard = self.env["cdu.elmis.picking.wizard"].create(
+            {
+                "batch_id": self.id,
+                "step": "review" if self.picking_confirmed_at else "overview",
+            }
+        )
         return {
             "type": "ir.actions.act_window",
             "name": _("Generate Picking List"),
@@ -116,7 +137,7 @@ class CduBatch(models.Model):
                 raise UserError(_("Please confirm the eLMIS picking list before printing."))
             if not batch.elmis_picking_line_ids:
                 batch._generate_elmis_picking_lines()
-            batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
+            batch.elmis_picking_line_ids._ensure_patient_resolutions()
             if not batch.elmis_stock_option_ids:
                 batch._refresh_store_stock_options()
             batch.action_mark_printed()
@@ -226,7 +247,7 @@ class CduBatch(models.Model):
             })
             batch.flush_recordset(["patient_picking_line_ids", "picking_line_ids"])
             batch._link_elmis_lines_to_summary_lines()
-            batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
+            batch.elmis_picking_line_ids._ensure_patient_resolutions()
 
     def _generate_unmapped_elmis_picking_lines(self, mapped_prescription_ids):
         self.ensure_one()
@@ -333,8 +354,8 @@ class CduBatch(models.Model):
                     ]
                 )
             batch._link_elmis_lines_to_summary_lines()
-            batch.elmis_picking_fulfilment_line_ids._sync_selected_stock_option()
-            batch._sync_picking_quantities_from_elmis_pack_sizes()
+            batch.elmis_picking_line_ids._ensure_patient_resolutions()
+            batch._sync_fulfilment_lines_from_allocations()
             batch._ensure_picking_ready()
             batch._apply_repeat_fulfilment_results()
             batch.stock_event_status = "pending"
@@ -365,6 +386,9 @@ class CduBatch(models.Model):
 
             batch._sync_picking_summary_from_elmis_lines()
 
+            batch.patient_allocation_ids.write({"locked": True})
+            batch.picking_bulk_group_ids.write({"locked": True})
+            batch.picking_resolution_ids.write({"locked": True})
             batch.write(
                 {
                     "state": "picking_generated",
@@ -372,9 +396,18 @@ class CduBatch(models.Model):
                     "picking_confirmed_at": fields.Datetime.now(),
                 }
             )
-            batch.prescription_ids.filtered(
+            served_prescriptions = batch.picking_resolution_ids.filtered(
+                lambda resolution: resolution.status in ("full", "partial")
+            ).mapped("prescription_id")
+            unserved_prescriptions = batch.picking_resolution_ids.filtered(
+                lambda resolution: resolution.status == "unserved"
+            ).mapped("prescription_id")
+            served_prescriptions.filtered(
                 lambda prescription: prescription.state == "awaiting_picking"
             ).write({"state": "awaiting_dispensing"})
+            unserved_prescriptions.filtered(
+                lambda prescription: prescription.state == "awaiting_picking"
+            ).write({"state": "awaiting_batching", "batch_id": False})
             service.invalidate_stock_cache(store_facility_code, program_code)
             service.invalidate_stock_cache(production_facility_code, program_code)
 
@@ -461,6 +494,39 @@ class CduBatch(models.Model):
             for line in batch.elmis_picking_line_ids:
                 if not line.summary_line_id:
                     continue
+                matching_patient_lines = line._get_matching_patient_picking_lines()
+                exact_allocations = line.patient_allocation_ids
+                if exact_allocations:
+                    pack_sizes = set(
+                        exact_allocations.mapped("selected_pack_size")
+                    )
+                    pack_sizes.discard(0)
+                    required_units = sum(
+                        matching_patient_lines.mapped("required_units")
+                    )
+                    line.summary_line_id.write(
+                        {
+                            "pack_size": (
+                                next(iter(pack_sizes))
+                                if len(pack_sizes) == 1
+                                else 0
+                            ),
+                            "total_tablets": required_units,
+                            "total_bottles": sum(
+                                exact_allocations.mapped("quantity_packs")
+                            ),
+                            "elmis_product_name": ", ".join(
+                                sorted(
+                                    set(
+                                        exact_allocations.filtered(
+                                            "selected_orderable_name"
+                                        ).mapped("selected_orderable_name")
+                                    )
+                                )
+                            ),
+                        }
+                    )
+                    continue
                 pack_size = (
                     batch._get_selected_elmis_pack_size(line)
                     or line.summary_line_id.pack_size
@@ -469,7 +535,6 @@ class CduBatch(models.Model):
                 )
                 if pack_size <= 0:
                     continue
-                matching_patient_lines = line._get_matching_patient_picking_lines()
                 batch._sync_patient_picking_lines_for_pack_size(
                     matching_patient_lines,
                     pack_size,
@@ -504,6 +569,8 @@ class CduBatch(models.Model):
     def _sync_picking_quantities_from_elmis_pack_sizes(self):
         for batch in self:
             for line in batch.elmis_picking_line_ids:
+                if line.patient_allocation_ids:
+                    continue
                 if not line.summary_line_id:
                     continue
                 pack_size = batch._get_selected_elmis_pack_size(line)
@@ -535,10 +602,7 @@ class CduBatch(models.Model):
                 )
                 line.quantity_to_pick = packs_to_pick
                 for fulfilment_line in line.fulfilment_line_ids:
-                    if (
-                        not fulfilment_line.quantity_picked
-                        or fulfilment_line.quantity_picked > packs_to_pick
-                    ):
+                    if not fulfilment_line.quantity_picked:
                         fulfilment_line.quantity_picked = min(
                             line.quantity_to_pick,
                             fulfilment_line.selected_stock_on_hand or line.quantity_to_pick,
@@ -587,56 +651,56 @@ class CduBatch(models.Model):
                     }
                 )
 
-            for line in batch.elmis_picking_line_ids:
-                patient_lines = line._get_matching_patient_picking_lines()
-                if not patient_lines:
-                    continue
-                pack_size = line.summary_line_id.pack_size or line.pack_size or 0
-                if pack_size <= 0:
-                    continue
-                available_units = sum(
-                    line.fulfilment_line_ids.mapped("selected_stock_on_hand")
-                ) * pack_size
-                remaining_units = sum(
-                    line.fulfilment_line_ids.mapped("quantity_picked")
-                ) * pack_size
-
-                for patient_line in patient_lines.sorted("id"):
-                    daily_dose = patient_line.daily_dose or 0
-                    effective_repeat_days = patient_line.effective_repeat_days or patient_line.repeat_days or 0
-                    required_quantity = daily_dose * effective_repeat_days
-                    line_available_quantity = min(required_quantity, available_units)
-                    bottle_quantity = (
-                        (patient_line.cdu_bottles_required or 0)
-                        * (patient_line.pack_size or pack_size)
+            if batch.picking_resolution_ids:
+                for resolution in batch.picking_resolution_ids:
+                    patient_line = resolution.patient_line_id
+                    required_quantity = (
+                        patient_line.required_units
+                        or patient_line.required_quantity
+                        or 0
                     )
-                    picked_bottle_quantity = min(bottle_quantity, remaining_units)
-                    actual_supplied_days = picked_bottle_quantity / daily_dose if daily_dose else 0
-                    served_days = int(actual_supplied_days)
-                    back_order_days = max((patient_line.cdu_days or 0) - actual_supplied_days, 0)
+                    picked_units = resolution.supplied_units
+                    actual_supplied_days = resolution.coverage_days
+                    back_order_days = max(
+                        (patient_line.cdu_days or 0) - actual_supplied_days, 0
+                    )
                     recalculated_date = False
-                    if patient_line.prescription_id.next_drug_pickup_date:
+                    if (
+                        resolution.status != "unserved"
+                        and patient_line.prescription_id.next_drug_pickup_date
+                    ):
                         recalculated_date = (
                             patient_line.prescription_id.next_drug_pickup_date
                             + timedelta(days=int(actual_supplied_days))
                         )
-
+                    pack_sizes = set(
+                        resolution.allocation_line_ids.mapped("selected_pack_size")
+                    )
+                    pack_sizes.discard(0)
                     patient_line.write(
                         {
                             "required_quantity": required_quantity,
-                            "available_quantity": line_available_quantity,
-                            "picked_quantity": picked_bottle_quantity,
-                            "picked_units": picked_bottle_quantity,
+                            "available_quantity": picked_units,
+                            "picked_quantity": picked_units,
+                            "picked_units": picked_units,
+                            "pack_size": (
+                                next(iter(pack_sizes))
+                                if len(pack_sizes) == 1
+                                else 0
+                            ),
+                            "packs_to_pick": resolution.allocated_packs,
                             "actual_supplied_days": actual_supplied_days,
                             "back_order_days": back_order_days,
-                            "served_days": served_days,
+                            "served_days": int(actual_supplied_days),
                             "remaining_days": int(back_order_days),
                             "recalculated_next_drug_pickup_date": recalculated_date,
                             "calculated_next_pickup_date": recalculated_date,
                         }
                     )
-                    available_units = max(available_units - required_quantity, 0)
-                    remaining_units = max(remaining_units - picked_bottle_quantity, 0)
+            else:
+                # Historical batches created before exact allocation records
+                # retain their deterministic patient-order allocation.
+                batch._apply_legacy_repeat_fulfilment_results()
 
             for prescription in batch.prescription_ids:
                 lines = batch.patient_picking_line_ids.filtered(
@@ -649,6 +713,191 @@ class CduBatch(models.Model):
                     prescription.next_drug_pickup_date = (
                         prescription.next_drug_pickup_date + timedelta(days=int(served_days))
                     )
+
+    def _apply_legacy_repeat_fulfilment_results(self):
+        """Compatibility allocation for historical aggregate-only batches."""
+        for batch in self:
+            for line in batch.elmis_picking_line_ids:
+                patient_lines = line._get_matching_patient_picking_lines()
+                pack_size = line.summary_line_id.pack_size or line.pack_size or 0
+                if not patient_lines or pack_size <= 0:
+                    continue
+                remaining_units = sum(
+                    line.fulfilment_line_ids.mapped("quantity_picked")
+                ) * pack_size
+                for patient_line in patient_lines.sorted("id"):
+                    daily_dose = patient_line.daily_dose or 0
+                    required = (
+                        patient_line.cdu_bottles_required or 0
+                    ) * (patient_line.pack_size or pack_size)
+                    picked = min(required, remaining_units)
+                    supplied_days = picked / daily_dose if daily_dose else 0
+                    patient_line.write(
+                        {
+                            "picked_quantity": picked,
+                            "picked_units": picked,
+                            "actual_supplied_days": supplied_days,
+                            "served_days": int(supplied_days),
+                            "back_order_days": max(
+                                (patient_line.cdu_days or 0) - supplied_days, 0
+                            ),
+                        }
+                    )
+                    remaining_units = max(remaining_units - picked, 0)
+
+    def _sync_fulfilment_lines_from_allocations(self):
+        """Rebuild read-only movement totals from exact prescription allocations."""
+        Fulfilment = self.env["cdu.picking.fulfilment.line"].with_context(
+            cdu_sync_from_patient_allocations=True
+        )
+        for batch in self:
+            if self.env.context.get("cdu_skip_fulfilment_sync"):
+                continue
+            allocations = batch.patient_allocation_ids
+            grouped = {}
+            for allocation in allocations:
+                key = (allocation.picking_line_id.id, allocation.stock_option_id.id)
+                grouped[key] = grouped.get(key, 0) + allocation.quantity_packs
+
+            existing = {
+                (line.picking_line_id.id, line.selected_stock_option_id.id): line
+                for line in batch.elmis_picking_fulfilment_line_ids
+                if line.selected_stock_option_id
+            }
+            for key, quantity in grouped.items():
+                line = existing.pop(key, False)
+                values = {
+                    "batch_id": batch.id,
+                    "picking_line_id": key[0],
+                    "selected_stock_option_id": key[1],
+                    "quantity_picked": quantity,
+                }
+                if line:
+                    line.with_context(
+                        cdu_sync_from_patient_allocations=True
+                    ).write(values)
+                else:
+                    Fulfilment.create(values)
+            stale = self.env["cdu.picking.fulfilment.line"]
+            for line in existing.values():
+                stale |= line
+            if stale:
+                stale.with_context(
+                    cdu_sync_from_patient_allocations=True
+                ).unlink()
+
+    def _migrate_legacy_picking_allocations(self):
+        """Backfill confirmed aggregate selections without posting stock events."""
+        Allocation = self.env["cdu.picking.patient.allocation"].with_context(
+            cdu_allocation_migration=True,
+            cdu_skip_fulfilment_sync=True,
+        )
+        for batch in self.filtered("picking_confirmed_at"):
+            if batch.patient_allocation_ids:
+                continue
+            batch.elmis_picking_line_ids.with_context(
+                cdu_allow_mode_switch=True
+            ).write({"allocation_mode": "individual"})
+            batch.elmis_picking_line_ids._ensure_patient_resolutions()
+
+            for picking_line in batch.elmis_picking_line_ids:
+                resolutions = picking_line.resolution_ids.sorted(
+                    lambda resolution: (resolution.sequence, resolution.id)
+                )
+                fulfilments = picking_line.fulfilment_line_ids.filtered(
+                    lambda line: line.selected_stock_option_id
+                    and line.quantity_picked > 0
+                ).sorted("id")
+                remaining = {
+                    fulfilment.id: int(fulfilment.quantity_picked)
+                    for fulfilment in fulfilments
+                }
+                for resolution in resolutions:
+                    required_units = resolution.required_units or 0
+                    for fulfilment in fulfilments:
+                        available = remaining[fulfilment.id]
+                        pack_size = (
+                            fulfilment.selected_pack_size
+                            or fulfilment.selected_stock_option_id.pack_size
+                            or 0
+                        )
+                        if available <= 0 or pack_size <= 0 or required_units <= 0:
+                            continue
+                        packs = min(
+                            available,
+                            int(math.ceil(required_units / pack_size)),
+                        )
+                        Allocation.create(
+                            {
+                                "batch_id": batch.id,
+                                "picking_line_id": picking_line.id,
+                                "resolution_id": resolution.id,
+                                "stock_option_id": (
+                                    fulfilment.selected_stock_option_id.id
+                                ),
+                                "quantity_packs": packs,
+                                "allocation_method": "individual",
+                                "legacy": True,
+                            }
+                        )
+                        remaining[fulfilment.id] -= packs
+                        required_units = max(required_units - packs * pack_size, 0)
+
+                if resolutions:
+                    last_resolution = resolutions[-1]
+                    for fulfilment in fulfilments:
+                        extra = remaining[fulfilment.id]
+                        if extra <= 0:
+                            continue
+                        existing = last_resolution.allocation_line_ids.filtered(
+                            lambda allocation, fulfilment=fulfilment: (
+                                allocation.stock_option_id
+                                == fulfilment.selected_stock_option_id
+                            )
+                        )[:1]
+                        if existing:
+                            existing.with_context(
+                                cdu_allocation_migration=True,
+                                cdu_skip_fulfilment_sync=True,
+                            ).write(
+                                {"quantity_packs": existing.quantity_packs + extra}
+                            )
+                        else:
+                            Allocation.create(
+                                {
+                                    "batch_id": batch.id,
+                                    "picking_line_id": picking_line.id,
+                                    "resolution_id": last_resolution.id,
+                                    "stock_option_id": (
+                                        fulfilment.selected_stock_option_id.id
+                                    ),
+                                    "quantity_packs": extra,
+                                    "allocation_method": "individual",
+                                    "legacy": True,
+                                }
+                            )
+                for resolution in resolutions:
+                    if resolution.allocation_line_ids:
+                        resolution.with_context(
+                            cdu_allocation_migration=True
+                        )._refresh_status()
+                    else:
+                        resolution.with_context(
+                            cdu_allocation_migration=True
+                        ).write(
+                            {
+                                "status": "unserved",
+                                "unserved_reason": "insufficient_stock",
+                                "legacy": True,
+                            }
+                        )
+
+            batch.patient_allocation_ids.with_context(
+                cdu_allocation_migration=True
+            ).write({"legacy": True, "locked": True})
+            batch.picking_resolution_ids.with_context(
+                cdu_allocation_migration=True
+            ).write({"legacy": True, "locked": True})
 
     def _link_elmis_lines_to_summary_lines(self):
         for batch in self:
@@ -925,80 +1174,111 @@ class CduBatch(models.Model):
             errors.append(_("No eLMIS picking lines have been generated."))
             return errors
 
+        self.elmis_picking_line_ids._ensure_patient_resolutions()
         for picking_line in self.elmis_picking_line_ids:
-            if not picking_line.fulfilment_line_ids:
+            label = picking_line.openmrs_drug_name or _("Picking line")
+            if not picking_line.resolution_ids:
+                errors.append(_("%s: no prescriptions were found.") % label)
+                continue
+            unresolved = picking_line.resolution_ids.filtered(
+                lambda resolution: resolution.status == "draft"
+            )
+            if unresolved:
                 errors.append(
-                    _("%s: add at least one eLMIS fulfilment line.")
-                    % (picking_line.openmrs_drug_name or _("Picking line"))
+                    _("%(regimen)s: resolve all prescriptions (%(count)s remaining).")
+                    % {"regimen": label, "count": len(unresolved)}
+                )
+            invalid_unserved = picking_line.resolution_ids.filtered(
+                lambda resolution: resolution.status == "unserved"
+                and resolution.unserved_reason != "insufficient_stock"
+            )
+            if invalid_unserved:
+                errors.append(
+                    _("%s: every unserved prescription requires Insufficient Stock.")
+                    % label
+                )
+            positive_without_allocations = picking_line.resolution_ids.filtered(
+                lambda resolution: resolution.status in ("full", "partial")
+                and not resolution.allocation_line_ids
+            )
+            if positive_without_allocations:
+                errors.append(
+                    _("%s: served prescriptions must have exact stock allocations.")
+                    % label
+                )
+            mixed_without_confirmation = picking_line.resolution_ids.filtered(
+                lambda resolution: (
+                    resolution.allocation_line_ids
+                    and resolution.coverage_confirmation_required
+                    and not resolution.coverage_confirmed
+                )
+            )
+            if mixed_without_confirmation:
+                errors.append(
+                    _(
+                        "%(regimen)s: confirm supplied days for %(count)s "
+                        "mixed-product prescription(s)."
+                    )
+                    % {
+                        "regimen": label,
+                        "count": len(mixed_without_confirmation),
+                    }
+                )
+            zero_with_allocations = picking_line.resolution_ids.filtered(
+                lambda resolution: resolution.status == "unserved"
+                and resolution.allocation_line_ids
+            )
+            if zero_with_allocations:
+                errors.append(
+                    _("%s: unserved prescriptions cannot contain picked packs.")
+                    % label
+                )
+            if picking_line.allocation_mode == "bulk":
+                ungrouped = picking_line.resolution_ids.filtered(
+                    lambda resolution: (
+                        not resolution.bulk_member_id
+                        and resolution.status != "unserved"
+                    )
+                )
+                if ungrouped:
+                    errors.append(
+                        _(
+                            "%(regimen)s: every prescription must belong to one "
+                            "bulk group (%(count)s not grouped)."
+                        )
+                        % {"regimen": label, "count": len(ungrouped)}
+                    )
+                for group in picking_line.bulk_group_ids:
+                    errors.extend(group._get_distribution_errors())
+
+        totals = {}
+        for allocation in self.patient_allocation_ids:
+            option = allocation.stock_option_id
+            if allocation.quantity_packs <= 0:
+                errors.append(
+                    _("%s: allocated packs must be a positive whole number.")
+                    % allocation.prescription_id.display_name
+                )
+            if not option or option.pack_size <= 0:
+                errors.append(
+                    _("%s: select stock with a positive pack size.")
+                    % allocation.prescription_id.display_name
                 )
                 continue
-            required_qty = picking_line.quantity_to_pick or 0.0
-            picked_qty = picking_line.total_quantity_picked or 0.0
-            selected_pack_sizes = {
-                line.selected_pack_size or line.selected_stock_option_id.pack_size
-                for line in picking_line.fulfilment_line_ids
-                if line.selected_stock_option_id
-            }
-            selected_pack_sizes.discard(0)
-            selected_pack_sizes.discard(False)
-            selected_pack_sizes.discard(None)
-            if not selected_pack_sizes:
+            totals[option] = totals.get(option, 0) + allocation.quantity_packs
+        for option, quantity in totals.items():
+            if quantity > option.stock_on_hand:
                 errors.append(
-                    _("%s: choose an eLMIS stock option with a valid pack size.")
-                    % (picking_line.openmrs_drug_name or _("Picking line"))
-                )
-            elif len(selected_pack_sizes) > 1:
-                errors.append(
-                    _("%s: selected stock options must use the same pack size.")
-                    % (picking_line.openmrs_drug_name or _("Picking line"))
-                )
-            if required_qty <= 0:
-                errors.append(
-                    _("%s: required packs could not be calculated from the selected pack size.")
-                    % (picking_line.openmrs_drug_name or _("Picking line"))
-                )
-            if picked_qty + 0.0001 < required_qty:
-                errors.append(
-                    _("%s: picked packs are short by %.2f.")
-                    % (
-                        picking_line.openmrs_drug_name or _("Picking line"),
-                        required_qty - picked_qty,
+                    _(
+                        "%(product)s / %(lot)s: %(quantity)s packs are allocated "
+                        "but only %(available)s are available."
                     )
-                )
-            if picked_qty > required_qty + 0.0001:
-                errors.append(
-                    _("%s: picked quantity exceeds required packs by %.2f.")
-                    % (
-                        picking_line.openmrs_drug_name or _("Picking line"),
-                        picked_qty - required_qty,
-                    )
-                )
-
-        for index, line in enumerate(self.elmis_picking_fulfilment_line_ids, start=1):
-            label = line.openmrs_drug_name or _("Fulfilment line %s") % index
-            if not line.selected_stock_option_id:
-                errors.append(_("%s: choose an eLMIS stock option before generating the picking list.") % label)
-            selected_pack_size = 0
-            if line.selected_stock_option_id:
-                selected_pack_size = (
-                    line.selected_pack_size
-                    or line.selected_stock_option_id.pack_size
-                    or 0
-                )
-            if line.selected_stock_option_id and selected_pack_size <= 0:
-                errors.append(_("%s: selected eLMIS stock option has no pack size.") % label)
-            if line.quantity_picked <= 0:
-                errors.append(_("%s: picked quantity must be greater than zero.") % label)
-            if line.quantity_picked and not float(line.quantity_picked).is_integer():
-                errors.append(_("%s: picked packs must be a whole number.") % label)
-            if (
-                line.selected_stock_option_id
-                and line.quantity_picked
-                and line.quantity_picked > line.selected_stock_on_hand
-            ):
-                errors.append(
-                    _("%s: picked packs (%s) exceed available packs (%s).")
-                    % (label, line.quantity_picked, line.selected_stock_on_hand)
+                    % {
+                        "product": option.orderable_name,
+                        "lot": option.lot or _("No batch"),
+                        "quantity": quantity,
+                        "available": option.stock_on_hand,
+                    }
                 )
         return errors
 
@@ -1033,7 +1313,7 @@ class CduBatch(models.Model):
             raise UserError(_("Default Program Code is not configured."))
         if not self.elmis_picking_line_ids:
             self._generate_elmis_picking_lines()
-        self.elmis_picking_line_ids._ensure_default_fulfilment_line()
+        self.elmis_picking_line_ids._ensure_patient_resolutions()
 
         service.invalidate_stock_cache(store_facility_code, program_code)
         payload = service.get_stock_card_summaries(
@@ -1051,15 +1331,57 @@ class CduBatch(models.Model):
 
     def _replace_store_stock_options(self, payload, facility_code, program_code):
         self.ensure_one()
-        self.elmis_stock_option_ids.unlink()
         option_values = self._stock_options_from_payload(
             payload,
             facility_code=facility_code,
             program_code=program_code,
         )
-        if option_values:
-            self.env["cdu.elmis.stock.option"].create(option_values)
+        existing_by_key = {
+            self._stock_option_identity(
+                {
+                    "orderable_id": option.orderable_id,
+                    "orderable_code": option.orderable_code,
+                    "lot_id": option.lot_id,
+                    "lot": option.lot,
+                    "pack_size": option.pack_size,
+                }
+            ): option
+            for option in self.elmis_stock_option_ids
+        }
+        retained = self.env["cdu.elmis.stock.option"]
+        for values in option_values:
+            existing = existing_by_key.pop(
+                self._stock_option_identity(values), False
+            )
+            if existing:
+                existing.write(values)
+                retained |= existing
+            else:
+                retained |= self.env["cdu.elmis.stock.option"].create(values)
+
+        referenced = (
+            self.patient_allocation_ids.mapped("stock_option_id")
+            | self.picking_bulk_group_ids.mapped("product_stock_option_id")
+            | self.picking_bulk_group_ids.mapped("lot_ids.stock_option_id")
+            | self.elmis_picking_fulfilment_line_ids.mapped(
+                "selected_stock_option_id"
+            )
+        )
+        stale = self.elmis_stock_option_ids - retained
+        (stale - referenced).unlink()
+        # Keep a referenced lot that disappeared from the current response so
+        # the draft remains auditable, but make it unavailable for new packs.
+        (stale & referenced).write(
+            {"stock_on_hand": 0, "stock_on_hand_units": 0}
+        )
         self._rebuild_elmis_stock_summaries()
+
+    def _stock_option_identity(self, values):
+        return (
+            values.get("orderable_id") or values.get("orderable_code") or "",
+            values.get("lot_id") or values.get("lot") or "",
+            int(values.get("pack_size") or 0),
+        )
 
     def _rebuild_elmis_stock_summaries(self):
         Summary = self.env["cdu.elmis.stock.summary"]

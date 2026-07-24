@@ -71,7 +71,8 @@
                 </span>
             </xpath>
             <xpath expr="//div[contains(@class, 'o_cdu_batch_table_context')]" position="after">
-                <div class="o_cdu_batch_readiness_message" attrs="{'invisible': ['|', ('state', '=', 'draft'), ('picking_ready', '=', True)]}">
+                <div class="o_cdu_batch_readiness_message"
+                     attrs="{'invisible': ['|', '|', ('state', '=', 'draft'), ('picking_ready', '=', True), ('picking_confirmed_at', '!=', False)]}">
                     <span>Picking selections are incomplete.</span>
                     <button name="action_open_elmis_picking_wizard"
                             string="Open stock selection"
@@ -310,16 +311,9 @@
                     </field>
                 </page>
                 <page string="eLMIS Picking Selections" attrs="{'invisible': [('state', '=', 'draft')]}">
-                    <button name="action_open_elmis_picking_wizard"
-                            string="Revise Selection"
-                            type="object"
-                            class="btn-secondary"
-                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            attrs="{'invisible': [('state', '!=', 'picking_generated')]}"/>
                     <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
-                        Each eRegister drug/regimen below is generated from the prescriptions in this batch.
-                        Add one or more eLMIS fulfilment rows for each regimen when multiple eLMIS products
-                        or lots are needed.
+                        Confirmed allocations are locked. The stock movement rows below
+                        are read-only totals derived from exact prescription allocations.
                     </div>
                     <div class="o_cdu_elmis_section_title">eRegister requirements</div>
                     <field name="elmis_picking_line_ids" readonly="1">
@@ -334,28 +328,35 @@
                             <field name="picked_quantity" readonly="1" optional="show"/>
                             <field name="remaining_quantity" readonly="1" optional="show"/>
                             <field name="quantity_to_pick" string="Required Packs" readonly="1"/>
+                            <field name="allocation_mode" readonly="1" widget="badge"/>
+                            <field name="allocation_progress" readonly="1"/>
+                            <field name="allocation_status" readonly="1" widget="badge"/>
                         </tree>
                     </field>
-                    <div class="o_cdu_elmis_section_title">Fulfil with eLMIS stock</div>
-                    <field name="elmis_picking_fulfilment_line_ids"
-                           attrs="{'readonly': [('state', 'in', ('picking_generated', 'printed', 'done'))]}">
-                        <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
+                    <div class="o_cdu_elmis_section_title">Aggregate stock movements</div>
+                    <field name="elmis_picking_fulfilment_line_ids" readonly="1">
+                        <tree create="0" delete="0" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
                             <field name="batch_id" invisible="1"/>
-                            <field name="picking_line_id"
-                                   options="{'no_create': True, 'no_open': True}"
-                                   required="1"/>
+                            <field name="picking_line_id"/>
                             <field name="openmrs_drug_name" readonly="1" optional="hide"/>
                             <field name="required_quantity" string="Required Packs" readonly="1"/>
-                            <field name="selected_stock_option_id" string="Fulfil With" options="{'no_create': True, 'no_open': True}"/>
-                            <field name="selected_orderable_name" invisible="1" force_save="1"/>
-                            <field name="selected_lot" string="Batch Number" readonly="1" force_save="1"/>
-                            <field name="selected_lot_expiry" string="Expiry Date" readonly="1" force_save="1"/>
-                            <field name="selected_pack_size" string="Pack Size" readonly="1" force_save="1"/>
-                            <field name="selected_stock_on_hand" string="Available Packs" readonly="1" force_save="1"/>
-                            <field name="quantity_picked" string="Picked Packs"/>
-                            <field name="selected_orderable_code" invisible="1" force_save="1"/>
-                            <field name="selected_orderable_id" invisible="1" force_save="1"/>
-                            <field name="selected_lot_id" invisible="1" force_save="1"/>
+                            <field name="selected_orderable_name" string="Product"/>
+                            <field name="selected_lot" string="Batch Number"/>
+                            <field name="selected_lot_expiry" string="Expiry Date"/>
+                            <field name="selected_pack_size" string="Pack Size"/>
+                            <field name="selected_stock_on_hand" string="Available Packs"/>
+                            <field name="quantity_picked" string="Picked Packs" sum="Total Packs"/>
+                        </tree>
+                    </field>
+                    <div class="o_cdu_elmis_section_title">Exact prescription allocations</div>
+                    <field name="patient_allocation_ids" readonly="1">
+                        <tree create="0" delete="0">
+                            <field name="prescription_id"/>
+                            <field name="patient_line_id"/>
+                            <field name="selected_orderable_name" string="Product"/>
+                            <field name="selected_pack_size"/>
+                            <field name="selected_lot" string="Batch Number"/>
+                            <field name="quantity_packs" sum="Total Packs"/>
                         </tree>
                     </field>
                 </page>

@@ -175,7 +175,9 @@
                                         <span t-field="batch.filter_next_drug_pickup_date_to"/>
                                     </td>
                                     <th>Total Prescriptions:</th>
-                                    <td><span t-field="batch.prescription_count"/></td>
+                                    <td>
+                                        <span t-esc="len(batch.picking_resolution_ids) or batch.prescription_count"/>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>Collection Location:</th>
@@ -230,7 +232,9 @@
                                     <td class="text-end">
                                         <span t-if="line.packs_to_pick or line.required_quantity" t-esc="'%d' % int(round(line.packs_to_pick or line.required_quantity))"/>
                                     </td>
-                                    <td><span class="cdu-manual-box"></span></td>
+                                    <td class="text-end">
+                                        <span t-esc="'%d' % int(round(line.quantity_picked or 0))"/>
+                                    </td>
                                     <td class="text-center"><span class="cdu-checkbox"></span></td>
                                 </tr>
                                 <tr t-if="not stock_lines">
@@ -241,50 +245,66 @@
                             </tbody>
                         </table>
 
-                        <t t-set="allocation_lines" t-value="batch.elmis_picking_fulfilment_line_ids.sorted(lambda line: ((line.openmrs_drug_name or ''), line.id))"/>
-                        <div class="cdu-section-title">Prescription Allocation</div>
+                        <t t-set="allocation_lines" t-value="batch.patient_allocation_ids.sorted(lambda line: ((line.picking_line_id.openmrs_drug_name or ''), (line.prescription_id.name or ''), line.sequence, line.id))"/>
+                        <div class="cdu-section-title">Exact Prescription-Level Pack Allocations</div>
                         <table class="table table-sm o_main_table cdu-picking-table">
                             <thead>
                                 <tr>
                                     <th style="width: 4%;">#</th>
-                                    <th style="width: 10%;">Rx No</th>
-                                    <th style="width: 33%;">Regimen / Prescription</th>
-                                    <th style="width: 8%;" class="text-end">Rx Count</th>
-                                    <th style="width: 10%;" class="text-end">Estimated Available Repeats</th>
-                                    <th style="width: 9%;" class="text-end">Repeats To Dispense</th>
-                                    <th style="width: 8%;" class="text-end">Repeat Cycle</th>
-                                    <th style="width: 8%;" class="text-end">Coverage Days</th>
-                                    <th style="width: 10%;" class="text-end">Required Units</th>
+                                    <th style="width: 13%;">Rx No</th>
+                                    <th style="width: 16%;">Patient</th>
+                                    <th style="width: 16%;">Regimen</th>
+                                    <th style="width: 19%;">Product</th>
+                                    <th style="width: 7%;" class="text-end">Daily</th>
+                                    <th style="width: 8%;" class="text-end">Pack Size</th>
+                                    <th style="width: 10%;">Lot</th>
+                                    <th style="width: 7%;" class="text-end">Packs</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr t-foreach="allocation_lines" t-as="line">
                                     <td><span t-esc="line_index + 1"/></td>
-                                    <td>
-                                        <span t-if="line.picking_line_id.prescription_id" t-field="line.picking_line_id.prescription_id.name"/>
-                                    </td>
-                                    <td><span t-field="line.openmrs_drug_name"/></td>
-                                    <td class="text-end"><span t-if="line.prescription_count" t-esc="'%d' % int(round(line.prescription_count))"/></td>
-                                    <td class="text-end">
-                                        <span t-if="line.estimated_available_repeats" t-esc="'%d' % int(round(float(line.estimated_available_repeats)))"/>
-                                    </td>
-                                    <td class="text-end">
-                                        <span t-if="line.repeats_to_dispense" t-esc="'%d' % int(round(float(line.repeats_to_dispense)))"/>
-                                    </td>
-                                    <td class="text-end">
-                                        <span t-if="'repeat_cycle' in line._fields and line.repeat_cycle" t-esc="line.repeat_cycle"/>
-                                    </td>
-                                    <td class="text-end">
-                                        <span t-if="line.coverage_days" t-esc="'%d' % int(round(float(line.coverage_days)))"/>
-                                    </td>
-                                    <td class="text-end">
-                                        <span t-if="line.required_units" t-esc="'%d' % int(round(line.required_units))"/>
-                                    </td>
+                                    <td><span t-field="line.prescription_id.name"/></td>
+                                    <td><span t-field="line.resolution_id.patient_id"/></td>
+                                    <td><span t-field="line.picking_line_id.openmrs_drug_name"/></td>
+                                    <td><span t-field="line.selected_orderable_name"/></td>
+                                    <td class="text-end"><span t-field="line.daily_units"/></td>
+                                    <td class="text-end"><span t-field="line.selected_pack_size"/></td>
+                                    <td><span t-field="line.selected_lot"/></td>
+                                    <td class="text-end"><span t-field="line.quantity_packs"/></td>
                                 </tr>
                                 <tr t-if="not allocation_lines">
                                     <td colspan="9" class="text-center text-muted">
-                                        No eLMIS fulfilment lines have been generated for this batch.
+                                        No prescription pack allocations were recorded.
                                     </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <t t-set="unserved_lines" t-value="batch.picking_resolution_ids.filtered(lambda line: line.status == 'unserved').sorted(lambda line: ((line.picking_line_id.openmrs_drug_name or ''), line.sequence, line.id))"/>
+                        <div class="cdu-section-title">Unserved / Exceptions</div>
+                        <table class="table table-sm o_main_table cdu-picking-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 5%;">#</th>
+                                    <th style="width: 16%;">Rx No</th>
+                                    <th style="width: 22%;">Patient</th>
+                                    <th style="width: 22%;">Regimen</th>
+                                    <th style="width: 15%;">Reason</th>
+                                    <th style="width: 20%;">Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="unserved_lines" t-as="line">
+                                    <td><span t-esc="line_index + 1"/></td>
+                                    <td><span t-field="line.prescription_id.name"/></td>
+                                    <td><span t-field="line.patient_id"/></td>
+                                    <td><span t-field="line.picking_line_id.openmrs_drug_name"/></td>
+                                    <td><span t-field="line.unserved_reason"/></td>
+                                    <td><span t-field="line.unserved_note"/></td>
+                                </tr>
+                                <tr t-if="not unserved_lines">
+                                    <td colspan="6" class="text-center text-muted">No unserved prescriptions.</td>
                                 </tr>
                             </tbody>
                         </table>

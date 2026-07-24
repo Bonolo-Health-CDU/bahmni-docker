@@ -13,6 +13,9 @@ class TestCduDispensingWorkflow(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.admin = cls.env.ref("cdu_prescription.user_cdu_admin")
+        cls.dispensing_officer = cls.env.ref(
+            "cdu_prescription.user_cdu_dispensing_officer"
+        )
         cls.facility = cls.env["cdu.facility"].create(
             {
                 "name": "Dispensing Test Facility",
@@ -113,7 +116,12 @@ class TestCduDispensingWorkflow(TransactionCase):
         dispense = self._create_ready_dispense(prescription)
         prescription.state = "awaiting_bagging_qa"
 
-        action = dispense._get_next_dispensing_action()
+        self.assertFalse(
+            self.dispensing_officer.has_group("base.group_system")
+        )
+        action = dispense.with_user(
+            self.dispensing_officer
+        )._get_next_dispensing_action()
 
         expected_action = self.env.ref(
             "cdu_elmis.action_cdu_dispensing_work_queue"
@@ -122,8 +130,62 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(action["res_model"], "cdu.prescription")
         self.assertEqual(action["views"], [(False, "tree"), (False, "form")])
 
-    def test_next_button_is_removed_and_later_prescriptions_can_reprint(self):
+    def test_exhausted_bagging_qa_returns_non_admin_to_work_queue(self):
         prescription = self._create_prescription("004", 40)
+        dispense = self._create_ready_dispense(prescription)
+        prescription.state = "awaiting_bagging_qa"
+        qa_record = self.env["cdu.bagging.qa"].create(
+            {
+                "prescription_id": prescription.id,
+                "dispense_id": dispense.id,
+            }
+        )
+
+        action = qa_record.with_user(
+            self.dispensing_officer
+        )._get_next_bagging_qa_action()
+
+        expected_action = self.env.ref(
+            "cdu_elmis.action_cdu_bagging_qa_work_queue"
+        )
+        self.assertEqual(action["id"], expected_action.id)
+        self.assertEqual(action["res_model"], "cdu.prescription")
+        self.assertEqual(action["views"], [(False, "tree"), (False, "form")])
+        self.assertEqual(
+            action["domain"],
+            [
+                ("state", "=", "awaiting_bagging_qa"),
+                ("batch_id", "=", self.batch.id),
+            ],
+        )
+
+    def test_raw_regimen_remains_available_to_picking_workflow(self):
+        prescription = self._create_prescription("005", 30)
+        prescription.next_clinical_visit_date = self.today + timedelta(days=60)
+
+        patient_lines, summary_lines = self.batch._prepare_picking_line_values()
+
+        patient_line = next(
+            values
+            for values in patient_lines
+            if values["prescription_id"] == prescription.id
+        )
+        summary_line = next(
+            values
+            for values in summary_lines
+            if values["unmapped_drug_name"] == "TEST-DISPENSING-REGIMEN"
+        )
+        self.assertFalse(patient_line["product_id"])
+        self.assertEqual(
+            patient_line["drug_name"],
+            prescription.regimen_prescribed_raw,
+        )
+        self.assertFalse(summary_line["product_id"])
+        self.assertEqual(summary_line["prescription_count"], 1)
+        self.assertNotIn("cdu.regimen", self.env.registry.models)
+
+    def test_next_button_is_removed_and_later_prescriptions_can_reprint(self):
+        prescription = self._create_prescription("006", 40)
         dispense = self._create_ready_dispense(prescription)
         dispense.write(
             {

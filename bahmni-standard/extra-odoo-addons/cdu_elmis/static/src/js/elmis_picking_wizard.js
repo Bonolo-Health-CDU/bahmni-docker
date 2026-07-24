@@ -109,14 +109,6 @@ function validatePickingWizard(record) {
                 message: `${label}: picked packs must be a whole number.`,
             };
         }
-        if (requiredQty && pickedQty > requiredQty + EPSILON) {
-            return {
-                valid: false,
-                message: `${label}: picked packs cannot exceed required packs (${formatQty(
-                    requiredQty
-                )}).`,
-            };
-        }
         if (pickedQty > stockOnHand + EPSILON) {
             return {
                 valid: false,
@@ -140,22 +132,6 @@ function validatePickingWizard(record) {
             return {
                 valid: false,
                 message: `${labelsByPickingLine[pickingLineKey]}: selected stock options must use the same pack size.`,
-            };
-        }
-        if (requiredQty && totalPicked + EPSILON < requiredQty) {
-            return {
-                valid: false,
-                message: `${labelsByPickingLine[pickingLineKey]}: picked packs are short by ${formatQty(
-                    requiredQty - totalPicked
-                )}.`,
-            };
-        }
-        if (requiredQty && totalPicked > requiredQty + EPSILON) {
-            return {
-                valid: false,
-                message: `${labelsByPickingLine[pickingLineKey]}: picked packs exceed required packs by ${formatQty(
-                    totalPicked - requiredQty
-                )}.`,
             };
         }
     }

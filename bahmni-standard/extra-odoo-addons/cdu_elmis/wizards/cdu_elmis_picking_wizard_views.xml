@@ -4,72 +4,126 @@
         <field name="name">cdu.elmis.picking.wizard.form</field>
         <field name="model">cdu.elmis.picking.wizard</field>
         <field name="arch" type="xml">
-            <form string="Generate Picking List" class="o_cdu_elmis_picking_wizard">
+            <form string="Prescription Allocation" class="o_cdu_elmis_picking_wizard">
                 <sheet>
                     <field name="batch_id" invisible="1"/>
                     <field name="batch_state" invisible="1"/>
                     <field name="picking_ready" invisible="1"/>
+                    <field name="step" invisible="1"/>
                     <div class="oe_title">
-                        <h1>Generate Picking List</h1>
-                        <div>
-                            <field name="subtitle" nolabel="1" readonly="1"/>
+                        <h1>Prescription Allocation</h1>
+                        <div><field name="subtitle" nolabel="1" readonly="1"/></div>
+                    </div>
+
+                    <div attrs="{'invisible': [('step', '!=', 'overview')]}">
+                        <div class="alert alert-info" role="alert">
+                            Choose a workflow per regimen. Switching modes clears only
+                            that regimen's unconfirmed allocations.
+                        </div>
+                        <separator string="Regimen Overview"/>
+                        <field name="elmis_picking_line_ids" readonly="1" nolabel="1">
+                            <tree create="0" delete="0" default_order="openmrs_drug_name asc">
+                                <field name="openmrs_drug_name" string="Regimen"/>
+                                <field name="prescription_count" string="Prescriptions"/>
+                                <field name="allocation_mode" widget="badge"/>
+                                <field name="allocation_progress" string="Progress"/>
+                                <field name="allocation_status" widget="badge"
+                                       decoration-success="allocation_status == 'ready'"
+                                       decoration-warning="allocation_status == 'in_progress'"
+                                       decoration-muted="allocation_status == 'not_started'"/>
+                                <button name="action_open_allocation"
+                                        string="Allocate"
+                                        type="object"
+                                        icon="fa-list"/>
+                                <button name="action_use_bulk_mode"
+                                        string="Use Bulk"
+                                        type="object"
+                                        icon="fa-users"
+                                        confirm="Switching to Bulk clears this regimen's draft allocations. Continue?"
+                                        attrs="{'invisible': [('allocation_mode', '=', 'bulk')]}"/>
+                                <button name="action_use_individual_mode"
+                                        string="Use Individual"
+                                        type="object"
+                                        icon="fa-user"
+                                        confirm="Switching to Individual clears this regimen's draft allocations. Continue?"
+                                        attrs="{'invisible': [('allocation_mode', '=', 'individual')]}"/>
+                            </tree>
+                        </field>
+                    </div>
+
+                    <div attrs="{'invisible': [('step', '!=', 'review')]}">
+                        <separator string="Aggregate Stock to Pick"/>
+                        <field name="elmis_picking_fulfilment_line_ids"
+                               nolabel="1" readonly="1">
+                            <tree create="0" delete="0">
+                                <field name="openmrs_drug_name" string="Regimen"/>
+                                <field name="selected_orderable_name" string="Product"/>
+                                <field name="selected_pack_size" string="Pack Size"/>
+                                <field name="selected_lot" string="Batch No."/>
+                                <field name="selected_lot_expiry" string="Expiry"/>
+                                <field name="quantity_picked" string="Picked Packs"
+                                       sum="Total Packs"/>
+                            </tree>
+                        </field>
+
+                        <separator string="Exact Prescription Allocations"/>
+                        <field name="patient_allocation_ids" nolabel="1" readonly="1">
+                            <tree create="0" delete="0">
+                                <field name="prescription_id"/>
+                                <field name="patient_line_id" string="Patient Requirement"/>
+                                <field name="selected_orderable_name" string="Product"/>
+                                <field name="selected_pack_size" string="Pack Size"/>
+                                <field name="selected_lot" string="Batch No."/>
+                                <field name="daily_units" string="Daily Units"/>
+                                <field name="quantity_packs" sum="Total Packs"/>
+                                <field name="product_coverage_days" string="Lot Coverage"/>
+                            </tree>
+                        </field>
+
+                        <separator string="Coverage and Exceptions"/>
+                        <field name="picking_resolution_ids" nolabel="1" readonly="1">
+                            <tree create="0" delete="0"
+                                  decoration-danger="status == 'unserved'"
+                                  decoration-warning="status == 'partial'"
+                                  decoration-success="status == 'full'">
+                                <field name="prescription_id"/>
+                                <field name="patient_id"/>
+                                <field name="status" widget="badge"/>
+                                <field name="distinct_product_count" string="Products"/>
+                                <field name="supplied_units"/>
+                                <field name="confirmed_supplied_days"/>
+                                <field name="coverage_confirmed"/>
+                                <field name="coverage_days"/>
+                                <field name="coverage_variance_days" string="Variance (days)"/>
+                                <field name="unserved_reason"/>
+                                <field name="unserved_note"/>
+                            </tree>
+                        </field>
+                        <div class="alert alert-warning"
+                             role="alert"
+                             attrs="{'invisible': [('picking_ready', '=', True)]}">
+                            <field name="picking_readiness_message" nolabel="1" readonly="1"/>
                         </div>
                     </div>
-
-                    <div class="o_cdu_elmis_wizard_steps">
-                        <span class="o_cdu_elmis_step o_cdu_elmis_step_done">Fetch stock</span>
-                        <span class="o_cdu_elmis_step o_cdu_elmis_step_current">Select stock</span>
-                        <span class="o_cdu_elmis_step">Generate</span>
-                    </div>
-
-                    <separator string="eRegister Requirements - from EMR, read only"/>
-                    <field name="elmis_picking_line_ids" readonly="1" nolabel="1">
-                        <tree create="0" delete="0" default_order="openmrs_drug_name asc">
-                            <field name="openmrs_drug_name" string="Regimen"/>
-                            <field name="prescription_count" string="Prescriptions"/>
-                            <field name="required_units" string="Required (tabs)"/>
-                        </tree>
-                    </field>
-
-                    <separator string="Fulfil With eLMIS Stock - add multiple lots if needed"/>
-                    <field name="elmis_picking_fulfilment_line_ids"
-                           nolabel="1"
-                           context="{'default_batch_id': batch_id}"
-                           attrs="{'readonly': [('batch_state', 'in', ('picking_generated', 'printed', 'done'))]}">
-                        <tree editable="bottom"
-                              default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
-                            <field name="batch_id" invisible="1"/>
-                            <field name="picking_line_id"
-                                   options="{'no_create': True, 'no_open': True}"
-                                   required="1"/>
-                            <field name="openmrs_drug_name" readonly="1" optional="hide"/>
-                            <field name="required_quantity" readonly="1" optional="hide"/>
-                            <field name="required_units" readonly="1" optional="hide"/>
-                            <field name="selected_stock_option_id"
-                                   string="Fulfil With"
-                                   options="{'no_create': True, 'no_open': True}"/>
-                            <field name="selected_orderable_name" invisible="1" force_save="1"/>
-                            <field name="selected_lot" string="Batch No." readonly="1" force_save="1"/>
-                            <field name="selected_lot_expiry" string="Expiry" readonly="1" force_save="1"/>
-                            <field name="selected_pack_size" string="Pack Size" readonly="1" force_save="1"/>
-                            <field name="selected_stock_on_hand" string="Available (packs)" readonly="1" force_save="1"/>
-                            <field name="quantity_picked" string="Picked (packs)"/>
-                            <field name="selected_orderable_code" invisible="1" force_save="1"/>
-                            <field name="selected_orderable_id" invisible="1" force_save="1"/>
-                            <field name="selected_lot_id" invisible="1" force_save="1"/>
-                        </tree>
-                    </field>
-
-                    <div class="alert alert-warning o_cdu_elmis_picking_client_warning d-none"
-                         role="alert"/>
                 </sheet>
                 <footer>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
-                    <button name="action_confirm"
-                            string="Generate Picking List"
+                    <button name="action_back_to_overview"
+                            string="Back to Overview"
                             type="object"
-                            confirm="This will move the selected stock from CDU Store to Production Floor. Continue?"
-                            class="btn-primary o_cdu_generate_picking_button"/>
+                            class="btn-secondary"
+                            attrs="{'invisible': ['|', ('step', '!=', 'review'), ('batch_state', '!=', 'confirmed')]}"/>
+                    <button name="action_review"
+                            string="Review Allocations"
+                            type="object"
+                            class="btn-primary"
+                            attrs="{'invisible': [('step', '!=', 'overview')]}"/>
+                    <button name="action_confirm"
+                            string="Confirm Picking"
+                            type="object"
+                            confirm="This locks all allocations and moves the selected stock from CDU Store to Production Floor. Continue?"
+                            class="btn-primary"
+                            attrs="{'invisible': ['|', ('step', '!=', 'review'), ('batch_state', '!=', 'confirmed')]}"/>
                 </footer>
             </form>
         </field>

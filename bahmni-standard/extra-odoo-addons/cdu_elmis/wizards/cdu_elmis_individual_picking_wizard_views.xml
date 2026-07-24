@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_elmis_individual_picking_wizard_form" model="ir.ui.view">
+        <field name="name">cdu.elmis.individual.picking.wizard.form</field>
+        <field name="model">cdu.elmis.individual.picking.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Individual Prescription Picking">
+                <sheet>
+                    <field name="batch_id" invisible="1"/>
+                    <field name="picking_line_id" invisible="1"/>
+                    <field name="resolution_id" invisible="1"/>
+                    <field name="has_previous" invisible="1"/>
+                    <field name="has_next" invisible="1"/>
+                    <field name="coverage_confirmation_required" invisible="1"/>
+                    <div class="oe_title">
+                        <h1><field name="progress" nolabel="1" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="prescription_id" readonly="1"/>
+                            <field name="patient_id" readonly="1"/>
+                            <field name="patient_line_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="status" widget="badge" readonly="1"/>
+                            <field name="target_days" readonly="1"/>
+                            <field name="supplied_units" readonly="1"/>
+                            <field name="distinct_product_count" readonly="1"/>
+                            <field name="coverage_days" readonly="1"/>
+                            <field name="coverage_variance_days"
+                                   string="Coverage Variance (days)" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Allocate whole packs from any positive-stock product, pack
+                        size, and lot. Set Daily Units for each product; it defaults
+                        to 1. Lots of the same product share that value. Suggested
+                        packs assume that product is used alone; entered packs remain
+                        authoritative.
+                    </div>
+                    <group string="Mixed-Product Coverage">
+                        <div class="alert alert-warning" role="alert" colspan="2">
+                            When more than one eLMIS product is selected, review
+                            each product's calculated coverage and enter the
+                            prescription's final total supplied days. Leave this
+                            at zero for a single product.
+                        </div>
+                        <field name="confirmed_supplied_days"
+                               string="Confirmed Supplied Days (mixed products only)"/>
+                        <field name="coverage_confirmed" readonly="1"/>
+                        <field name="coverage_confirmed_by"
+                               attrs="{'invisible': [('coverage_confirmed', '=', False)]}"
+                               readonly="1"/>
+                        <field name="coverage_confirmed_at"
+                               attrs="{'invisible': [('coverage_confirmed', '=', False)]}"
+                               readonly="1"/>
+                    </group>
+                    <field name="allocation_line_ids"
+                           context="{'default_batch_id': batch_id,
+                                     'default_picking_line_id': picking_line_id,
+                                     'default_resolution_id': resolution_id,
+                                     'default_allocation_method': 'individual'}">
+                        <tree editable="bottom">
+                            <field name="batch_id" invisible="1"/>
+                            <field name="picking_line_id" invisible="1"/>
+                            <field name="resolution_id" invisible="1"/>
+                            <field name="stock_option_id"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="selected_orderable_name" string="Product" readonly="1"/>
+                            <field name="selected_pack_size" readonly="1"/>
+                            <field name="selected_lot" string="Batch No." readonly="1"/>
+                            <field name="selected_lot_expiry" readonly="1"/>
+                            <field name="selected_stock_on_hand" readonly="1"/>
+                            <field name="daily_units"/>
+                            <field name="suggested_packs"
+                                   string="Packs if Used Alone" readonly="1"/>
+                            <field name="quantity_packs"/>
+                            <field name="allocated_units" readonly="1"/>
+                            <field name="product_coverage_days" readonly="1"/>
+                            <field name="original_daily_units" optional="hide" readonly="1"/>
+                            <field name="daily_units_changed_by" optional="hide" readonly="1"/>
+                            <field name="daily_units_changed_at" optional="hide" readonly="1"/>
+                        </tree>
+                    </field>
+                    <group string="Unserved">
+                        <field name="unserved_note"
+                               placeholder="Optional explanation or follow-up note"/>
+                        <button name="action_mark_unserved"
+                                string="Mark Unserved — Insufficient Stock"
+                                type="object"
+                                class="btn-secondary"
+                                confirm="This removes this prescription's draft allocations and marks it unserved. Continue?"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_previous"
+                            string="Back"
+                            type="object"
+                            class="btn-secondary"
+                            attrs="{'invisible': [('has_previous', '=', False)]}"/>
+                    <button name="action_next"
+                            string="Next"
+                            type="object"
+                            class="btn-primary"
+                            attrs="{'invisible': [('has_next', '=', False)]}"/>
+                    <button name="action_review"
+                            string="Final Review"
+                            type="object"
+                            class="btn-primary"
+                            attrs="{'invisible': [('has_next', '=', True)]}"/>
+                    <button string="Close" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

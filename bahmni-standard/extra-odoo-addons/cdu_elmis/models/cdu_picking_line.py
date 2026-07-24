@@ -95,6 +95,44 @@ class CduPickingLine(models.Model):
         required=True
     )
     quantity_picked = fields.Float(string="Picked Packs")
+    allocation_mode = fields.Selection(
+        [
+            ("bulk", "Bulk"),
+            ("individual", "Individual"),
+        ],
+        string="Allocation Mode",
+        required=True,
+        default="bulk",
+        index=True,
+    )
+    resolution_ids = fields.One2many(
+        "cdu.picking.patient.resolution",
+        "picking_line_id",
+        string="Prescription Resolutions",
+    )
+    patient_allocation_ids = fields.One2many(
+        "cdu.picking.patient.allocation",
+        "picking_line_id",
+        string="Exact Prescription Allocations",
+    )
+    bulk_group_ids = fields.One2many(
+        "cdu.picking.bulk.group",
+        "picking_line_id",
+        string="Bulk Groups",
+    )
+    resolved_prescription_count = fields.Integer(
+        compute="_compute_allocation_progress"
+    )
+    allocation_progress = fields.Char(compute="_compute_allocation_progress")
+    allocation_status = fields.Selection(
+        [
+            ("not_started", "Not Started"),
+            ("in_progress", "In Progress"),
+            ("ready", "Ready"),
+            ("locked", "Locked"),
+        ],
+        compute="_compute_allocation_progress",
+    )
     fulfilment_line_ids = fields.One2many(
         "cdu.picking.fulfilment.line",
         "picking_line_id",
@@ -130,6 +168,35 @@ class CduPickingLine(models.Model):
     def _compute_total_quantity_picked(self):
         for line in self:
             line.total_quantity_picked = sum(line.fulfilment_line_ids.mapped("quantity_picked"))
+
+    @api.depends(
+        "resolution_ids.status",
+        "resolution_ids.locked",
+        "prescription_count",
+        "batch_id.picking_confirmed_at",
+    )
+    def _compute_allocation_progress(self):
+        for line in self:
+            total = len(line.resolution_ids)
+            resolved = len(
+                line.resolution_ids.filtered(
+                    lambda resolution: resolution.status
+                    in ("full", "partial", "unserved")
+                )
+            )
+            line.resolved_prescription_count = resolved
+            line.allocation_progress = _("%(resolved)s of %(total)s") % {
+                "resolved": resolved,
+                "total": total or line.prescription_count or 0,
+            }
+            if line.batch_id.picking_confirmed_at:
+                line.allocation_status = "locked"
+            elif not resolved:
+                line.allocation_status = "not_started"
+            elif resolved < total:
+                line.allocation_status = "in_progress"
+            else:
+                line.allocation_status = "ready"
 
     @api.depends(
         "fulfilment_line_ids.quantity_picked",
@@ -263,7 +330,65 @@ class CduPickingLine(models.Model):
             lambda patient_line: (patient_line.drug_name or "").strip().lower() == regimen_name
         )
 
+    def _get_patient_fulfilment_allocations(self, patient_line):
+        """Allocate this patient's picked packs across the selected stock lots."""
+        self.ensure_one()
+        if not patient_line:
+            return {}
+
+        exact_allocations = self.patient_allocation_ids.filtered(
+            lambda allocation: allocation.patient_line_id == patient_line
+        )
+        if exact_allocations:
+            result = {}
+            for allocation in exact_allocations:
+                fulfilment = self.fulfilment_line_ids.filtered(
+                    lambda line: line.selected_stock_option_id
+                    == allocation.stock_option_id
+                )[:1]
+                if fulfilment:
+                    result[fulfilment.id] = allocation.quantity_packs
+            return result
+
+        pack_size = self._get_effective_pack_size()
+        if pack_size <= 0:
+            return {}
+
+        patient_lines = self._get_matching_patient_picking_lines().sorted("id")
+        preceding_packs = 0.0
+        for candidate in patient_lines:
+            if candidate == patient_line:
+                break
+            preceding_packs += (
+                candidate.picked_units or candidate.picked_quantity or 0.0
+            ) / pack_size
+
+        remaining_packs = (
+            patient_line.picked_units or patient_line.picked_quantity or 0.0
+        ) / pack_size
+        allocations = {}
+        for fulfilment_line in self.fulfilment_line_ids.sorted("id"):
+            lot_packs = fulfilment_line.quantity_picked or 0.0
+            if preceding_packs >= lot_packs:
+                preceding_packs -= lot_packs
+                continue
+
+            available_packs = lot_packs - preceding_packs
+            preceding_packs = 0.0
+            allocated_packs = min(remaining_packs, available_packs)
+            if allocated_packs > 0:
+                allocations[fulfilment_line.id] = allocated_packs
+                remaining_packs -= allocated_packs
+            if remaining_packs <= 0:
+                break
+        return allocations
+
     def _ensure_default_fulfilment_line(self):
+        # Fulfilment rows are aggregate, read-only movement rows in the new
+        # workflow. Legacy callers may still request defaults for historical
+        # records, but draft prescription-level allocation starts empty.
+        if not self.env.context.get("cdu_create_legacy_fulfilment_default"):
+            return
         for line in self:
             if line.fulfilment_line_ids:
                 continue
@@ -275,6 +400,119 @@ class CduPickingLine(models.Model):
             if line.selected_stock_option_id:
                 values["selected_stock_option_id"] = line.selected_stock_option_id.id
             self.env["cdu.picking.fulfilment.line"].create(values)
+
+    def _ensure_patient_resolutions(self):
+        Resolution = self.env["cdu.picking.patient.resolution"]
+        for line in self:
+            existing_patient_ids = set(line.resolution_ids.mapped("patient_line_id").ids)
+            values = []
+            for sequence, patient_line in enumerate(
+                line._get_matching_patient_picking_lines().sorted("id"), start=1
+            ):
+                if patient_line.id in existing_patient_ids:
+                    continue
+                values.append(
+                    {
+                        "batch_id": line.batch_id.id,
+                        "picking_line_id": line.id,
+                        "patient_line_id": patient_line.id,
+                        "sequence": sequence * 10,
+                    }
+                )
+            if values:
+                Resolution.create(values)
+
+    def _has_draft_allocations(self):
+        self.ensure_one()
+        return bool(
+            self.patient_allocation_ids
+            or self.bulk_group_ids
+            or self.resolution_ids.filtered(
+                lambda resolution: resolution.status != "draft"
+                or resolution.unserved_note
+            )
+        )
+
+    def _switch_allocation_mode(self, mode):
+        if mode not in ("bulk", "individual"):
+            raise ValidationError(_("Unknown allocation mode."))
+        for line in self:
+            if line.batch_id.picking_confirmed_at:
+                raise ValidationError(_("Confirmed picking allocations are locked."))
+            if line.allocation_mode == mode:
+                continue
+            line.patient_allocation_ids.unlink()
+            line.bulk_group_ids.unlink()
+            line.resolution_ids.write(
+                {
+                    "status": "draft",
+                    "unserved_reason": False,
+                    "unserved_note": False,
+                }
+            )
+            line.with_context(cdu_allow_mode_switch=True).allocation_mode = mode
+        return True
+
+    def action_use_bulk_mode(self):
+        self._switch_allocation_mode("bulk")
+        return {"type": "ir.actions.client", "tag": "reload"}
+
+    def action_use_individual_mode(self):
+        self._switch_allocation_mode("individual")
+        return {"type": "ir.actions.client", "tag": "reload"}
+
+    def action_open_allocation(self):
+        self.ensure_one()
+        self._ensure_patient_resolutions()
+        if self.allocation_mode == "individual":
+            first = self.resolution_ids.sorted(
+                lambda resolution: (resolution.sequence, resolution.id)
+            )[:1]
+            if not first:
+                raise ValidationError(_("No prescriptions were found for this regimen."))
+            wizard = self.env["cdu.elmis.individual.picking.wizard"].create(
+                {"resolution_id": first.id}
+            )
+            return wizard._open_action()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("%s - Bulk Allocation") % self.openmrs_drug_name,
+            "res_model": "cdu.picking.line",
+            "res_id": self.id,
+            "view_mode": "form",
+            "view_id": self.env.ref(
+                "cdu_elmis.view_cdu_picking_line_bulk_allocation_form"
+            ).id,
+            "target": "current",
+            "context": {
+                "default_batch_id": self.batch_id.id,
+                "default_picking_line_id": self.id,
+            },
+        }
+
+    def action_back_to_allocation_overview(self):
+        self.ensure_one()
+        wizard = self.env["cdu.elmis.picking.wizard"].create(
+            {"batch_id": self.batch_id.id, "step": "overview"}
+        )
+        return wizard._open_action()
+
+    def write(self, vals):
+        if (
+            "allocation_mode" in vals
+            and not self.env.context.get("cdu_allow_mode_switch")
+        ):
+            changed = self.filtered(
+                lambda line: line.allocation_mode != vals["allocation_mode"]
+            )
+            if any(line._has_draft_allocations() for line in changed):
+                raise ValidationError(
+                    _(
+                        "Use the mode-switch button so the affected regimen's "
+                        "draft allocations can be cleared safely."
+                    )
+                )
+        return super().write(vals)
 
     @api.onchange("selected_stock_option_id")
     def _onchange_selected_stock_option_id(self):

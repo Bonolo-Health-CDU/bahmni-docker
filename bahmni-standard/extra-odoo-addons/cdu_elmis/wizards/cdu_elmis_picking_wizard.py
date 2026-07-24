@@ -1,4 +1,5 @@
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class CduElmisPickingWizard(models.TransientModel):
@@ -10,6 +11,14 @@ class CduElmisPickingWizard(models.TransientModel):
         required=True,
         readonly=True,
         ondelete="cascade",
+    )
+    step = fields.Selection(
+        [
+            ("overview", "Regimen Overview"),
+            ("review", "Final Review"),
+        ],
+        required=True,
+        default="overview",
     )
     batch_name = fields.Char(related="batch_id.name", readonly=True)
     batch_state = fields.Selection(related="batch_id.state", readonly=True)
@@ -27,8 +36,34 @@ class CduElmisPickingWizard(models.TransientModel):
     )
     elmis_picking_fulfilment_line_ids = fields.One2many(
         related="batch_id.elmis_picking_fulfilment_line_ids",
-        readonly=False,
+        readonly=True,
     )
+    patient_allocation_ids = fields.One2many(
+        related="batch_id.patient_allocation_ids",
+        readonly=True,
+    )
+    picking_resolution_ids = fields.One2many(
+        related="batch_id.picking_resolution_ids",
+        readonly=True,
+    )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records.mapped("batch_id.elmis_picking_line_ids")._ensure_patient_resolutions()
+        return records
+
+    def _open_action(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Generate Picking List"),
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_batch_id": self.batch_id.id},
+        }
 
     @api.depends("batch_name", "prescription_count", "pickup_date_from")
     def _compute_subtitle(self):
@@ -62,20 +97,15 @@ class CduElmisPickingWizard(models.TransientModel):
         self.ensure_one()
         batch = self.batch_id
         if batch.picking_confirmed_at:
-            batch._ensure_picking_ready()
-            batch._link_elmis_lines_to_summary_lines()
-            batch.elmis_picking_fulfilment_line_ids._sync_selected_stock_option()
-            batch._apply_repeat_fulfilment_results()
-            batch._sync_picking_summary_from_elmis_lines()
-            return {
-                "type": "ir.actions.client",
-                "tag": "display_notification",
-                "params": {
-                    "title": _("Picking selection revised"),
-                    "message": _("The picking selection was updated."),
-                    "type": "success",
-                    "sticky": False,
-                    "next": {"type": "ir.actions.client", "tag": "reload"},
-                },
-            }
+            raise UserError(_("Confirmed picking allocations are locked."))
         return batch.action_confirm_elmis_picking()
+
+    def action_review(self):
+        self.ensure_one()
+        self.step = "review"
+        return self._open_action()
+
+    def action_back_to_overview(self):
+        self.ensure_one()
+        self.step = "overview"
+        return self._open_action()
