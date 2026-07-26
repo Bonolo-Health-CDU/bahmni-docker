@@ -615,11 +615,14 @@ class CduDispense(models.Model):
 
     def _action_open(self):
         self.ensure_one()
+        form_view = self.env.ref("cdu_elmis.view_cdu_dispense_form")
         return {
             "type": "ir.actions.act_window",
             "name": _("Dispense Prescription"),
             "res_model": "cdu.dispense",
             "res_id": self.id,
             "view_mode": "form",
+            "view_id": form_view.id,
+            "views": [(form_view.id, "form")],
             "target": "current",
         }

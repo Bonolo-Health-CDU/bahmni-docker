@@ -66,7 +66,7 @@ class CduBatch(models.Model):
     picking_bulk_group_ids = fields.One2many(
         "cdu.picking.bulk.group",
         "batch_id",
-        string="Bulk Picking Groups",
+        string="Regimen Components",
     )
     elmis_stock_option_ids = fields.One2many(
         "cdu.elmis.stock.option",
@@ -109,6 +109,12 @@ class CduBatch(models.Model):
         self.elmis_picking_line_ids._ensure_patient_resolutions()
         if refresh_stock and not self.picking_confirmed_at:
             self._refresh_store_stock_options()
+        if not self.picking_confirmed_at:
+            first_line = self.elmis_picking_line_ids.sorted(
+                lambda line: ((line.openmrs_drug_name or "").casefold(), line.id)
+            )[:1]
+            if first_line:
+                return first_line.action_open_allocation()
         wizard = self.env["cdu.elmis.picking.wizard"].create(
             {
                 "batch_id": self.id,
@@ -358,6 +364,7 @@ class CduBatch(models.Model):
             batch._sync_fulfilment_lines_from_allocations()
             batch._ensure_picking_ready()
             batch._apply_repeat_fulfilment_results()
+            batch.picking_resolution_ids._create_partial_backorder_prescriptions()
             batch.stock_event_status = "pending"
             store_items = batch._build_picking_stock_event_items(store_debit_reason)
             production_items = batch._build_picking_stock_event_items(
@@ -1234,21 +1241,32 @@ class CduBatch(models.Model):
                     % label
                 )
             if picking_line.allocation_mode == "bulk":
-                ungrouped = picking_line.resolution_ids.filtered(
-                    lambda resolution: (
-                        not resolution.bulk_member_id
-                        and resolution.status != "unserved"
+                if (
+                    not picking_line.bulk_group_ids
+                    and picking_line.resolution_ids.filtered(
+                        lambda resolution: resolution.status != "unserved"
                     )
-                )
-                if ungrouped:
+                ):
                     errors.append(
-                        _(
-                            "%(regimen)s: every prescription must belong to one "
-                            "bulk group (%(count)s not grouped)."
-                        )
-                        % {"regimen": label, "count": len(ungrouped)}
+                        _("%s: add at least one regimen component.") % label
                     )
                 for group in picking_line.bulk_group_ids:
+                    missing = (
+                        picking_line.resolution_ids
+                        - group.member_ids.mapped("resolution_id")
+                    )
+                    if missing:
+                        errors.append(
+                            _(
+                                "%(regimen)s / %(component)s: every prescription "
+                                "must be included (%(count)s missing)."
+                            )
+                            % {
+                                "regimen": label,
+                                "component": group.name,
+                                "count": len(missing),
+                            }
+                        )
                     errors.extend(group._get_distribution_errors())
 
         totals = {}

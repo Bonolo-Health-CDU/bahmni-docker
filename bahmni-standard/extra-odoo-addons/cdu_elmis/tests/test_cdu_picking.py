@@ -103,19 +103,28 @@ class TestPrescriptionLevelPicking(TransactionCase):
         )
 
     @classmethod
-    def _create_stock(cls, code, name, pack_size, lot, stock):
-        return cls.env["cdu.elmis.stock.option"].create(
-            {
-                "batch_id": cls.batch.id,
-                "facility_code": "TEST-CDU",
-                "program_code": "TEST-PROGRAM",
-                "orderable_code": code,
-                "orderable_name": name,
-                "pack_size": pack_size,
-                "lot": lot,
-                "stock_on_hand": stock,
-            }
-        )
+    def _create_stock(
+        cls,
+        code,
+        name,
+        pack_size,
+        lot,
+        stock,
+        expiration_date=None,
+    ):
+        values = {
+            "batch_id": cls.batch.id,
+            "facility_code": "TEST-CDU",
+            "program_code": "TEST-PROGRAM",
+            "orderable_code": code,
+            "orderable_name": name,
+            "pack_size": pack_size,
+            "lot": lot,
+            "stock_on_hand": stock,
+        }
+        if expiration_date:
+            values["expiration_date"] = expiration_date
+        return cls.env["cdu.elmis.stock.option"].create(values)
 
     def _allocate(self, resolution, option, packs, daily_units=None):
         values = {
@@ -275,35 +284,38 @@ class TestPrescriptionLevelPicking(TransactionCase):
         self.assertEqual(resolution.confirmed_supplied_days, 0)
         self.assertEqual(resolution.status, "draft")
 
-    def test_bulk_defaults_are_editable_and_members_are_exclusive(self):
+    def test_bulk_group_automatically_adds_prescriptions_in_patient_order(self):
         self.picking_line.action_use_bulk_mode()
         first_group = self.env["cdu.picking.bulk.group"].create(
             {
-                "name": "30-pack patients",
+                "name": "All patients",
                 "batch_id": self.batch.id,
                 "picking_line_id": self.picking_line.id,
-                "product_stock_option_id": self.stock_30_lot_1.id,
             }
         )
-        member = self.env["cdu.picking.bulk.member"].create(
-            {
-                "group_id": first_group.id,
-                "resolution_id": self.resolutions[0].id,
-            }
+
+        members = first_group.member_ids.sorted(
+            lambda member: (member.sequence, member.id)
         )
-        self.assertEqual(member.daily_units, 1)
-        self.assertEqual(member.calculated_packs, 1)
-        self.assertEqual(member.requested_packs, 1)
-        member.requested_packs = 12
-        self.assertEqual(member.requested_packs, 12)
+        self.assertEqual(members.mapped("resolution_id"), self.resolutions)
+        self.assertEqual(
+            members.mapped("sequence"),
+            self.resolutions.mapped("sequence"),
+        )
+        self.assertEqual(members.mapped("daily_units"), [10, 10, 10])
+        self.assertEqual(members.mapped("requested_packs"), [0, 0, 0])
+        self.assertTrue(first_group.distribution_stale)
 
         second_group = self.env["cdu.picking.bulk.group"].create(
             {
-                "name": "Other patients",
+                "name": "Second component",
                 "batch_id": self.batch.id,
                 "picking_line_id": self.picking_line.id,
-                "product_stock_option_id": self.stock_30_lot_2.id,
             }
+        )
+        self.assertEqual(
+            second_group.member_ids.mapped("resolution_id"),
+            self.resolutions,
         )
         with self.assertRaises(ValidationError):
             self.env["cdu.picking.bulk.member"].create(
@@ -313,22 +325,72 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 }
             )
 
-    def test_bulk_daily_units_change_requires_distribution_reapplication(self):
+    def test_generate_picking_list_opens_and_reuses_bulk_group_directly(self):
+        self.env.user.write(
+            {
+                "groups_id": [
+                    (
+                        4,
+                        self.env.ref(
+                            "cdu_prescription.group_cdu_dispensing_officer"
+                        ).id,
+                    )
+                ]
+            }
+        )
+        self.picking_line.action_use_bulk_mode()
+        service = self.env["cdu.elmis.stock.service"]
+
+        with patch.object(
+            type(service),
+            "has_valid_current_user_elmis_token",
+            return_value=True,
+        ), patch.object(
+            type(self.batch),
+            "_refresh_store_stock_options",
+            return_value=True,
+        ):
+            action = self.batch.action_generate_picking_list()
+
+        group = self.env["cdu.picking.bulk.group"].browse(action["res_id"])
+        self.assertEqual(action["res_model"], "cdu.picking.bulk.group")
+        self.assertEqual(action["target"], "new")
+        self.assertEqual(
+            action["view_id"],
+            self.env.ref("cdu_elmis.view_cdu_picking_bulk_group_form").id,
+        )
+        self.assertEqual(group.picking_line_id, self.picking_line)
+        self.assertEqual(
+            group.member_ids.mapped("resolution_id"),
+            self.resolutions,
+        )
+
+        second_action = self.picking_line.action_open_allocation()
+        self.assertEqual(second_action["res_id"], group.id)
+        self.assertEqual(len(self.picking_line.bulk_group_ids), 1)
+
+        overview_action = group.action_allocate_or_reallocate()
+        self.assertEqual(overview_action["res_model"], "cdu.picking.line")
+        self.assertEqual(overview_action["res_id"], self.picking_line.id)
+        self.assertEqual(overview_action["target"], "current")
+        self.assertEqual(
+            overview_action["view_id"],
+            self.env.ref(
+                "cdu_elmis.view_cdu_picking_line_bulk_allocation_form"
+            ).id,
+        )
+
+    def test_bulk_daily_units_change_recalculates_automatically(self):
         self.picking_line.action_use_bulk_mode()
         group = self.env["cdu.picking.bulk.group"].create(
             {
                 "name": "Dose recalculation group",
                 "batch_id": self.batch.id,
                 "picking_line_id": self.picking_line.id,
-                "product_stock_option_id": self.stock_30_lot_1.id,
             }
         )
-        member = self.env["cdu.picking.bulk.member"].create(
-            {
-                "group_id": group.id,
-                "resolution_id": self.resolutions[0].id,
-                "daily_units": 10,
-            }
+        member = group.member_ids.filtered(
+            lambda candidate: candidate.resolution_id == self.resolutions[0]
         )
         self.env["cdu.picking.bulk.lot"].create(
             {
@@ -337,16 +399,137 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 "quantity_packs": 10,
             }
         )
-        group.action_distribute_by_priority()
+        self.assertFalse(group.distribution_stale)
+        self.assertEqual(member.allocated_packs, 10)
+        self.assertEqual(member.allocation_status, "full")
 
         member.daily_units = 20
         self.assertEqual(member.requested_packs, 10)
         self.assertEqual(member.calculated_packs, 20)
-        self.assertTrue(group.distribution_stale)
-        self.assertIn("daily units changed", " ".join(group._get_distribution_errors()))
-
-        group.action_distribute_by_priority()
         self.assertFalse(group.distribution_stale)
+        self.assertEqual(member.allocated_packs, 10)
+        self.assertEqual(member.coverage_days, 15)
+        self.assertEqual(member.allocation_status, "partial")
+        self.assertEqual(member.resolution_id.allocation_line_ids.daily_units, 20)
+        self.assertEqual(group._get_distribution_errors(), [])
+
+    def test_every_regimen_component_serves_every_prescription(self):
+        self.picking_line.action_use_bulk_mode()
+        component_one = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Component 1",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        component_one_stock = self._create_stock(
+            "PRODUCT-E",
+            "Product E 30",
+            30,
+            "E30-1",
+            30,
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": component_one.id,
+                "stock_option_id": component_one_stock.id,
+                "quantity_packs": 30,
+            }
+        )
+        component_two_stock = self._create_stock(
+            "PRODUCT-C",
+            "Product C 30",
+            30,
+            "C30-1",
+            30,
+        )
+        component_two = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Component 2",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+
+        self.assertEqual(
+            component_two.member_ids.mapped("resolution_id"),
+            self.resolutions,
+        )
+        self.assertEqual(
+            component_two.member_ids.mapped("required_units"),
+            component_one.member_ids.mapped("required_units"),
+        )
+
+        self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": component_two.id,
+                "stock_option_id": component_two_stock.id,
+                "quantity_packs": 30,
+            }
+        )
+
+        self.assertEqual(component_one.member_ids.mapped("allocated_packs"), [10, 10, 10])
+        self.assertEqual(component_two.member_ids.mapped("allocated_packs"), [10, 10, 10])
+        self.assertEqual(self.resolutions.mapped("coverage_days"), [30, 30, 30])
+        self.assertEqual(self.resolutions.mapped("status"), ["full", "full", "full"])
+        self.assertEqual(self.batch._get_picking_readiness_errors(), [])
+
+    def test_overall_coverage_uses_least_covered_component(self):
+        self.picking_line.action_use_bulk_mode()
+        component_one = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Complete component",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        component_one_stock = self._create_stock(
+            "PRODUCT-F",
+            "Product F 30",
+            30,
+            "F30-1",
+            30,
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": component_one.id,
+                "stock_option_id": component_one_stock.id,
+                "quantity_packs": 30,
+            }
+        )
+        component_two_stock = self._create_stock(
+            "PRODUCT-D",
+            "Product D 30",
+            30,
+            "D30-1",
+            15,
+        )
+        component_two = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Short component",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": component_two.id,
+                "stock_option_id": component_two_stock.id,
+                "quantity_packs": 15,
+            }
+        )
+
+        self.assertEqual(self.resolutions.mapped("coverage_days"), [30, 15, 0])
+        self.assertEqual(self.resolutions.mapped("status"), ["full", "partial", "partial"])
+        self.assertEqual(component_one.member_ids.mapped("coverage_days"), [30, 30, 30])
+        self.assertEqual(component_two.member_ids.mapped("coverage_days"), [30, 15, 0])
+
+        self.batch._apply_repeat_fulfilment_results()
+        balance = self.resolutions[1]._create_partial_backorder_prescriptions()
+        components = balance.backorder_component_ids.sorted("sequence")
+        self.assertEqual(len(components), 2)
+        self.assertEqual(components.mapped("outstanding_days"), [0, 15])
+        self.assertEqual(components.mapped("outstanding_units"), [0, 150])
 
     def test_bulk_short_stock_uses_priority_for_full_partial_and_unserved(self):
         self.picking_line.action_use_bulk_mode()
@@ -355,18 +538,8 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 "name": "Priority group",
                 "batch_id": self.batch.id,
                 "picking_line_id": self.picking_line.id,
-                "product_stock_option_id": self.stock_30_lot_1.id,
             }
         )
-        for sequence, resolution in enumerate(self.resolutions, start=1):
-            self.env["cdu.picking.bulk.member"].create(
-                {
-                    "group_id": group.id,
-                    "resolution_id": resolution.id,
-                    "sequence": sequence * 10,
-                    "daily_units": 10,
-                }
-            )
         self.env["cdu.picking.bulk.lot"].create(
             {
                 "group_id": group.id,
@@ -375,13 +548,183 @@ class TestPrescriptionLevelPicking(TransactionCase):
             }
         )
 
-        group.action_distribute_by_priority()
-
         self.assertEqual(self.resolutions.mapped("status"), ["full", "partial", "unserved"])
         self.assertEqual(self.resolutions.mapped("allocated_packs"), [10, 5, 0])
         self.assertEqual(group.allocated_packs, group.picked_packs)
         self.assertEqual(group.picked_packs, 15)
         self.assertEqual(self.batch._get_picking_readiness_errors(), [])
+
+    def test_bulk_stock_changes_recalculate_automatically(self):
+        self.picking_line.action_use_bulk_mode()
+        group = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Automatic stock recalculation",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        lot = self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": group.id,
+                "stock_option_id": self.stock_30_lot_1.id,
+                "quantity_packs": 20,
+            }
+        )
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [10, 10, 0])
+        self.assertFalse(group.distribution_stale)
+
+        lot.quantity_packs = 15
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [10, 5, 0])
+        self.assertFalse(group.distribution_stale)
+
+        lot.unlink()
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [0, 0, 0])
+        self.assertEqual(self.resolutions.mapped("status"), ["draft", "draft", "draft"])
+        self.assertTrue(group.distribution_stale)
+
+    def test_bulk_accepts_user_selected_products_with_different_pack_sizes(self):
+        self.picking_line.action_use_bulk_mode()
+        group = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Trusted mixed-pack selection",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        member = group.member_ids.filtered(
+            lambda candidate: candidate.resolution_id == self.resolutions[0]
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            [
+                {
+                    "group_id": group.id,
+                    "stock_option_id": self.stock_60.id,
+                    "quantity_packs": 4,
+                },
+                {
+                    "group_id": group.id,
+                    "stock_option_id": self.stock_15.id,
+                    "quantity_packs": 4,
+                },
+            ]
+        )
+
+        allocations = member.resolution_id.allocation_line_ids
+        self.assertEqual(
+            {
+                allocation.selected_pack_size: allocation.quantity_packs
+                for allocation in allocations
+            },
+            {60: 4, 15: 4},
+        )
+        self.assertEqual(member.required_units, 300)
+        self.assertEqual(member.supplied_units, 300)
+        self.assertEqual(member.coverage_days, 30)
+        self.assertEqual(member.allocation_status, "full")
+        self.assertEqual(member.resolution_id.distinct_product_count, 2)
+        self.assertFalse(member.resolution_id.coverage_confirmation_required)
+        self.assertFalse(member.resolution_id.coverage_confirmed)
+
+    def test_bulk_minimizes_excess_for_stock_with_the_same_expiry(self):
+        self.picking_line.action_use_bulk_mode()
+        common_expiry = fields.Date.today() + timedelta(days=365)
+        stock_200 = self._create_stock(
+            "USER-SELECTED-200",
+            "User Selected Pack 200",
+            200,
+            "PACK-200",
+            2,
+            expiration_date=common_expiry,
+        )
+        stock_150 = self._create_stock(
+            "USER-SELECTED-150",
+            "User Selected Pack 150",
+            150,
+            "PACK-150",
+            2,
+            expiration_date=common_expiry,
+        )
+        group = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Minimum excess",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        member = group.member_ids.filtered(
+            lambda candidate: candidate.resolution_id == self.resolutions[0]
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            [
+                {
+                    "group_id": group.id,
+                    "stock_option_id": stock_200.id,
+                    "quantity_packs": 2,
+                },
+                {
+                    "group_id": group.id,
+                    "stock_option_id": stock_150.id,
+                    "quantity_packs": 2,
+                },
+            ]
+        )
+
+        allocations = member.resolution_id.allocation_line_ids
+        self.assertEqual(len(allocations), 1)
+        self.assertEqual(allocations.stock_option_id, stock_150)
+        self.assertEqual(allocations.quantity_packs, 2)
+        self.assertEqual(member.supplied_units, 300)
+        self.assertEqual(member.excess_units, 0)
+
+    def test_bulk_prefers_earliest_expiry_before_minimum_excess(self):
+        self.picking_line.action_use_bulk_mode()
+        stock_early_200 = self._create_stock(
+            "USER-SELECTED-EARLY",
+            "Early Pack 200",
+            200,
+            "EARLY-200",
+            2,
+            expiration_date=fields.Date.today() + timedelta(days=180),
+        )
+        stock_later_150 = self._create_stock(
+            "USER-SELECTED-LATER",
+            "Later Pack 150",
+            150,
+            "LATER-150",
+            2,
+            expiration_date=fields.Date.today() + timedelta(days=365),
+        )
+        group = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Earliest expiry",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        member = group.member_ids.filtered(
+            lambda candidate: candidate.resolution_id == self.resolutions[0]
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            [
+                {
+                    "group_id": group.id,
+                    "stock_option_id": stock_early_200.id,
+                    "quantity_packs": 2,
+                },
+                {
+                    "group_id": group.id,
+                    "stock_option_id": stock_later_150.id,
+                    "quantity_packs": 2,
+                },
+            ]
+        )
+
+        allocations = member.resolution_id.allocation_line_ids
+        self.assertEqual(len(allocations), 1)
+        self.assertEqual(allocations.stock_option_id, stock_early_200)
+        self.assertEqual(allocations.quantity_packs, 2)
+        self.assertEqual(member.supplied_units, 400)
+        self.assertEqual(member.excess_units, 100)
 
     def test_bulk_mode_allows_explicit_unserved_without_a_stock_group(self):
         self.picking_line.action_use_bulk_mode()
@@ -573,8 +916,20 @@ class TestPrescriptionLevelPicking(TransactionCase):
         ), patch.object(
             type(service), "invalidate_stock_cache", return_value=True
         ):
-            self.batch.action_confirm_elmis_picking()
+            action = self.picking_line.action_confirm_picking()
 
+        self.assertEqual(action["res_model"], "cdu.batch")
+        self.assertEqual(action["res_id"], self.batch.id)
+        self.assertEqual(action["target"], "current")
+        self.assertEqual(
+            action["views"],
+            [
+                (
+                    self.env.ref("cdu_prescription.view_cdu_batch_form").id,
+                    "form",
+                )
+            ],
+        )
         self.assertEqual(self.resolutions[0].prescription_id.state, "awaiting_dispensing")
         for prescription in self.resolutions[1:].mapped("prescription_id"):
             self.assertEqual(prescription.state, "awaiting_batching")
@@ -585,6 +940,96 @@ class TestPrescriptionLevelPicking(TransactionCase):
             allocation.quantity_packs = 9
         with self.assertRaises(UserError):
             allocation.daily_units = 12
+
+    def test_confirmation_creates_linked_backorder_for_partial_supply(self):
+        self.env.user.write(
+            {
+                "groups_id": [
+                    (
+                        4,
+                        self.env.ref(
+                            "cdu_prescription.group_cdu_dispensing_officer"
+                        ).id,
+                    ),
+                    (
+                        4,
+                        self.env.ref(
+                            "cdu_prescription.group_cdu_data_clerk"
+                        ).id,
+                    ),
+                ]
+            }
+        )
+        source_prescription = self.resolutions[0].prescription_id
+        self._allocate(
+            self.resolutions[0],
+            self.stock_30_lot_1,
+            5,
+            daily_units=10,
+        )
+        self.resolutions[1:].action_mark_unserved()
+        params = self.env["ir.config_parameter"].sudo()
+        for key, value in {
+            "cdu.elmis.cdu_store_facility_code": "STORE",
+            "cdu.elmis.cdu_production_floor_facility_code": "FLOOR",
+            "cdu.elmis.default_program_code": "PROGRAM",
+            "cdu.elmis.picking_debit_reason_name": "DEBIT",
+            "cdu.elmis.picking_credit_reason_name": "CREDIT",
+        }.items():
+            params.set_param(key, value)
+        service = self.env["cdu.elmis.stock.service"]
+        with patch.object(
+            type(service),
+            "has_valid_current_user_elmis_token",
+            return_value=True,
+        ), patch.object(
+            type(service), "post_internal_stock_event", return_value={}
+        ), patch.object(
+            type(service), "invalidate_stock_cache", return_value=True
+        ):
+            self.picking_line.action_confirm_picking()
+
+        balance = source_prescription.backorder_prescription_ids
+        self.assertEqual(len(balance), 1)
+        self.assertTrue(balance.is_backorder)
+        self.assertEqual(balance.state, "awaiting_verification")
+        self.assertEqual(balance.backorder_source_prescription_id, source_prescription)
+        self.assertEqual(balance.backorder_root_prescription_id, source_prescription)
+        self.assertEqual(balance.backorder_created_from_batch_id, self.batch)
+        self.assertFalse(balance.batch_id)
+        self.assertEqual(balance.backorder_required_days, 15)
+        self.assertEqual(balance.repeat_days, 15)
+        self.assertEqual(balance.remaining_days_supply, 15)
+        self.assertEqual(balance.cdu_days_supply, 15)
+        self.assertEqual(
+            balance.next_drug_pickup_date,
+            self.pickup_date + timedelta(days=15),
+        )
+        self.assertEqual(source_prescription.state, "awaiting_dispensing")
+        self.assertEqual(source_prescription.remaining_days_supply, 15)
+        component = balance.backorder_component_ids
+        self.assertEqual(len(component), 1)
+        self.assertEqual(component.target_days, 30)
+        self.assertEqual(component.supplied_days, 15)
+        self.assertEqual(component.outstanding_days, 15)
+        self.assertEqual(component.outstanding_units, 150)
+
+        self.resolutions[0]._create_partial_backorder_prescriptions()
+        self.assertEqual(len(source_prescription.backorder_prescription_ids), 1)
+
+        balance.action_mark_patient_verified()
+        self.assertEqual(balance.state, "awaiting_validation")
+        balance.action_mark_medicine_validated()
+        self.assertEqual(balance.state, "awaiting_batching")
+
+        balance_batch = self.env["cdu.batch"].create({"state": "draft"})
+        balance.batch_id = balance_batch
+        patient_values, summary_values = balance_batch._prepare_picking_line_values()
+        self.assertEqual(len(patient_values), 1)
+        self.assertEqual(patient_values[0]["prescription_id"], balance.id)
+        self.assertEqual(patient_values[0]["effective_repeat_days"], 15)
+        self.assertEqual(patient_values[0]["required_units"], 15)
+        self.assertEqual(len(summary_values), 1)
 
     def test_confirmed_legacy_aggregate_is_backfilled_and_locked_without_events(self):
         fulfilment = self.env["cdu.picking.fulfilment.line"].create(

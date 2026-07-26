@@ -106,6 +106,15 @@ class TestCduDispensingWorkflow(TransactionCase):
         )
         self.assertEqual(result["params"]["report_action"]["type"], "ir.actions.report")
         self.assertEqual(result["params"]["next"]["res_id"], second_dispense.id)
+        self.assertEqual(
+            result["params"]["next"]["views"],
+            [
+                (
+                    self.env.ref("cdu_elmis.view_cdu_dispense_form").id,
+                    "form",
+                )
+            ],
+        )
         self.assertEqual(first_dispense.state, "confirmed")
         self.assertTrue(first_dispense.labels_printed)
         self.assertEqual(first_prescription.state, "awaiting_bagging_qa")

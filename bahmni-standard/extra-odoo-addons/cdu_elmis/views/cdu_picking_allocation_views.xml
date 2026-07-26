@@ -4,8 +4,14 @@
         <field name="name">cdu.picking.line.bulk.allocation.form</field>
         <field name="model">cdu.picking.line</field>
         <field name="arch" type="xml">
-            <form string="Bulk Prescription Allocation">
+            <form string="Regimen Component Allocation">
                 <header>
+                    <button name="action_confirm_picking"
+                            string="Confirm Picking"
+                            type="object"
+                            class="btn-primary"
+                            confirm="This locks all allocations and moves the selected stock from CDU Store to Production Floor. Continue?"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
                     <button name="action_back_to_allocation_overview"
                             string="Back to Regimen Overview"
                             type="object"
@@ -23,21 +29,29 @@
                         <field name="allocation_status" widget="badge" readonly="1"/>
                     </group>
                     <div class="alert alert-info" role="alert">
-                        Create one or more exclusive groups. Each group uses one
-                        product/pack size and may consume multiple lots.
+                        Add as many components as the regimen requires. Every component
+                        automatically includes every prescription and allocates its own
+                        selected products and lots. Overall coverage is determined by
+                        the least-covered component.
                     </div>
-                    <separator string="Bulk Groups"/>
+                    <separator string="Regimen Components"/>
                     <field name="bulk_group_ids"
                            context="{'default_batch_id': batch_id,
                                      'default_picking_line_id': id}">
                         <tree>
+                            <control>
+                                <create string="Add Component"/>
+                            </control>
                             <field name="sequence" widget="handle"/>
                             <field name="name"/>
-                            <field name="orderable_name" string="Product"/>
-                            <field name="pack_size"/>
-                            <field name="requested_packs"/>
-                            <field name="picked_packs"/>
+                            <field name="selected_products_display"/>
+                            <field name="selected_pack_sizes_display"/>
+                            <field name="required_units"/>
+                            <field name="available_packs"/>
                             <field name="allocated_packs"/>
+                            <field name="supplied_units"/>
+                            <field name="excess_units"/>
+                            <field name="distribution_stale"/>
                         </tree>
                     </field>
                     <separator string="Prescription Status / Stock Exceptions"/>
@@ -76,11 +90,13 @@
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="picking_line_id"/>
-                <field name="orderable_name" string="Product"/>
-                <field name="pack_size"/>
-                <field name="requested_packs"/>
-                <field name="picked_packs"/>
+                <field name="selected_products_display"/>
+                <field name="selected_pack_sizes_display"/>
+                <field name="required_units"/>
+                <field name="available_packs"/>
                 <field name="allocated_packs"/>
+                <field name="supplied_units"/>
+                <field name="excess_units"/>
                 <field name="distribution_stale" readonly="1"/>
             </tree>
         </field>
@@ -90,12 +106,8 @@
         <field name="name">cdu.picking.bulk.group.form</field>
         <field name="model">cdu.picking.bulk.group</field>
         <field name="arch" type="xml">
-            <form string="Bulk Prescription Group">
+            <form string="Regimen Component">
                 <header>
-                    <button name="action_distribute_by_priority"
-                            string="Preview / Apply Priority Distribution"
-                            type="object"
-                            class="btn-primary"/>
                     <button name="action_back_to_regimen_overview"
                             string="Back to Regimen Overview"
                             type="object"
@@ -112,65 +124,89 @@
                                    options="{'no_create': True, 'no_open': True}"/>
                         </group>
                         <group>
-                            <field name="product_stock_option_id"
-                                   options="{'no_create': True, 'no_open': True}"/>
-                            <field name="orderable_name" readonly="1"/>
-                            <field name="pack_size" readonly="1"/>
+                            <field name="selected_products_display" readonly="1"/>
+                            <field name="selected_pack_sizes_display" readonly="1"/>
+                            <field name="available_packs" readonly="1"/>
+                            <field name="distribution_stale" readonly="1"/>
                         </group>
                     </group>
                     <div class="alert alert-info" role="alert">
-                        Priority controls who is served first during a shortage.
-                        Patient pack quantities are editable; lot sequence defaults
-                        to earliest expiry first. Set Daily Units for the selected
-                        product per prescription; it defaults to 1. Changing it
-                        preserves entered pack quantities and requires this
-                        distribution to be applied again.
+                        Select the products and lots for this regimen component.
+                        Every prescription is included automatically in patient order.
+                        Allocation recalculates when selected stock or daily units
+                        change, using availability, earliest expiry, minimum excess,
+                        then patient order.
                     </div>
                     <notebook>
-                        <page string="Prescriptions">
-                            <field name="member_ids"
+                        <page string="Selected Products / Lots">
+                            <field name="lot_ids"
                                    context="{'default_group_id': active_id}">
-                                <tree editable="bottom" default_order="sequence asc">
+                                <tree editable="bottom"
+                                      default_order="expiration_date asc, sequence asc">
+                                    <field name="batch_id" invisible="1"/>
+                                    <field name="sequence" string="Lot Order" widget="handle"/>
+                                    <field name="stock_option_id"
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="orderable_name" readonly="1"/>
+                                    <field name="pack_size" readonly="1"/>
+                                    <field name="lot" readonly="1"/>
+                                    <field name="expiration_date" readonly="1"/>
+                                    <field name="available_packs" readonly="1"/>
+                                    <field name="quantity_packs"/>
+                                    <field name="allocated_packs" readonly="1"/>
+                                    <field name="remaining_selected_packs" readonly="1"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Prescriptions">
+                            <field name="member_ids">
+                                <tree editable="bottom"
+                                      create="0"
+                                      delete="0"
+                                      default_order="sequence asc">
                                     <field name="picking_line_id" invisible="1"/>
-                                    <field name="sequence" string="Priority" widget="handle"/>
+                                    <field name="sequence" string="Patient Order" readonly="1"/>
                                     <field name="resolution_id"
-                                           domain="[('id', 'in', parent.eligible_resolution_ids)]"
+                                           readonly="1"
                                            options="{'no_create': True, 'no_open': True}"/>
                                     <field name="patient_id" readonly="1"/>
+                                    <field name="target_days" readonly="1"/>
                                     <field name="daily_units"/>
-                                    <field name="calculated_packs" readonly="1"/>
-                                    <field name="requested_packs"/>
+                                    <field name="required_units" readonly="1"/>
                                     <field name="allocated_packs" readonly="1"/>
+                                    <field name="supplied_units" readonly="1"/>
+                                    <field name="excess_units" readonly="1"/>
+                                    <field name="coverage_days" readonly="1"/>
                                     <field name="allocation_status" widget="badge" readonly="1"/>
+                                    <field name="requested_packs" optional="hide" readonly="1"/>
+                                    <field name="calculated_packs" optional="hide" readonly="1"/>
                                     <field name="original_daily_units" optional="hide" readonly="1"/>
                                     <field name="daily_units_changed_by" optional="hide" readonly="1"/>
                                     <field name="daily_units_changed_at" optional="hide" readonly="1"/>
                                 </tree>
                             </field>
                         </page>
-                        <page string="Lots">
-                            <field name="lot_ids"
-                                   context="{'default_group_id': active_id}">
-                                <tree editable="bottom" default_order="sequence asc">
-                                    <field name="batch_id" invisible="1"/>
-                                    <field name="sequence" string="Lot Sequence" widget="handle"/>
-                                    <field name="stock_option_id"
-                                           options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="lot" readonly="1"/>
-                                    <field name="expiration_date" readonly="1"/>
-                                    <field name="available_packs" readonly="1"/>
-                                    <field name="quantity_packs"/>
-                                </tree>
-                            </field>
-                        </page>
                     </notebook>
                     <group string="Totals">
-                        <field name="requested_packs" readonly="1"/>
-                        <field name="picked_packs" readonly="1"/>
+                        <field name="required_units" readonly="1"/>
+                        <field name="available_packs" readonly="1"/>
                         <field name="allocated_packs" readonly="1"/>
+                        <field name="supplied_units" readonly="1"/>
+                        <field name="excess_units" readonly="1"/>
                         <field name="distribution_stale" readonly="1"/>
                     </group>
                 </sheet>
+                <footer>
+                    <button name="action_allocate_or_reallocate"
+                            string="Allocate or Reallocate"
+                            type="object"
+                            class="btn-primary"
+                            data-hotkey="a"/>
+                    <button string="Discard"
+                            special="cancel"
+                            class="btn-secondary"
+                            data-hotkey="d"/>
+                </footer>
             </form>
         </field>
     </record>

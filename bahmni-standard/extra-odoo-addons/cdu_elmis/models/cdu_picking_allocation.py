@@ -103,7 +103,7 @@ class CduPickingPatientResolution(models.Model):
     bulk_member_id = fields.Many2one(
         "cdu.picking.bulk.member",
         compute="_compute_bulk_member_id",
-        string="Bulk Group Member",
+        string="Regimen Component Member",
     )
     required_units = fields.Float(
         related="patient_line_id.required_units", readonly=True
@@ -169,8 +169,14 @@ class CduPickingPatientResolution(models.Model):
         "allocation_line_ids.quantity_packs",
         "allocation_line_ids.selected_pack_size",
         "allocation_line_ids.daily_units",
+        "allocation_line_ids.bulk_group_id",
+        "allocation_line_ids.bulk_member_id",
         "allocation_line_ids.selected_orderable_id",
         "allocation_line_ids.selected_orderable_code",
+        "allocation_line_ids.allocation_method",
+        "picking_line_id.regimen_component_mode",
+        "picking_line_id.bulk_group_ids.member_ids.daily_units",
+        "picking_line_id.bulk_group_ids.member_ids.resolution_id",
         "confirmed_supplied_days",
         "coverage_confirmed",
         "patient_line_id.required_units",
@@ -201,10 +207,59 @@ class CduPickingPatientResolution(models.Model):
                 if values["daily_units"] > 0
             ]
             product_count = len(products)
-            automatic_coverage = (
-                product_coverages[0] if product_count == 1 else 0
+            bulk_allocations = resolution.allocation_line_ids.filtered(
+                lambda allocation: allocation.allocation_method == "bulk"
             )
-            confirmation_required = product_count > 1
+            is_bulk_allocation = bool(
+                resolution.allocation_line_ids
+                and len(bulk_allocations) == len(resolution.allocation_line_ids)
+            )
+            if (
+                is_bulk_allocation
+                and resolution.picking_line_id.regimen_component_mode
+            ):
+                # Every bulk group is one regimen component. A prescription is
+                # only covered for as many days as its least-covered component.
+                component_coverages = []
+                for group in resolution.picking_line_id.bulk_group_ids:
+                    member = group.member_ids.filtered(
+                        lambda candidate, resolution=resolution: (
+                            candidate.resolution_id == resolution
+                        )
+                    )[:1]
+                    component_allocations = bulk_allocations.filtered(
+                        lambda allocation, group=group: (
+                            allocation.bulk_group_id == group
+                        )
+                    )
+                    component_units = sum(
+                        allocation.quantity_packs
+                        * allocation.selected_pack_size
+                        for allocation in component_allocations
+                    )
+                    daily_units = member.daily_units if member else 0
+                    component_coverages.append(
+                        component_units / daily_units
+                        if daily_units > 0
+                        else 0
+                    )
+                automatic_coverage = (
+                    min(component_coverages) if component_coverages else 0
+                )
+                confirmation_required = False
+            elif is_bulk_allocation:
+                # Preserve the calculation used by confirmed historical picks
+                # created before regimen components were introduced.
+                daily_units = bulk_allocations[0].daily_units or 0
+                automatic_coverage = (
+                    supplied_units / daily_units if daily_units > 0 else 0
+                )
+                confirmation_required = False
+            else:
+                automatic_coverage = (
+                    product_coverages[0] if product_count == 1 else 0
+                )
+                confirmation_required = product_count > 1
             coverage = (
                 resolution.confirmed_supplied_days
                 if confirmation_required and resolution.coverage_confirmed
@@ -404,6 +459,134 @@ class CduPickingPatientResolution(models.Model):
                 }
             )
 
+    def _create_partial_backorder_prescriptions(self):
+        """Create one traceable balance prescription for every partial supply."""
+        Component = self.env["cdu.prescription.backorder.component"]
+        created = self.env["cdu.prescription"]
+        for resolution in self.filtered(
+            lambda candidate: candidate.status == "partial"
+        ):
+            source = resolution.prescription_id
+            existing = source.backorder_prescription_ids[:1]
+            if existing:
+                created |= existing
+                continue
+
+            remaining_days = int(
+                math.ceil(
+                    max(
+                        (resolution.target_days or 0)
+                        - (resolution.coverage_days or 0),
+                        0,
+                    )
+                )
+            )
+            if remaining_days <= 0:
+                continue
+
+            source.remaining_days_supply = remaining_days
+            next_pickup_date = (
+                source.next_drug_pickup_date
+                or resolution.patient_line_id.calculated_next_pickup_date
+                or fields.Date.context_today(source)
+            )
+            root = source.backorder_root_prescription_id or source
+            note = _(
+                "System-created balance from %(source)s after partial supply "
+                "in %(batch)s. Outstanding supply: %(days)s day(s)."
+            ) % {
+                "source": source.display_name,
+                "batch": resolution.batch_id.display_name,
+                "days": remaining_days,
+            }
+            existing_notes = (source.validation_notes or "").strip()
+            balance = source.copy(
+                default={
+                    "state": "awaiting_verification",
+                    "batch_id": False,
+                    "repeat_days": remaining_days,
+                    "remaining_days_supply": remaining_days,
+                    "next_drug_pickup_date": next_pickup_date,
+                    "next_clinical_visit_date": (
+                        next_pickup_date + timedelta(days=remaining_days)
+                    ),
+                    "verified_by": False,
+                    "verified_at": False,
+                    "validated_by": False,
+                    "validated_at": False,
+                    "active_rejection_id": False,
+                    "rejected_from_state": False,
+                    "is_backorder": True,
+                    "backorder_source_prescription_id": source.id,
+                    "backorder_root_prescription_id": root.id,
+                    "backorder_created_from_batch_id": resolution.batch_id.id,
+                    "backorder_required_days": remaining_days,
+                    "validation_notes": "\n\n".join(
+                        value for value in (existing_notes, note) if value
+                    ),
+                }
+            )
+
+            members = resolution.picking_line_id.bulk_group_ids.mapped(
+                "member_ids"
+            ).filtered(
+                lambda member, resolution=resolution: (
+                    member.resolution_id == resolution
+                )
+            )
+            if members:
+                Component.create(
+                    [
+                        {
+                            "backorder_prescription_id": balance.id,
+                            "source_group_id": member.group_id.id,
+                            "sequence": member.group_id.sequence,
+                            "name": member.group_id.name,
+                            "selected_products": (
+                                member.group_id.selected_products_display
+                            ),
+                            "daily_units": member.daily_units,
+                            "target_days": member.target_days,
+                            "supplied_days": member.coverage_days,
+                            "outstanding_days": max(
+                                member.target_days - member.coverage_days,
+                                0,
+                            ),
+                            "required_units": member.required_units,
+                            "supplied_units": member.supplied_units,
+                            "outstanding_units": max(
+                                member.required_units - member.supplied_units,
+                                0,
+                            ),
+                        }
+                        for member in members.sorted(
+                            lambda member: (
+                                member.group_id.sequence,
+                                member.group_id.id,
+                            )
+                        )
+                    ]
+                )
+            else:
+                Component.create(
+                    {
+                        "backorder_prescription_id": balance.id,
+                        "name": _("Prescription balance"),
+                        "daily_units": resolution.daily_dose,
+                        "target_days": resolution.target_days,
+                        "supplied_days": resolution.coverage_days,
+                        "outstanding_days": remaining_days,
+                        "required_units": resolution.required_units,
+                        "supplied_units": resolution.supplied_units,
+                        "outstanding_units": max(
+                            resolution.required_units - resolution.supplied_units,
+                            0,
+                        ),
+                    }
+                )
+            created |= balance
+        return created
+
 
 class CduPickingPatientAllocation(models.Model):
     _name = "cdu.picking.patient.allocation"
@@ -491,7 +674,7 @@ class CduPickingPatientAllocation(models.Model):
         string="Coverage from This Lot", compute="_compute_product_calculations"
     )
     allocation_method = fields.Selection(
-        [("bulk", "Bulk"), ("individual", "Individual")],
+        [("bulk", "Regimen Component"), ("individual", "Individual")],
         required=True,
         default="individual",
     )
@@ -826,10 +1009,10 @@ class CduPickingPatientAllocation(models.Model):
 
 class CduPickingBulkGroup(models.Model):
     _name = "cdu.picking.bulk.group"
-    _description = "CDU Bulk Prescription Picking Group"
+    _description = "CDU Regimen Component"
     _order = "picking_line_id, sequence, id"
 
-    name = fields.Char(required=True, default=lambda self: _("Bulk Group"))
+    name = fields.Char(required=True, default=lambda self: _("Regimen Component"))
     sequence = fields.Integer(default=10)
     batch_id = fields.Many2one(
         "cdu.batch", required=True, ondelete="cascade", index=True
@@ -844,10 +1027,10 @@ class CduPickingBulkGroup(models.Model):
     )
     product_stock_option_id = fields.Many2one(
         "cdu.elmis.stock.option",
-        string="Product / Pack Size",
-        required=True,
+        string="Legacy Product / Pack Size",
         ondelete="restrict",
         domain="[('batch_id', '=', batch_id), ('stock_on_hand', '>', 0), ('pack_size', '>', 0)]",
+        help="Retained for historical records. New components select stock on the Lots tab.",
     )
     orderable_name = fields.Char(
         related="product_stock_option_id.orderable_name", readonly=True
@@ -870,13 +1053,31 @@ class CduPickingBulkGroup(models.Model):
         compute="_compute_totals", string="Requested Packs"
     )
     picked_packs = fields.Integer(
-        compute="_compute_totals", string="Selected Lot Packs"
+        compute="_compute_totals", string="Allocated Packs"
     )
     allocated_packs = fields.Integer(
         compute="_compute_totals", string="Assigned Packs"
     )
+    available_packs = fields.Integer(
+        compute="_compute_totals", string="Selected Available Packs"
+    )
+    required_units = fields.Integer(
+        compute="_compute_totals", string="Required Units"
+    )
+    supplied_units = fields.Integer(
+        compute="_compute_totals", string="Supplied Units"
+    )
+    excess_units = fields.Integer(
+        compute="_compute_totals", string="Excess Units"
+    )
+    selected_products_display = fields.Char(
+        compute="_compute_totals", string="Selected Products"
+    )
+    selected_pack_sizes_display = fields.Char(
+        compute="_compute_totals", string="Selected Pack Sizes"
+    )
     distribution_stale = fields.Boolean(
-        string="Distribution Needs Reapplying", default=False, copy=False
+        string="Automatic Allocation Pending", default=True, copy=False
     )
     locked = fields.Boolean(default=False, copy=False, index=True)
     legacy = fields.Boolean(default=False, copy=False, index=True)
@@ -887,29 +1088,60 @@ class CduPickingBulkGroup(models.Model):
     )
     def _compute_eligible_resolution_ids(self):
         for group in self:
-            used = group.picking_line_id.bulk_group_ids.filtered(
-                lambda candidate: candidate != group
-            ).mapped("member_ids.resolution_id")
-            group.eligible_resolution_ids = group.picking_line_id.resolution_ids - used
+            group.eligible_resolution_ids = group.picking_line_id.resolution_ids
 
     @api.depends(
         "member_ids.requested_packs",
         "member_ids.allocated_packs",
+        "member_ids.required_units",
+        "member_ids.supplied_units",
         "lot_ids.quantity_packs",
+        "lot_ids.stock_option_id",
+        "lot_ids.stock_option_id.orderable_name",
+        "lot_ids.stock_option_id.pack_size",
+        "lot_ids.stock_option_id.stock_on_hand",
     )
     def _compute_totals(self):
         for group in self:
             group.requested_packs = sum(group.member_ids.mapped("requested_packs"))
-            group.picked_packs = sum(group.lot_ids.mapped("quantity_packs"))
-            group.allocated_packs = sum(group.member_ids.mapped("allocated_packs"))
+            allocated_packs = sum(group.member_ids.mapped("allocated_packs"))
+            group.picked_packs = allocated_packs
+            group.allocated_packs = allocated_packs
+            group.available_packs = sum(
+                min(lot.quantity_packs, lot.available_packs)
+                for lot in group.lot_ids
+            )
+            group.required_units = sum(group.member_ids.mapped("required_units"))
+            group.supplied_units = sum(group.member_ids.mapped("supplied_units"))
+            group.excess_units = sum(group.member_ids.mapped("excess_units"))
+            group.selected_products_display = ", ".join(
+                sorted(
+                    {
+                        name
+                        for name in group.lot_ids.mapped("orderable_name")
+                        if name
+                    }
+                )
+            )
+            group.selected_pack_sizes_display = ", ".join(
+                str(pack_size)
+                for pack_size in sorted(
+                    set(group.lot_ids.mapped("pack_size"))
+                )
+                if pack_size
+            )
 
     @api.constrains("batch_id", "picking_line_id", "product_stock_option_id")
     def _check_group(self):
         for group in self:
             if group.picking_line_id.batch_id != group.batch_id:
-                raise ValidationError(_("The bulk group belongs to another batch."))
+                raise ValidationError(
+                    _("The regimen component belongs to another batch.")
+                )
             if group.picking_line_id.allocation_mode != "bulk":
-                raise ValidationError(_("Bulk groups require Bulk allocation mode."))
+                raise ValidationError(
+                    _("Regimen components require Regimen Components allocation mode.")
+                )
             if (
                 group.product_stock_option_id
                 and group.product_stock_option_id.batch_id != group.batch_id
@@ -917,6 +1149,77 @@ class CduPickingBulkGroup(models.Model):
                 raise ValidationError(
                     _("The selected product belongs to another batch.")
                 )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        existing_by_line = {}
+        for values in vals_list:
+            picking_line_id = values.get("picking_line_id")
+            if (
+                picking_line_id
+                and values.get("name") in (False, _("Regimen Component"))
+            ):
+                existing_count = existing_by_line.setdefault(
+                    picking_line_id,
+                    self.search_count(
+                        [("picking_line_id", "=", picking_line_id)]
+                    ),
+                )
+                values["name"] = _("Component %s") % (existing_count + 1)
+                existing_by_line[picking_line_id] = existing_count + 1
+        groups = super().create(vals_list)
+        groups._populate_prescriptions()
+        return groups
+
+    def _populate_prescriptions(self):
+        """Add every prescription to this component in established patient order."""
+        Member = self.env["cdu.picking.bulk.member"].with_context(
+            cdu_skip_auto_bulk_recalculation=True
+        )
+        editable_groups = self.filtered(
+            lambda group: not group.locked and not group.batch_id.picking_confirmed_at
+        )
+        for group in editable_groups.sorted(
+            lambda candidate: (candidate.sequence, candidate.id)
+        ):
+            group.picking_line_id._ensure_patient_resolutions()
+            for member in group.member_ids:
+                patient_sequence = member.resolution_id.sequence
+                if member.sequence != patient_sequence:
+                    member.with_context(
+                        cdu_skip_auto_bulk_recalculation=True
+                    ).write({"sequence": patient_sequence})
+            existing_resolutions = group.member_ids.mapped("resolution_id")
+            resolutions = (
+                group.picking_line_id.resolution_ids
+                - existing_resolutions
+            ).sorted(lambda resolution: (resolution.sequence, resolution.id))
+            if not resolutions:
+                continue
+            Member.create(
+                [
+                    {
+                        "group_id": group.id,
+                        "resolution_id": resolution.id,
+                        "sequence": resolution.sequence,
+                        "daily_units": (
+                            group.picking_line_id.bulk_group_ids.filtered(
+                                lambda candidate, group=group: candidate != group
+                            )
+                            .sorted(lambda candidate: (candidate.sequence, candidate.id))
+                            .mapped("member_ids")
+                            .filtered(
+                                lambda member, resolution=resolution: (
+                                    member.resolution_id == resolution
+                                )
+                            )[:1].daily_units
+                            or resolution.daily_dose
+                        ),
+                    }
+                    for resolution in resolutions
+                ]
+            )
+        self._auto_recalculate_distribution()
 
     def _ensure_unlocked(self):
         if self.env.context.get("cdu_allocation_migration"):
@@ -928,48 +1231,32 @@ class CduPickingBulkGroup(models.Model):
 
     def write(self, vals):
         self._ensure_unlocked()
-        if "product_stock_option_id" in vals and any(
-            group.member_ids or group.lot_ids for group in self
-        ):
-            raise UserError(
-                _(
-                    "Remove this group's prescriptions and lots before changing "
-                    "its product or pack size."
-                )
-            )
         return super().write(vals)
 
     def unlink(self):
         self._ensure_unlocked()
         return super().unlink()
 
-    def action_distribute_by_priority(self):
+    def _apply_priority_distribution(self):
         self.ensure_one()
-        self._ensure_unlocked()
-        if not self.member_ids:
-            raise ValidationError(_("Add at least one prescription to this group."))
-        if not self.lot_ids:
-            raise ValidationError(_("Add at least one stock lot to this group."))
-        if any(lot.quantity_packs <= 0 for lot in self.lot_ids):
-            raise ValidationError(_("Every selected lot must contain picked packs."))
+        plan = self._build_priority_distribution_plan()
 
         self.member_ids.mapped("resolution_id.allocation_line_ids").filtered(
             lambda allocation: allocation.bulk_group_id == self
         ).unlink()
 
         members = self.member_ids.sorted(lambda member: (member.sequence, member.id))
-        lots = self.lot_ids.sorted(lambda lot: (lot.sequence, lot.id))
-        remaining_by_lot = {
-            lot.id: lot.quantity_packs for lot in lots
-        }
+        lots_by_id = {lot.id: lot for lot in self.lot_ids}
         Allocation = self.env["cdu.picking.patient.allocation"]
         for member in members:
-            remaining_request = member.requested_packs
-            for lot in lots:
-                available = remaining_by_lot[lot.id]
-                if remaining_request <= 0 or available <= 0:
+            member_plan = plan.get(member.id, {})
+            member.with_context(cdu_skip_auto_bulk_recalculation=True).write(
+                {"requested_packs": sum(member_plan.values())}
+            )
+            for lot_id, quantity in member_plan.items():
+                if quantity <= 0:
                     continue
-                quantity = min(remaining_request, available)
+                lot = lots_by_id[lot_id]
                 Allocation.create(
                     {
                         "batch_id": self.batch_id.id,
@@ -984,8 +1271,6 @@ class CduPickingBulkGroup(models.Model):
                         "sequence": lot.sequence,
                     }
                 )
-                remaining_request -= quantity
-                remaining_by_lot[lot.id] -= quantity
 
             resolution = member.resolution_id
             if resolution.supplied_units <= 0:
@@ -998,23 +1283,66 @@ class CduPickingBulkGroup(models.Model):
             else:
                 resolution._refresh_status()
 
-        unassigned = sum(remaining_by_lot.values())
-        if unassigned:
-            raise ValidationError(
-                _(
-                    "%s picked packs remain unassigned. Reduce the lot quantities "
-                    "or increase patient pack allocations."
-                )
-                % unassigned
-            )
         self.distribution_stale = False
+
+    def _clear_automatic_distribution(self):
+        for group in self:
+            allocations = group.member_ids.mapped(
+                "resolution_id.allocation_line_ids"
+            ).filtered(
+                lambda allocation, group=group: allocation.bulk_group_id == group
+            )
+            allocations.unlink()
+            for resolution in group.member_ids.mapped("resolution_id"):
+                resolution.with_context(cdu_reset_coverage_confirmation=True).write(
+                    {
+                        "status": "draft",
+                        "unserved_reason": False,
+                        "unserved_note": False,
+                        "confirmed_supplied_days": 0,
+                        "coverage_confirmed": False,
+                    }
+                )
+            group.distribution_stale = True
+
+    def _auto_recalculate_distribution(self):
+        if self.env.context.get("cdu_skip_auto_bulk_recalculation"):
+            return
+        for group in self:
+            if group.locked or group.batch_id.picking_confirmed_at:
+                continue
+            if not group.member_ids or not group.lot_ids:
+                group.with_context(
+                    cdu_skip_auto_bulk_recalculation=True
+                )._clear_automatic_distribution()
+                continue
+            group.with_context(
+                cdu_skip_auto_bulk_recalculation=True
+            )._apply_priority_distribution()
+
+    def action_distribute_by_priority(self):
+        self.ensure_one()
+        self._ensure_unlocked()
+        if not self.member_ids:
+            raise ValidationError(_("No prescriptions were found for this group."))
+        if not self.lot_ids:
+            raise ValidationError(_("Add at least one stock lot to this group."))
+        if any(lot.quantity_packs <= 0 for lot in self.lot_ids):
+            raise ValidationError(
+                _("Every selected lot must have a positive maximum pack quantity.")
+            )
+
+        self.with_context(
+            cdu_skip_auto_bulk_recalculation=True
+        )._apply_priority_distribution()
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
-                "title": _("Bulk allocation updated"),
+                "title": _("Regimen component allocation updated"),
                 "message": _(
-                    "Packs were assigned by prescription priority and lot sequence."
+                    "Packs were assigned by availability, earliest expiry, "
+                    "minimum excess, and patient order."
                 ),
                 "type": "success",
                 "sticky": False,
@@ -1022,14 +1350,193 @@ class CduPickingBulkGroup(models.Model):
             },
         }
 
+    def _sorted_distribution_lots(self):
+        self.ensure_one()
+        no_expiry = fields.Date.to_date("9999-12-31")
+        return self.lot_ids.sorted(
+            lambda lot: (
+                lot.expiration_date or no_expiry,
+                lot.sequence,
+                lot.id,
+            )
+        )
+
+    def _available_packs_by_lot(self):
+        """Return selected capacity after allocations made outside this group."""
+        self.ensure_one()
+        options = self.lot_ids.mapped("stock_option_id")
+        allocated_elsewhere = {}
+        if options:
+            allocations = self.env["cdu.picking.patient.allocation"].search(
+                [
+                    ("batch_id", "=", self.batch_id.id),
+                    ("stock_option_id", "in", options.ids),
+                ]
+            )
+            for allocation in allocations:
+                if allocation.bulk_group_id == self:
+                    continue
+                option_id = allocation.stock_option_id.id
+                allocated_elsewhere[option_id] = (
+                    allocated_elsewhere.get(option_id, 0)
+                    + allocation.quantity_packs
+                )
+
+        available = {}
+        for lot in self.lot_ids:
+            option_available = max(
+                lot.available_packs
+                - allocated_elsewhere.get(lot.stock_option_id.id, 0),
+                0,
+            )
+            available[lot.id] = min(lot.quantity_packs, option_available)
+        return available
+
+    def _allocation_expiry_score(self, quantities, lot_data):
+        used = [
+            (index, quantity)
+            for index, quantity in enumerate(quantities)
+            if quantity > 0
+        ]
+        if not used:
+            return (-1, 0, 0, tuple())
+        latest_expiry_rank = max(
+            lot_data[index]["expiry_rank"] for index, _quantity in used
+        )
+        weighted_expiry = sum(
+            lot_data[index]["expiry_rank"]
+            * quantity
+            * lot_data[index]["pack_size"]
+            for index, quantity in used
+        )
+        pack_count = sum(quantity for _index, quantity in used)
+        # Prefer the earlier lot only as the final deterministic tie-breaker
+        # when expiry, supplied units, excess, and pack count are identical.
+        deterministic = tuple(-quantity for quantity in quantities)
+        return (
+            latest_expiry_rank,
+            weighted_expiry,
+            pack_count,
+            deterministic,
+        )
+
+    def _find_priority_pack_combination(
+        self,
+        required_units,
+        lots,
+        available_by_lot,
+    ):
+        """Find a bounded whole-pack combination for one prescription.
+
+        Full coverage is preferred over partial coverage. For full combinations,
+        the priority is earliest expiry, then minimum excess, then fewer packs.
+        Patient order is applied by the caller.
+        """
+        self.ensure_one()
+        active_lots = [
+            lot
+            for lot in lots
+            if lot.pack_size > 0 and available_by_lot.get(lot.id, 0) > 0
+        ]
+        if required_units <= 0 or not active_lots:
+            return {}
+
+        expiry_values = []
+        no_expiry = fields.Date.to_date("9999-12-31")
+        for lot in active_lots:
+            expiry = lot.expiration_date or no_expiry
+            if expiry not in expiry_values:
+                expiry_values.append(expiry)
+        expiry_rank_by_date = {
+            expiry: index for index, expiry in enumerate(sorted(expiry_values))
+        }
+        lot_data = [
+            {
+                "lot": lot,
+                "pack_size": lot.pack_size,
+                "available": available_by_lot[lot.id],
+                "expiry_rank": expiry_rank_by_date[
+                    lot.expiration_date or no_expiry
+                ],
+            }
+            for lot in active_lots
+        ]
+
+        max_pack_size = max(item["pack_size"] for item in lot_data)
+        maximum_units = required_units + max_pack_size - 1
+        empty_quantities = tuple(0 for _item in lot_data)
+        states = {0: empty_quantities}
+
+        for index, item in enumerate(lot_data):
+            previous_states = dict(states)
+            for supplied_units, quantities in previous_states.items():
+                maximum_quantity = min(
+                    item["available"],
+                    (maximum_units - supplied_units) // item["pack_size"],
+                )
+                for quantity in range(1, maximum_quantity + 1):
+                    total_units = supplied_units + quantity * item["pack_size"]
+                    candidate = list(quantities)
+                    candidate[index] = quantity
+                    candidate = tuple(candidate)
+                    existing = states.get(total_units)
+                    if existing is None or self._allocation_expiry_score(
+                        candidate, lot_data
+                    ) < self._allocation_expiry_score(existing, lot_data):
+                        states[total_units] = candidate
+
+        full_candidates = [
+            (supplied_units, quantities)
+            for supplied_units, quantities in states.items()
+            if supplied_units >= required_units
+        ]
+        if full_candidates:
+            supplied_units, quantities = min(
+                full_candidates,
+                key=lambda candidate: (
+                    self._allocation_expiry_score(candidate[1], lot_data)[0],
+                    self._allocation_expiry_score(candidate[1], lot_data)[1],
+                    candidate[0] - required_units,
+                    self._allocation_expiry_score(candidate[1], lot_data)[2],
+                    self._allocation_expiry_score(candidate[1], lot_data)[3],
+                ),
+            )
+        else:
+            supplied_units = max(states)
+            quantities = states[supplied_units]
+
+        return {
+            item["lot"].id: quantity
+            for item, quantity in zip(lot_data, quantities)
+            if quantity > 0
+        }
+
+    def _build_priority_distribution_plan(self):
+        self.ensure_one()
+        lots = self._sorted_distribution_lots()
+        available_by_lot = self._available_packs_by_lot()
+        plan = {}
+        for member in self.member_ids.sorted(
+            lambda candidate: (candidate.sequence, candidate.id)
+        ):
+            member_plan = self._find_priority_pack_combination(
+                member.required_units,
+                lots,
+                available_by_lot,
+            )
+            plan[member.id] = member_plan
+            for lot_id, quantity in member_plan.items():
+                available_by_lot[lot_id] -= quantity
+        return plan
+
     def _get_distribution_errors(self):
         self.ensure_one()
         errors = []
         if self.distribution_stale:
             errors.append(
                 _(
-                    "%s: daily units changed; review patient pack quantities "
-                    "and apply the priority distribution again."
+                    "%s: automatic allocation is pending; save the selected stock "
+                    "or daily-unit changes."
                 )
                 % self.name
             )
@@ -1037,18 +1544,13 @@ class CduPickingBulkGroup(models.Model):
             return [_("%s: add at least one prescription.") % self.name]
         if not self.lot_ids:
             return [_("%s: add at least one stock lot.") % self.name]
-        members = self.member_ids.sorted(lambda member: (member.sequence, member.id))
-        lots = self.lot_ids.sorted(lambda lot: (lot.sequence, lot.id))
-        remaining_by_lot = {lot.id: lot.quantity_packs for lot in lots}
-        expected = {}
-        for member in members:
-            request = member.requested_packs
-            for lot in lots:
-                quantity = min(request, remaining_by_lot[lot.id])
-                if quantity > 0:
-                    expected[(member.id, lot.stock_option_id.id)] = quantity
-                    request -= quantity
-                    remaining_by_lot[lot.id] -= quantity
+        lots_by_id = {lot.id: lot for lot in self.lot_ids}
+        expected = {
+            (member_id, lots_by_id[lot_id].stock_option_id.id): quantity
+            for member_id, member_plan in self._build_priority_distribution_plan().items()
+            for lot_id, quantity in member_plan.items()
+            if quantity > 0
+        }
 
         actual = {
             (allocation.bulk_member_id.id, allocation.stock_option_id.id): (
@@ -1058,11 +1560,11 @@ class CduPickingBulkGroup(models.Model):
                 [("bulk_group_id", "=", self.id)]
             )
         }
-        if expected != actual or any(remaining_by_lot.values()):
+        if expected != actual:
             errors.append(
                 _(
-                    "%s: apply the priority distribution again so every "
-                    "selected lot pack is assigned to the current patient list."
+                    "%s: the automatic allocation is out of date with the selected "
+                    "stock or current patient requirements."
                 )
                 % self.name
             )
@@ -1075,10 +1577,36 @@ class CduPickingBulkGroup(models.Model):
         )
         return wizard._open_action()
 
+    def action_allocate_or_reallocate(self):
+        self.ensure_one()
+        self._ensure_unlocked()
+        self._populate_prescriptions()
+        self._auto_recalculate_distribution()
+        return self.picking_line_id.action_open_bulk_allocation_overview()
+
+    def _open_allocation_action(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("%s - Allocate or Reallocate")
+            % self.picking_line_id.openmrs_drug_name,
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "view_id": self.env.ref(
+                "cdu_elmis.view_cdu_picking_bulk_group_form"
+            ).id,
+            "target": "new",
+            "context": {
+                "default_batch_id": self.batch_id.id,
+                "default_picking_line_id": self.picking_line_id.id,
+            },
+        }
+
 
 class CduPickingBulkMember(models.Model):
     _name = "cdu.picking.bulk.member"
-    _description = "CDU Bulk Picking Group Prescription"
+    _description = "CDU Regimen Component Prescription"
     _order = "group_id, sequence, id"
 
     group_id = fields.Many2one(
@@ -1102,9 +1630,17 @@ class CduPickingBulkMember(models.Model):
         related="resolution_id.patient_id", store=True, readonly=True
     )
     sequence = fields.Integer(string="Priority", default=10)
-    calculated_packs = fields.Integer(compute="_compute_calculated_packs")
+    target_days = fields.Integer(
+        related="resolution_id.target_days",
+        string="Target Days",
+        readonly=True,
+    )
+    calculated_packs = fields.Integer(
+        compute="_compute_calculated_packs",
+        string="Minimum Pack Estimate",
+    )
     daily_units = fields.Integer(
-        string="Daily Units for This Product",
+        string="Daily Units",
         required=True,
         default=1,
     )
@@ -1121,27 +1657,92 @@ class CduPickingBulkMember(models.Model):
     daily_units_changed_at = fields.Datetime(
         string="Daily Units Changed At", readonly=True, copy=False
     )
-    requested_packs = fields.Integer(string="Packs for Patient", required=True)
+    required_units = fields.Integer(
+        string="Required Units",
+        compute="_compute_required_units",
+    )
+    requested_packs = fields.Integer(
+        string="Planned Packs",
+        required=True,
+        default=0,
+    )
     allocated_packs = fields.Integer(
-        related="resolution_id.allocated_packs", readonly=True
+        compute="_compute_component_totals", readonly=True
+    )
+    supplied_units = fields.Float(
+        compute="_compute_component_totals",
+        string="Supplied Units",
+        readonly=True,
+    )
+    coverage_days = fields.Float(
+        compute="_compute_component_totals",
+        string="Coverage Days",
+        readonly=True,
+    )
+    excess_units = fields.Integer(
+        string="Excess Units",
+        compute="_compute_required_units",
     )
     allocation_status = fields.Selection(
-        related="resolution_id.status", readonly=True
+        [
+            ("draft", "Not Allocated"),
+            ("full", "Full"),
+            ("partial", "Partial"),
+            ("unserved", "Unserved"),
+        ],
+        compute="_compute_component_totals",
+        readonly=True,
     )
 
     _sql_constraints = [
         (
             "unique_bulk_resolution",
-            "unique(picking_line_id, resolution_id)",
-            "A prescription can only belong to one bulk group for this regimen.",
+            "unique(group_id, resolution_id)",
+            "A prescription can only appear once in a regimen component.",
         ),
     ]
+
+    @api.depends(
+        "daily_units",
+        "target_days",
+        "resolution_id.allocation_line_ids.quantity_packs",
+        "resolution_id.allocation_line_ids.selected_pack_size",
+        "resolution_id.allocation_line_ids.bulk_member_id",
+    )
+    def _compute_component_totals(self):
+        for member in self:
+            allocations = member.resolution_id.allocation_line_ids.filtered(
+                lambda allocation, member=member: (
+                    allocation.bulk_member_id == member
+                )
+            )
+            member.allocated_packs = sum(allocations.mapped("quantity_packs"))
+            supplied_units = sum(
+                allocation.quantity_packs * allocation.selected_pack_size
+                for allocation in allocations
+            )
+            member.supplied_units = supplied_units
+            coverage_days = (
+                supplied_units / member.daily_units
+                if member.daily_units > 0
+                else 0
+            )
+            member.coverage_days = coverage_days
+            if not allocations:
+                member.allocation_status = "draft"
+            elif coverage_days >= member.target_days:
+                member.allocation_status = "full"
+            elif supplied_units > 0:
+                member.allocation_status = "partial"
+            else:
+                member.allocation_status = "unserved"
 
     @api.depends(
         "resolution_id.patient_line_id.effective_repeat_days",
         "resolution_id.patient_line_id.prescription_repeat_days",
         "resolution_id.patient_line_id.repeat_days",
         "group_id.pack_size",
+        "group_id.lot_ids.stock_option_id.pack_size",
         "daily_units",
     )
     def _compute_calculated_packs(self):
@@ -1152,14 +1753,35 @@ class CduPickingBulkMember(models.Model):
                 or member.resolution_id.patient_line_id.repeat_days
                 or 0
             )
+            pack_sizes = [
+                pack_size
+                for pack_size in member.group_id.lot_ids.mapped("pack_size")
+                if pack_size > 0
+            ]
+            if not pack_sizes and member.group_id.pack_size > 0:
+                pack_sizes = [member.group_id.pack_size]
+            largest_pack_size = max(pack_sizes) if pack_sizes else 0
             member.calculated_packs = (
                 math.ceil(
                     target_days
                     * member.daily_units
-                    / member.group_id.pack_size
+                    / largest_pack_size
                 )
-                if target_days > 0 and member.group_id.pack_size > 0
+                if target_days > 0 and largest_pack_size > 0
                 else 0
+            )
+
+    @api.depends(
+        "target_days",
+        "daily_units",
+        "supplied_units",
+    )
+    def _compute_required_units(self):
+        for member in self:
+            member.required_units = member.target_days * member.daily_units
+            member.excess_units = max(
+                int(member.supplied_units or 0) - member.required_units,
+                0,
             )
 
     @api.constrains(
@@ -1194,14 +1816,14 @@ class CduPickingBulkMember(models.Model):
             resolution_id = vals.get("resolution_id")
             if resolution_id and self.search_count(
                 [
-                    ("picking_line_id", "=", group.picking_line_id.id),
+                    ("group_id", "=", group.id),
                     ("resolution_id", "=", resolution_id),
                 ]
             ):
                 raise ValidationError(
                     _(
-                        "A prescription can only belong to one bulk group "
-                        "for this regimen."
+                        "A prescription can only appear once in a regimen "
+                        "component."
                     )
                 )
             if "requested_packs" not in vals and group.pack_size > 0:
@@ -1221,7 +1843,11 @@ class CduPickingBulkMember(models.Model):
                     if target_days > 0
                     else 0
                 )
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        groups = records.mapped("group_id")
+        groups.write({"distribution_stale": True})
+        groups._auto_recalculate_distribution()
+        return records
 
     def write(self, vals):
         self.mapped("group_id")._ensure_unlocked()
@@ -1257,16 +1883,27 @@ class CduPickingBulkMember(models.Model):
                     member_allocations.write(
                         {"daily_units": member.daily_units}
                     )
-            self.mapped("group_id").write({"distribution_stale": True})
+            groups = self.mapped("group_id")
+            groups.write({"distribution_stale": True})
+            groups._auto_recalculate_distribution()
+        elif {"sequence", "resolution_id"}.intersection(values):
+            groups = self.mapped("group_id")
+            groups.write({"distribution_stale": True})
+            groups._auto_recalculate_distribution()
         return result
 
     def unlink(self):
-        self.mapped("group_id")._ensure_unlocked()
+        groups = self.mapped("group_id")
+        groups._ensure_unlocked()
         allocations = self.mapped("resolution_id.allocation_line_ids").filtered(
             lambda allocation: allocation.bulk_member_id in self
         )
         allocations.unlink()
-        return super().unlink()
+        result = super().unlink()
+        groups = groups.exists()
+        groups.write({"distribution_stale": True})
+        groups._auto_recalculate_distribution()
+        return result
 
     @api.onchange("resolution_id")
     def _onchange_resolution_id(self):
@@ -1276,7 +1913,7 @@ class CduPickingBulkMember(models.Model):
 
 class CduPickingBulkLot(models.Model):
     _name = "cdu.picking.bulk.lot"
-    _description = "CDU Bulk Picking Selected Lot"
+    _description = "CDU Regimen Component Selected Lot"
     _order = "group_id, sequence, id"
 
     group_id = fields.Many2one(
@@ -1294,17 +1931,40 @@ class CduPickingBulkLot(models.Model):
     expiration_date = fields.Date(
         related="stock_option_id.expiration_date", readonly=True
     )
+    orderable_name = fields.Char(
+        related="stock_option_id.orderable_name",
+        string="Product",
+        readonly=True,
+    )
+    pack_size = fields.Integer(
+        related="stock_option_id.pack_size",
+        string="Pack Size",
+        readonly=True,
+    )
     lot = fields.Char(related="stock_option_id.lot", readonly=True)
     available_packs = fields.Integer(
         related="stock_option_id.stock_on_hand", readonly=True
     )
-    quantity_packs = fields.Integer(string="Picked Packs", required=True, default=1)
+    quantity_packs = fields.Integer(
+        string="Maximum Packs to Use",
+        required=True,
+        default=1,
+        help="Maximum packs from this selected stock row that the allocator may use.",
+    )
+    allocated_packs = fields.Integer(
+        string="Allocated Packs",
+        compute="_compute_allocation_totals",
+    )
+    remaining_selected_packs = fields.Integer(
+        string="Remaining Selected Packs",
+        compute="_compute_allocation_totals",
+    )
 
     _sql_constraints = [
         (
             "unique_bulk_group_lot",
             "unique(group_id, stock_option_id)",
-            "A stock lot can only appear once in a bulk group.",
+            "A stock lot can only appear once in a regimen component.",
         ),
     ]
 
@@ -1313,32 +1973,27 @@ class CduPickingBulkLot(models.Model):
         for lot in self:
             lot.group_id._ensure_unlocked()
             option = lot.stock_option_id
-            product = lot.group_id.product_stock_option_id
             if lot.quantity_packs <= 0:
-                raise ValidationError(_("Picked packs must be a positive whole number."))
+                raise ValidationError(
+                    _("Maximum packs must be a positive whole number.")
+                )
             if lot.quantity_packs > option.stock_on_hand:
                 raise ValidationError(
-                    _("Picked packs exceed the available packs for this lot.")
+                    _("Maximum packs cannot exceed the available packs for this lot.")
                 )
-            same_orderable = (
-                option.orderable_id
-                and product.orderable_id
-                and option.orderable_id == product.orderable_id
-            ) or (
-                not option.orderable_id
-                and not product.orderable_id
-                and option.orderable_code == product.orderable_code
-            )
-            if not same_orderable or option.pack_size != product.pack_size:
+            if option.batch_id != lot.group_id.batch_id:
                 raise ValidationError(
-                    _(
-                        "All lots in a bulk group must use the selected product "
-                        "and pack size."
-                    )
+                    _("The selected stock option belongs to another batch.")
                 )
 
     @api.model_create_multi
     def create(self, vals_list):
+        for values in vals_list:
+            option = self.env["cdu.elmis.stock.option"].browse(
+                values.get("stock_option_id")
+            )
+            if option and "quantity_packs" not in values:
+                values["quantity_packs"] = option.stock_on_hand or 1
         records = super().create(vals_list)
         for group in records.mapped("group_id"):
             for index, record in enumerate(
@@ -1350,13 +2005,56 @@ class CduPickingBulkLot(models.Model):
                 ),
                 start=1,
             ):
-                record.sequence = index * 10
+                record.with_context(
+                    cdu_skip_auto_bulk_recalculation=True
+                ).sequence = index * 10
+            group.write({"distribution_stale": True})
+            group._auto_recalculate_distribution()
         return records
 
     def write(self, vals):
-        self.mapped("group_id")._ensure_unlocked()
-        return super().write(vals)
+        groups = self.mapped("group_id")
+        groups._ensure_unlocked()
+        result = super().write(vals)
+        if {"stock_option_id", "quantity_packs", "sequence"}.intersection(vals):
+            groups.write({"distribution_stale": True})
+            groups._auto_recalculate_distribution()
+        return result
 
     def unlink(self):
-        self.mapped("group_id")._ensure_unlocked()
-        return super().unlink()
+        groups = self.mapped("group_id")
+        groups._ensure_unlocked()
+        result = super().unlink()
+        groups = groups.exists()
+        groups.write({"distribution_stale": True})
+        groups._auto_recalculate_distribution()
+        return result
+
+    @api.onchange("stock_option_id")
+    def _onchange_stock_option_id(self):
+        for lot in self:
+            if lot.stock_option_id:
+                lot.quantity_packs = lot.stock_option_id.stock_on_hand or 1
+
+    @api.depends(
+        "group_id.member_ids.resolution_id.allocation_line_ids.quantity_packs",
+        "group_id.member_ids.resolution_id.allocation_line_ids.stock_option_id",
+        "stock_option_id",
+        "quantity_packs",
+    )
+    def _compute_allocation_totals(self):
+        for lot in self:
+            allocations = lot.group_id.member_ids.mapped(
+                "resolution_id.allocation_line_ids"
+            ).filtered(
+                lambda allocation, lot=lot: (
+                    allocation.bulk_group_id == lot.group_id
+                    and allocation.stock_option_id == lot.stock_option_id
+                )
+            )
+            lot.allocated_packs = sum(allocations.mapped("quantity_packs"))
+            lot.remaining_selected_packs = max(
+                min(lot.quantity_packs, lot.available_packs)
+                - lot.allocated_packs,
+                0,
+            )

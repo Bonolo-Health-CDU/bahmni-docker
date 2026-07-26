@@ -97,13 +97,22 @@ class CduPickingLine(models.Model):
     quantity_picked = fields.Float(string="Picked Packs")
     allocation_mode = fields.Selection(
         [
-            ("bulk", "Bulk"),
+            ("bulk", "Regimen Components"),
             ("individual", "Individual"),
         ],
         string="Allocation Mode",
         required=True,
         default="bulk",
         index=True,
+    )
+    regimen_component_mode = fields.Boolean(
+        string="Regimen Component Allocation",
+        default=True,
+        copy=False,
+        help=(
+            "When enabled, every component is required "
+            "and every prescription is allocated from every component."
+        ),
     )
     resolution_ids = fields.One2many(
         "cdu.picking.patient.resolution",
@@ -118,7 +127,7 @@ class CduPickingLine(models.Model):
     bulk_group_ids = fields.One2many(
         "cdu.picking.bulk.group",
         "picking_line_id",
-        string="Bulk Groups",
+        string="Regimen Components",
     )
     resolved_prescription_count = fields.Integer(
         compute="_compute_allocation_progress"
@@ -474,10 +483,33 @@ class CduPickingLine(models.Model):
                 {"resolution_id": first.id}
             )
             return wizard._open_action()
+        group = self._get_or_create_primary_bulk_group()
+        return group._open_allocation_action()
+
+    def _get_or_create_primary_bulk_group(self):
+        self.ensure_one()
+        self._ensure_patient_resolutions()
+        group = self.bulk_group_ids.sorted(
+            lambda candidate: (candidate.sequence, candidate.id)
+        )[:1]
+        if not group:
+            group = self.env["cdu.picking.bulk.group"].create(
+                {
+                    "batch_id": self.batch_id.id,
+                    "picking_line_id": self.id,
+                }
+            )
+        else:
+            group._populate_prescriptions()
+        return group
+
+    def action_open_bulk_allocation_overview(self):
+        self.ensure_one()
         return {
             "type": "ir.actions.act_window",
-            "name": _("%s - Bulk Allocation") % self.openmrs_drug_name,
-            "res_model": "cdu.picking.line",
+            "name": _("%s - Regimen Component Allocation")
+            % self.openmrs_drug_name,
+            "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
             "view_id": self.env.ref(
@@ -489,6 +521,32 @@ class CduPickingLine(models.Model):
                 "default_picking_line_id": self.id,
             },
         }
+
+    def action_confirm_picking(self):
+        self.ensure_one()
+        result = self.batch_id.action_confirm_elmis_picking()
+        if result.get("res_model") == "cdu.elmis.auth.wizard":
+            return result
+
+        action = self.env["ir.actions.actions"]._for_xml_id(
+            "cdu_prescription.action_cdu_batch"
+        )
+        action.update(
+            {
+                "res_id": self.batch_id.id,
+                "views": [
+                    (
+                        self.env.ref(
+                            "cdu_prescription.view_cdu_batch_form"
+                        ).id,
+                        "form",
+                    )
+                ],
+                "view_mode": "form",
+                "target": "current",
+            }
+        )
+        return action
 
     def action_back_to_allocation_overview(self):
         self.ensure_one()
@@ -512,19 +570,16 @@ class CduPickingLine(models.Model):
                         "draft allocations can be cleared safely."
                     )
                 )
-        return super().write(vals)
-
-    @api.onchange("selected_stock_option_id")
-    def _onchange_selected_stock_option_id(self):
-        for line in self:
-            line._sync_selected_stock_option()
-
-    def write(self, vals):
         result = super().write(vals)
         if "selected_stock_option_id" in vals:
             self._sync_selected_stock_option()
             self.mapped("batch_id")._sync_picking_quantities_from_elmis_pack_sizes()
         return result
+
+    @api.onchange("selected_stock_option_id")
+    def _onchange_selected_stock_option_id(self):
+        for line in self:
+            line._sync_selected_stock_option()
 
     def _sync_selected_stock_option(self):
         for line in self:
