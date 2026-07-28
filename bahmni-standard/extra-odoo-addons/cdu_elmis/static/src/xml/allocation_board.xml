@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="cdu_elmis.AllocationBoard" owl="1">
+        <div class="o_cdu_allocation_board">
+            <div t-if="state.loading" class="o_cdu_allocation_loading">
+                <i class="fa fa-spinner fa-spin"/>
+                <span>Loading allocation proposal…</span>
+            </div>
+            <t t-else="">
+                <header class="o_cdu_allocation_header">
+                    <div class="o_cdu_allocation_title">
+                        <button type="button"
+                                class="btn btn-link"
+                                t-on-click="backToRegimen">
+                            <i class="fa fa-arrow-left"/> Back to regimen
+                        </button>
+                        <span class="o_cdu_allocation_eyebrow">Allocation board</span>
+                        <h1 t-esc="state.data.regimen"/>
+                        <p>
+                            <span t-esc="state.data.batch_name"/>
+                            <span class="o_cdu_allocation_strategy"
+                                  t-esc="state.data.strategy_label"/>
+                        </p>
+                    </div>
+                    <div class="o_cdu_allocation_actions">
+                        <button type="button"
+                                class="btn btn-secondary"
+                                t-att-disabled="!state.historyCount || state.saving"
+                                t-on-click="undo">
+                            <i class="fa fa-undo"/> Undo
+                        </button>
+                        <button type="button"
+                                class="btn btn-secondary"
+                                t-att-disabled="!state.redoCount || state.saving"
+                                t-on-click="redo">
+                            <i class="fa fa-repeat"/> Redo
+                        </button>
+                        <button type="button"
+                                class="btn btn-secondary"
+                                t-att-disabled="state.data.locked || state.saving"
+                                t-on-click="resetRecommended">
+                            Reset to Recommended
+                        </button>
+                        <button type="button"
+                                class="btn btn-primary"
+                                t-att-disabled="!state.data.can_confirm || state.saving"
+                                t-on-click="confirmPicking">
+                            Confirm Picking
+                        </button>
+                    </div>
+                </header>
+
+                <section class="o_cdu_allocation_summary">
+                    <div class="is-success">
+                        <span>Full</span>
+                        <strong t-esc="state.data.summary.full || 0"/>
+                    </div>
+                    <div class="is-warning">
+                        <span>Partial</span>
+                        <strong t-esc="state.data.summary.partial || 0"/>
+                    </div>
+                    <div class="is-danger">
+                        <span>Unserved</span>
+                        <strong t-esc="state.data.summary.unserved || 0"/>
+                    </div>
+                    <div class="is-muted">
+                        <span>Pending</span>
+                        <strong t-esc="state.data.summary.draft || 0"/>
+                    </div>
+                </section>
+
+                <section t-if="state.data.readiness_errors.length"
+                         class="o_cdu_allocation_errors">
+                    <strong>Needs attention before confirmation</strong>
+                    <ul>
+                        <li t-foreach="state.data.readiness_errors"
+                            t-as="error"
+                            t-key="error"
+                            t-esc="error"/>
+                    </ul>
+                </section>
+
+                <section class="o_cdu_allocation_stock">
+                    <div class="o_cdu_allocation_section_title">
+                        <div>
+                            <span>Selected eLMIS stock</span>
+                            <small>Drag one unopened pack to a patient, or select a lot and use the buttons.</small>
+                        </div>
+                    </div>
+                    <div class="o_cdu_stock_components">
+                        <article t-foreach="state.data.components"
+                                 t-as="component"
+                                 t-key="component.id"
+                                 class="o_cdu_stock_component">
+                            <h2 t-esc="component.name"/>
+                            <div t-if="!component.lots.length"
+                                 class="o_cdu_stock_empty">
+                                No stock lots selected for this component.
+                            </div>
+                            <button t-foreach="component.lots"
+                                    t-as="lot"
+                                    t-key="lot.id"
+                                    type="button"
+                                    t-att-class="'o_cdu_stock_lot is-' + lot.status + (this.selectedLot(component.id) === lot.stock_option_id ? ' is-selected' : '')"
+                                    t-att-aria-disabled="lot.status === 'expired' || !lot.remaining_packs ? 'true' : 'false'"
+                                    t-att-draggable="lot.status !== 'expired' &amp;&amp; lot.remaining_packs ? 'true' : 'false'"
+                                    t-on-click="() => this.selectLot(component.id, lot.stock_option_id, lot.remaining_packs, lot.status)"
+                                    t-on-dragstart="(ev) => this.startLotDrag(ev, component.id, lot.stock_option_id)"
+                                    t-on-dragover="allowDrop"
+                                    t-on-drop="(ev) => this.dropOnStock(ev, component.id, lot.stock_option_id)">
+                                <span class="o_cdu_stock_product" t-esc="lot.product"/>
+                                <span>
+                                    <b t-esc="lot.lot"/>
+                                    <small t-esc="'Pack ' + lot.pack_size"/>
+                                </span>
+                                <span>
+                                    <b t-esc="lot.expiry || 'No expiry date'"/>
+                                    <small t-att-class="'is-' + lot.status"
+                                           t-esc="lot.status_label"/>
+                                </span>
+                                <span class="o_cdu_stock_balance">
+                                    <b t-esc="lot.remaining_packs + ' remaining'"/>
+                                    <small t-esc="lot.allocated_packs + ' allocated / ' + lot.selected_maximum + ' selected'"/>
+                                </span>
+                            </button>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="o_cdu_patient_allocations">
+                    <div class="o_cdu_allocation_section_title">
+                        <div>
+                            <span>Patient coverage</span>
+                            <small>Overall coverage is the least-covered required component.</small>
+                        </div>
+                    </div>
+                    <div class="o_cdu_patient_table">
+                        <div class="o_cdu_patient_row o_cdu_patient_header"
+                             t-att-style="'--cdu-component-count: ' + state.data.components.length">
+                            <span>Patient / Prescription</span>
+                            <span>Coverage</span>
+                            <span t-foreach="state.data.components"
+                                  t-as="component"
+                                  t-key="component.id"
+                                  t-esc="component.name"/>
+                            <span>Action</span>
+                        </div>
+                        <div t-foreach="state.data.patients"
+                             t-as="patient"
+                             t-key="patient.resolution_id"
+                             class="o_cdu_patient_row"
+                             t-att-style="'--cdu-component-count: ' + state.data.components.length">
+                            <div class="o_cdu_patient_identity">
+                                <strong t-esc="patient.patient"/>
+                                <small t-esc="patient.prescription"/>
+                            </div>
+                            <div class="o_cdu_patient_coverage">
+                                <strong t-esc="patient.coverage_days + ' / ' + patient.target_days + ' days'"/>
+                                <span t-att-class="'o_cdu_status_badge is-' + patient.status"
+                                      t-esc="patient.status_label"/>
+                            </div>
+                            <div t-foreach="patient.components"
+                                 t-as="component"
+                                 t-key="component.group_id"
+                                 class="o_cdu_patient_component"
+                                 t-on-dragover="allowDrop"
+                                 t-on-drop="(ev) => this.dropOnPatient(ev, patient.resolution_id, component.group_id)">
+                                <div class="o_cdu_component_coverage"
+                                     t-esc="component.coverage_days + ' days'"/>
+                                <div t-if="component.allocations.length"
+                                     class="o_cdu_pack_chips">
+                                    <div t-foreach="component.allocations"
+                                         t-as="allocation"
+                                         t-key="allocation.id"
+                                         class="o_cdu_pack_chip"
+                                         draggable="true"
+                                         t-on-dragstart="(ev) => this.startAllocationDrag(ev, patient.resolution_id, component.group_id, allocation.stock_option_id)">
+                                        <span>
+                                            <b t-esc="allocation.quantity + ' × ' + allocation.pack_size"/>
+                                            <small t-esc="allocation.lot"/>
+                                        </span>
+                                        <span class="o_cdu_pack_controls">
+                                            <button type="button"
+                                                    title="Remove one pack"
+                                                    t-on-click.stop="() => this.adjust(patient.resolution_id, component.group_id, allocation.stock_option_id, -1)">−</button>
+                                            <button type="button"
+                                                    title="Add one pack"
+                                                    t-on-click.stop="() => this.adjust(patient.resolution_id, component.group_id, allocation.stock_option_id, 1)">+</button>
+                                        </span>
+                                    </div>
+                                </div>
+                                <button type="button"
+                                        class="o_cdu_add_selected_pack"
+                                        t-att-disabled="!this.selectedLot(component.group_id) || state.saving"
+                                        t-on-click="() => this.addSelectedLot(patient.resolution_id, component.group_id)">
+                                    + Add selected pack
+                                </button>
+                            </div>
+                            <button type="button"
+                                    class="btn btn-outline-primary o_cdu_add_bundle"
+                                    t-att-disabled="state.data.locked || state.saving || patient.status === 'full'"
+                                    t-on-click="() => this.addNextBundle(patient.resolution_id)">
+                                Add Next Bundle
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section t-if="state.data.strategy === 'manual'"
+                         t-att-class="'o_cdu_override_reason' + (state.data.override_required &amp;&amp; !state.data.override_reason ? ' is-required' : '')">
+                    <div>
+                        <strong>Manual override reason</strong>
+                        <p>
+                            Explain why the allocation differs from Balanced FEFO.
+                            The reason and user are recorded when picking is confirmed.
+                        </p>
+                    </div>
+                    <textarea t-model="state.reason"
+                              rows="3"
+                              placeholder="Enter the operational reason for this override…"/>
+                    <button type="button"
+                            class="btn btn-secondary"
+                            t-att-disabled="state.saving"
+                            t-on-click="saveReason">
+                        Save Reason
+                    </button>
+                </section>
+
+                <footer class="o_cdu_allocation_footer">
+                    <span t-if="state.saving">
+                        <i class="fa fa-spinner fa-spin"/> Updating allocation…
+                    </span>
+                    <span t-else="">
+                        Dragging or pressing +/− moves one unopened pack.
+                    </span>
+                    <button type="button"
+                            class="btn btn-primary"
+                            t-att-disabled="!state.data.can_confirm || state.saving"
+                            t-on-click="confirmPicking">
+                        Confirm Picking
+                    </button>
+                </footer>
+            </t>
+        </div>
+    </t>
+</templates>

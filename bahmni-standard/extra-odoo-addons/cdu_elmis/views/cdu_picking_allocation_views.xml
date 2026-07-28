@@ -12,6 +12,11 @@
                             class="btn-primary"
                             confirm="This locks all allocations and moves the selected stock from CDU Store to Production Floor. Continue?"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+                    <button name="action_open_allocation_board"
+                            string="Review / Adjust Allocation"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
                     <button name="action_back_to_allocation_overview"
                             string="Back to Regimen Overview"
                             type="object"
@@ -20,6 +25,7 @@
                 <sheet>
                     <field name="batch_id" invisible="1"/>
                     <field name="allocation_mode" invisible="1"/>
+                    <field name="allocation_strategy" invisible="1"/>
                     <div class="oe_title">
                         <h1><field name="openmrs_drug_name" readonly="1"/></h1>
                     </div>
@@ -30,9 +36,10 @@
                     </group>
                     <div class="alert alert-info" role="alert">
                         Add as many components as the regimen requires. Every component
-                        automatically includes every prescription and allocates its own
-                        selected products and lots. Overall coverage is determined by
-                        the least-covered component.
+                        automatically includes every prescription. Balanced FEFO
+                        distributes unopened packs across patients with the lowest
+                        coverage first. Overall coverage is determined by the
+                        least-covered component.
                     </div>
                     <separator string="Regimen Components"/>
                     <field name="bulk_group_ids"
@@ -133,9 +140,10 @@
                     <div class="alert alert-info" role="alert">
                         Select the products and lots for this regimen component.
                         Every prescription is included automatically in patient order.
-                        Allocation recalculates when selected stock or daily units
-                        change, using availability, earliest expiry, minimum excess,
-                        then patient order.
+                        Allocation recalculates across all components using unopened
+                        packs, equal patient coverage, valid earliest-expiry stock,
+                        and minimum excess. Stock that cannot be consumed before expiry
+                        is not allocated.
                     </div>
                     <notebook>
                         <page string="Selected Products / Lots">

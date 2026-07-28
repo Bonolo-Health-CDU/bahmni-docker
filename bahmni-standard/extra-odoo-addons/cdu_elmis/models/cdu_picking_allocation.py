@@ -772,6 +772,19 @@ class CduPickingPatientAllocation(models.Model):
                 raise ValidationError(
                     _("The selected stock option belongs to another batch.")
                 )
+            if (
+                option.expiration_date
+                and option.expiration_date < fields.Date.context_today(allocation)
+            ):
+                raise ValidationError(
+                    _(
+                        "%(product)s / %(lot)s is expired and cannot be allocated."
+                    )
+                    % {
+                        "product": option.orderable_name,
+                        "lot": option.lot or _("No batch"),
+                    }
+                )
             if allocation.resolution_id.batch_id != allocation.batch_id:
                 raise ValidationError(
                     _("The prescription resolution belongs to another batch.")
@@ -877,6 +890,8 @@ class CduPickingPatientAllocation(models.Model):
             vals["original_daily_units"] = daily_units
         records = super().create(vals_list)
         records._sync_stock_snapshots()
+        if self.env.context.get("cdu_skip_allocation_side_effects"):
+            return records
         resolutions = records.mapped("resolution_id")
         resolutions._reset_coverage_confirmation()
         resolutions._refresh_status()
@@ -946,6 +961,8 @@ class CduPickingPatientAllocation(models.Model):
         result = super().write(values) if values else True
         if "stock_option_id" in vals:
             self._sync_stock_snapshots()
+        if self.env.context.get("cdu_skip_allocation_side_effects"):
+            return result
         touched_records = self | daily_write_records
         resolutions = touched_records.mapped("resolution_id")
         if relevant_change:
@@ -966,6 +983,8 @@ class CduPickingPatientAllocation(models.Model):
         batches = self.mapped("batch_id")
         resolutions = self.mapped("resolution_id")
         result = super().unlink()
+        if self.env.context.get("cdu_skip_allocation_side_effects"):
+            return result
         resolutions = resolutions.exists()
         resolutions._reset_coverage_confirmation()
         resolutions._refresh_status()
@@ -1308,17 +1327,15 @@ class CduPickingBulkGroup(models.Model):
     def _auto_recalculate_distribution(self):
         if self.env.context.get("cdu_skip_auto_bulk_recalculation"):
             return
-        for group in self:
-            if group.locked or group.batch_id.picking_confirmed_at:
+        for picking_line in self.mapped("picking_line_id"):
+            if picking_line.batch_id.picking_confirmed_at:
                 continue
-            if not group.member_ids or not group.lot_ids:
-                group.with_context(
+            if picking_line.allocation_strategy == "manual":
+                picking_line.bulk_group_ids.with_context(
                     cdu_skip_auto_bulk_recalculation=True
-                )._clear_automatic_distribution()
+                ).write({"distribution_stale": True})
                 continue
-            group.with_context(
-                cdu_skip_auto_bulk_recalculation=True
-            )._apply_priority_distribution()
+            picking_line._apply_balanced_distribution()
 
     def action_distribute_by_priority(self):
         self.ensure_one()
@@ -1332,17 +1349,15 @@ class CduPickingBulkGroup(models.Model):
                 _("Every selected lot must have a positive maximum pack quantity.")
             )
 
-        self.with_context(
-            cdu_skip_auto_bulk_recalculation=True
-        )._apply_priority_distribution()
+        self.picking_line_id.action_reset_balanced_allocation()
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
-                "title": _("Regimen component allocation updated"),
+                "title": _("Balanced FEFO allocation updated"),
                 "message": _(
-                    "Packs were assigned by availability, earliest expiry, "
-                    "minimum excess, and patient order."
+                    "Whole packs were balanced across patients using valid "
+                    "earliest-expiry stock and complete regimen components."
                 ),
                 "type": "success",
                 "sticky": False,
@@ -1544,27 +1559,26 @@ class CduPickingBulkGroup(models.Model):
             return [_("%s: add at least one prescription.") % self.name]
         if not self.lot_ids:
             return [_("%s: add at least one stock lot.") % self.name]
-        lots_by_id = {lot.id: lot for lot in self.lot_ids}
-        expected = {
-            (member_id, lots_by_id[lot_id].stock_option_id.id): quantity
-            for member_id, member_plan in self._build_priority_distribution_plan().items()
-            for lot_id, quantity in member_plan.items()
-            if quantity > 0
-        }
+        if self.picking_line_id.allocation_strategy == "manual":
+            return errors
 
+        expected = {
+            key: quantity
+            for key, quantity in self.picking_line_id._distribution_signature_from_plan(
+                self.picking_line_id._build_balanced_distribution_plan()
+            ).items()
+            if key[1] == self.id
+        }
         actual = {
-            (allocation.bulk_member_id.id, allocation.stock_option_id.id): (
-                allocation.quantity_packs
-            )
-            for allocation in self.env["cdu.picking.patient.allocation"].search(
-                [("bulk_group_id", "=", self.id)]
-            )
+            key: quantity
+            for key, quantity in self.picking_line_id._actual_bulk_distribution_signature().items()
+            if key[1] == self.id
         }
         if expected != actual:
             errors.append(
                 _(
-                    "%s: the automatic allocation is out of date with the selected "
-                    "stock or current patient requirements."
+                    "%s: the Balanced FEFO allocation is out of date with the "
+                    "selected stock or current patient requirements."
                 )
                 % self.name
             )
@@ -1582,7 +1596,7 @@ class CduPickingBulkGroup(models.Model):
         self._ensure_unlocked()
         self._populate_prescriptions()
         self._auto_recalculate_distribution()
-        return self.picking_line_id.action_open_bulk_allocation_overview()
+        return self.picking_line_id.action_open_allocation_board()
 
     def _open_allocation_action(self):
         self.ensure_one()
@@ -1925,7 +1939,7 @@ class CduPickingBulkLot(models.Model):
         string="eLMIS Lot",
         required=True,
         ondelete="restrict",
-        domain="[('batch_id', '=', batch_id), ('stock_on_hand', '>', 0), ('pack_size', '>', 0)]",
+        domain="['&', '&', '&', ('batch_id', '=', batch_id), ('stock_on_hand', '>', 0), ('pack_size', '>', 0), '|', ('expiration_date', '=', False), ('expiration_date', '>=', context_today().strftime('%Y-%m-%d'))]",
     )
     sequence = fields.Integer(string="Lot Sequence", default=10)
     expiration_date = fields.Date(
@@ -1984,6 +1998,36 @@ class CduPickingBulkLot(models.Model):
             if option.batch_id != lot.group_id.batch_id:
                 raise ValidationError(
                     _("The selected stock option belongs to another batch.")
+                )
+            if (
+                option.expiration_date
+                and option.expiration_date < fields.Date.context_today(lot)
+            ):
+                raise ValidationError(
+                    _(
+                        "%(product)s / %(batch)s is expired and cannot be "
+                        "selected for picking."
+                    )
+                    % {
+                        "product": option.orderable_name,
+                        "batch": option.lot or _("No batch"),
+                    }
+                )
+            duplicate_component = self.search(
+                [
+                    ("id", "!=", lot.id),
+                    ("group_id.picking_line_id", "=", lot.group_id.picking_line_id.id),
+                    ("group_id", "!=", lot.group_id.id),
+                    ("stock_option_id", "=", option.id),
+                ],
+                limit=1,
+            )
+            if duplicate_component:
+                raise ValidationError(
+                    _(
+                        "The same eLMIS lot cannot be selected in more than one "
+                        "regimen component."
+                    )
                 )
 
     @api.model_create_multi

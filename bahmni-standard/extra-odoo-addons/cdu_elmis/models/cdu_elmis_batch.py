@@ -363,6 +363,26 @@ class CduBatch(models.Model):
             batch.elmis_picking_line_ids._ensure_patient_resolutions()
             batch._sync_fulfilment_lines_from_allocations()
             batch._ensure_picking_ready()
+            for picking_line in batch.elmis_picking_line_ids.filtered(
+                lambda line: (
+                    line.allocation_strategy == "manual"
+                    and line._manual_override_is_required()
+                )
+            ):
+                batch.message_post(
+                    body=_(
+                        "Manual allocation override confirmed for %(regimen)s "
+                        "by %(user)s. Reason: %(reason)s"
+                    )
+                    % {
+                        "regimen": picking_line.openmrs_drug_name,
+                        "user": (
+                            picking_line.manual_override_by.display_name
+                            or self.env.user.display_name
+                        ),
+                        "reason": picking_line.manual_override_reason,
+                    }
+                )
             batch._apply_repeat_fulfilment_results()
             batch.picking_resolution_ids._create_partial_backorder_prescriptions()
             batch.stock_event_status = "pending"
@@ -1268,6 +1288,10 @@ class CduBatch(models.Model):
                             }
                         )
                     errors.extend(group._get_distribution_errors())
+                errors.extend(
+                    picking_line._bulk_allocation_safety_errors()
+                )
+                errors.extend(picking_line._manual_override_errors())
 
         totals = {}
         for allocation in self.patient_allocation_ids:

@@ -4,6 +4,7 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools.safe_eval import safe_eval
 
 
 @tagged("post_install", "-at_install", "cdu_picking")
@@ -11,6 +12,18 @@ class TestPrescriptionLevelPicking(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.env.user.write(
+            {
+                "groups_id": [
+                    (
+                        4,
+                        cls.env.ref(
+                            "cdu_prescription.group_cdu_dispensing_officer"
+                        ).id,
+                    )
+                ]
+            }
+        )
         cls.facility = cls.env["cdu.facility"].create(
             {"name": "Picking Test Facility", "code": "PICK-FAC"}
         )
@@ -370,14 +383,15 @@ class TestPrescriptionLevelPicking(TransactionCase):
         self.assertEqual(len(self.picking_line.bulk_group_ids), 1)
 
         overview_action = group.action_allocate_or_reallocate()
-        self.assertEqual(overview_action["res_model"], "cdu.picking.line")
-        self.assertEqual(overview_action["res_id"], self.picking_line.id)
+        self.assertEqual(overview_action["type"], "ir.actions.client")
+        self.assertEqual(
+            overview_action["tag"],
+            "cdu_elmis_allocation_board",
+        )
         self.assertEqual(overview_action["target"], "current")
         self.assertEqual(
-            overview_action["view_id"],
-            self.env.ref(
-                "cdu_elmis.view_cdu_picking_line_bulk_allocation_form"
-            ).id,
+            overview_action["params"]["picking_line_id"],
+            self.picking_line.id,
         )
 
     def test_bulk_daily_units_change_recalculates_automatically(self):
@@ -400,15 +414,19 @@ class TestPrescriptionLevelPicking(TransactionCase):
             }
         )
         self.assertFalse(group.distribution_stale)
-        self.assertEqual(member.allocated_packs, 10)
-        self.assertEqual(member.allocation_status, "full")
+        self.assertEqual(
+            self.resolutions.mapped("allocated_packs"),
+            [4, 3, 3],
+        )
+        self.assertEqual(member.allocated_packs, 4)
+        self.assertEqual(member.allocation_status, "partial")
 
         member.daily_units = 20
-        self.assertEqual(member.requested_packs, 10)
+        self.assertEqual(member.requested_packs, 5)
         self.assertEqual(member.calculated_packs, 20)
         self.assertFalse(group.distribution_stale)
-        self.assertEqual(member.allocated_packs, 10)
-        self.assertEqual(member.coverage_days, 15)
+        self.assertEqual(member.allocated_packs, 5)
+        self.assertEqual(member.coverage_days, 7.5)
         self.assertEqual(member.allocation_status, "partial")
         self.assertEqual(member.resolution_id.allocation_line_ids.daily_units, 20)
         self.assertEqual(group._get_distribution_errors(), [])
@@ -519,19 +537,32 @@ class TestPrescriptionLevelPicking(TransactionCase):
             }
         )
 
-        self.assertEqual(self.resolutions.mapped("coverage_days"), [30, 15, 0])
-        self.assertEqual(self.resolutions.mapped("status"), ["full", "partial", "partial"])
-        self.assertEqual(component_one.member_ids.mapped("coverage_days"), [30, 30, 30])
-        self.assertEqual(component_two.member_ids.mapped("coverage_days"), [30, 15, 0])
+        self.assertEqual(self.resolutions.mapped("coverage_days"), [15, 15, 15])
+        self.assertEqual(
+            self.resolutions.mapped("status"),
+            ["partial", "partial", "partial"],
+        )
+        self.assertEqual(
+            component_one.member_ids.mapped("coverage_days"),
+            [15, 15, 15],
+        )
+        self.assertEqual(
+            component_two.member_ids.mapped("coverage_days"),
+            [15, 15, 15],
+        )
+        self.assertEqual(
+            component_one.member_ids.mapped("allocated_packs"),
+            component_two.member_ids.mapped("allocated_packs"),
+        )
 
         self.batch._apply_repeat_fulfilment_results()
-        balance = self.resolutions[1]._create_partial_backorder_prescriptions()
+        balance = self.resolutions[0]._create_partial_backorder_prescriptions()
         components = balance.backorder_component_ids.sorted("sequence")
         self.assertEqual(len(components), 2)
-        self.assertEqual(components.mapped("outstanding_days"), [0, 15])
-        self.assertEqual(components.mapped("outstanding_units"), [0, 150])
+        self.assertEqual(components.mapped("outstanding_days"), [15, 15])
+        self.assertEqual(components.mapped("outstanding_units"), [150, 150])
 
-    def test_bulk_short_stock_uses_priority_for_full_partial_and_unserved(self):
+    def test_bulk_short_stock_is_balanced_equally_across_patients(self):
         self.picking_line.action_use_bulk_mode()
         group = self.env["cdu.picking.bulk.group"].create(
             {
@@ -548,8 +579,11 @@ class TestPrescriptionLevelPicking(TransactionCase):
             }
         )
 
-        self.assertEqual(self.resolutions.mapped("status"), ["full", "partial", "unserved"])
-        self.assertEqual(self.resolutions.mapped("allocated_packs"), [10, 5, 0])
+        self.assertEqual(
+            self.resolutions.mapped("status"),
+            ["partial", "partial", "partial"],
+        )
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [5, 5, 5])
         self.assertEqual(group.allocated_packs, group.picked_packs)
         self.assertEqual(group.picked_packs, 15)
         self.assertEqual(self.batch._get_picking_readiness_errors(), [])
@@ -570,11 +604,11 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 "quantity_packs": 20,
             }
         )
-        self.assertEqual(self.resolutions.mapped("allocated_packs"), [10, 10, 0])
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [7, 7, 6])
         self.assertFalse(group.distribution_stale)
 
         lot.quantity_packs = 15
-        self.assertEqual(self.resolutions.mapped("allocated_packs"), [10, 5, 0])
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [5, 5, 5])
         self.assertFalse(group.distribution_stale)
 
         lot.unlink()
@@ -591,9 +625,6 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 "picking_line_id": self.picking_line.id,
             }
         )
-        member = group.member_ids.filtered(
-            lambda candidate: candidate.resolution_id == self.resolutions[0]
-        )
         self.env["cdu.picking.bulk.lot"].create(
             [
                 {
@@ -609,21 +640,29 @@ class TestPrescriptionLevelPicking(TransactionCase):
             ]
         )
 
-        allocations = member.resolution_id.allocation_line_ids
+        allocations = self.resolutions.mapped("allocation_line_ids")
         self.assertEqual(
-            {
-                allocation.selected_pack_size: allocation.quantity_packs
-                for allocation in allocations
-            },
-            {60: 4, 15: 4},
+            sum(allocations.filtered(
+                lambda allocation: allocation.selected_pack_size == 60
+            ).mapped("quantity_packs")),
+            4,
         )
-        self.assertEqual(member.required_units, 300)
-        self.assertEqual(member.supplied_units, 300)
-        self.assertEqual(member.coverage_days, 30)
-        self.assertEqual(member.allocation_status, "full")
-        self.assertEqual(member.resolution_id.distinct_product_count, 2)
-        self.assertFalse(member.resolution_id.coverage_confirmation_required)
-        self.assertFalse(member.resolution_id.coverage_confirmed)
+        self.assertEqual(
+            sum(allocations.filtered(
+                lambda allocation: allocation.selected_pack_size == 15
+            ).mapped("quantity_packs")),
+            4,
+        )
+        self.assertEqual(
+            self.resolutions.mapped("status"),
+            ["partial", "partial", "partial"],
+        )
+        self.assertTrue(
+            all(
+                not resolution.coverage_confirmation_required
+                for resolution in self.resolutions
+            )
+        )
 
     def test_bulk_minimizes_excess_for_stock_with_the_same_expiry(self):
         self.picking_line.action_use_bulk_mode()
@@ -641,7 +680,7 @@ class TestPrescriptionLevelPicking(TransactionCase):
             "User Selected Pack 150",
             150,
             "PACK-150",
-            2,
+            6,
             expiration_date=common_expiry,
         )
         group = self.env["cdu.picking.bulk.group"].create(
@@ -664,17 +703,23 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 {
                     "group_id": group.id,
                     "stock_option_id": stock_150.id,
-                    "quantity_packs": 2,
+                    "quantity_packs": 6,
                 },
             ]
         )
 
-        allocations = member.resolution_id.allocation_line_ids
-        self.assertEqual(len(allocations), 1)
-        self.assertEqual(allocations.stock_option_id, stock_150)
-        self.assertEqual(allocations.quantity_packs, 2)
-        self.assertEqual(member.supplied_units, 300)
-        self.assertEqual(member.excess_units, 0)
+        allocations = self.resolutions.mapped("allocation_line_ids")
+        self.assertEqual(len(allocations), 3)
+        self.assertEqual(allocations.mapped("stock_option_id"), stock_150)
+        self.assertEqual(sum(allocations.mapped("quantity_packs")), 6)
+        self.assertEqual(
+            self.resolutions.mapped("supplied_units"),
+            [300, 300, 300],
+        )
+        self.assertEqual(
+            self.resolutions.mapped("coverage_days"),
+            [30, 30, 30],
+        )
 
     def test_bulk_prefers_earliest_expiry_before_minimum_excess(self):
         self.picking_line.action_use_bulk_mode()
@@ -691,7 +736,7 @@ class TestPrescriptionLevelPicking(TransactionCase):
             "Later Pack 150",
             150,
             "LATER-150",
-            2,
+            4,
             expiration_date=fields.Date.today() + timedelta(days=365),
         )
         group = self.env["cdu.picking.bulk.group"].create(
@@ -700,9 +745,6 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 "batch_id": self.batch.id,
                 "picking_line_id": self.picking_line.id,
             }
-        )
-        member = group.member_ids.filtered(
-            lambda candidate: candidate.resolution_id == self.resolutions[0]
         )
         self.env["cdu.picking.bulk.lot"].create(
             [
@@ -714,17 +756,262 @@ class TestPrescriptionLevelPicking(TransactionCase):
                 {
                     "group_id": group.id,
                     "stock_option_id": stock_later_150.id,
-                    "quantity_packs": 2,
+                    "quantity_packs": 4,
                 },
             ]
         )
 
-        allocations = member.resolution_id.allocation_line_ids
-        self.assertEqual(len(allocations), 1)
-        self.assertEqual(allocations.stock_option_id, stock_early_200)
-        self.assertEqual(allocations.quantity_packs, 2)
-        self.assertEqual(member.supplied_units, 400)
-        self.assertEqual(member.excess_units, 100)
+        early_allocations = self.resolutions.mapped(
+            "allocation_line_ids"
+        ).filtered(
+            lambda allocation: allocation.stock_option_id == stock_early_200
+        )
+        self.assertEqual(sum(early_allocations.mapped("quantity_packs")), 2)
+        self.assertEqual(
+            early_allocations.mapped("resolution_id"),
+            self.resolutions[:2],
+        )
+        self.assertEqual(
+            self.resolutions.mapped("status"),
+            ["full", "full", "full"],
+        )
+
+    def test_bulk_near_expiry_stock_is_limited_to_safe_consumption(self):
+        self.picking_line.action_use_bulk_mode()
+        near_expiry = self._create_stock(
+            "NEAR-EXPIRY",
+            "Near Expiry Product",
+            30,
+            "NEAR-EXPIRY-LOT",
+            20,
+            expiration_date=fields.Date.today() + timedelta(days=8),
+        )
+        group = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Near expiry component",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        lot = self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": group.id,
+                "stock_option_id": near_expiry.id,
+                "quantity_packs": 20,
+            }
+        )
+
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [3, 3, 3])
+        self.assertEqual(self.resolutions.mapped("coverage_days"), [9, 9, 9])
+        self.assertEqual(lot.allocated_packs, 9)
+        self.assertEqual(self.batch._get_picking_readiness_errors(), [])
+
+    def test_expired_stock_cannot_be_selected_for_bulk_picking(self):
+        self.picking_line.action_use_bulk_mode()
+        expired = self._create_stock(
+            "EXPIRED",
+            "Expired Product",
+            30,
+            "EXPIRED-LOT",
+            20,
+            expiration_date=fields.Date.today() - timedelta(days=1),
+        )
+        group = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Expiry protected component",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            "expired and cannot be selected",
+        ):
+            self.env["cdu.picking.bulk.lot"].create(
+                {
+                    "group_id": group.id,
+                    "stock_option_id": expired.id,
+                    "quantity_packs": 1,
+                }
+            )
+
+    def test_bulk_stock_picker_domain_is_serializable_and_excludes_expired_lots(self):
+        expired = self._create_stock(
+            "EXPIRED-PICKER",
+            "Expired Picker Product",
+            30,
+            "EXPIRED-PICKER-LOT",
+            20,
+            expiration_date=fields.Date.today() - timedelta(days=1),
+        )
+        domain_expression = self.env["cdu.picking.bulk.lot"]._fields[
+            "stock_option_id"
+        ].domain
+        domain = safe_eval(
+            domain_expression,
+            {
+                "batch_id": self.batch.id,
+                "context_today": fields.Date.today,
+            },
+        )
+
+        self.assertIsInstance(domain[-1][2], str)
+        selectable_options = self.env["cdu.elmis.stock.option"].search(domain)
+        self.assertIn(self.stock_30_lot_1, selectable_options)
+        self.assertNotIn(expired, selectable_options)
+
+    def test_back_to_regimen_action_has_client_safe_views(self):
+        action = self.picking_line.action_open_bulk_allocation_overview()
+        expected_view = self.env.ref(
+            "cdu_elmis.view_cdu_picking_line_bulk_allocation_form"
+        )
+
+        self.assertEqual(action["res_id"], self.picking_line.id)
+        self.assertEqual(action["view_id"], expected_view.id)
+        self.assertEqual(action["views"], [(expected_view.id, "form")])
+
+    def test_manual_allocation_override_requires_audited_reason(self):
+        self.picking_line.action_use_bulk_mode()
+        group = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Manual allocation component",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": group.id,
+                "stock_option_id": self.stock_30_lot_1.id,
+                "quantity_packs": 15,
+            }
+        )
+        changes = [
+            {
+                "resolution_id": self.resolutions[2].id,
+                "group_id": group.id,
+                "stock_option_id": self.stock_30_lot_1.id,
+                "delta": -1,
+            },
+            {
+                "resolution_id": self.resolutions[0].id,
+                "group_id": group.id,
+                "stock_option_id": self.stock_30_lot_1.id,
+                "delta": 1,
+            },
+        ]
+
+        board = self.picking_line.action_update_allocation_board(changes)
+
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [6, 5, 4])
+        self.assertEqual(self.picking_line.allocation_strategy, "manual")
+        self.assertTrue(board["override_required"])
+        self.assertFalse(board["can_confirm"])
+        self.assertTrue(
+            any(
+                "reason for the manual allocation override" in error
+                for error in board["readiness_errors"]
+            )
+        )
+
+        board = self.picking_line.action_set_manual_override_reason(
+            "Patient one has an earlier collection deadline."
+        )
+        self.assertTrue(board["can_confirm"])
+        self.assertEqual(self.picking_line.manual_override_by, self.env.user)
+        self.assertTrue(self.picking_line.manual_override_at)
+
+        board = self.picking_line.action_reset_balanced_allocation()
+        self.assertEqual(self.resolutions.mapped("allocated_packs"), [5, 5, 5])
+        self.assertEqual(self.picking_line.allocation_strategy, "balanced_fefo")
+        self.assertFalse(board["override_required"])
+
+    def test_manual_component_changes_must_end_as_complete_pack_bundles(self):
+        self.picking_line.action_use_bulk_mode()
+        first = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Bundle component one",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        first_stock = self._create_stock(
+            "BUNDLE-ONE",
+            "Bundle Component One",
+            30,
+            "BUNDLE-ONE-LOT",
+            6,
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": first.id,
+                "stock_option_id": first_stock.id,
+                "quantity_packs": 6,
+            }
+        )
+        second = self.env["cdu.picking.bulk.group"].create(
+            {
+                "name": "Bundle component two",
+                "batch_id": self.batch.id,
+                "picking_line_id": self.picking_line.id,
+            }
+        )
+        second_stock = self._create_stock(
+            "BUNDLE-TWO",
+            "Bundle Component Two",
+            30,
+            "BUNDLE-TWO-LOT",
+            6,
+        )
+        self.env["cdu.picking.bulk.lot"].create(
+            {
+                "group_id": second.id,
+                "stock_option_id": second_stock.id,
+                "quantity_packs": 6,
+            }
+        )
+        self.assertEqual(first.member_ids.mapped("allocated_packs"), [2, 2, 2])
+        self.assertEqual(second.member_ids.mapped("allocated_packs"), [2, 2, 2])
+
+        board = self.picking_line.action_update_allocation_board(
+            [
+                {
+                    "resolution_id": self.resolutions[0].id,
+                    "group_id": second.id,
+                    "stock_option_id": second_stock.id,
+                    "delta": -1,
+                }
+            ]
+        )
+
+        self.assertFalse(board["can_confirm"])
+        self.assertTrue(
+            any(
+                "incomplete pack bundle" in error
+                for error in board["readiness_errors"]
+            )
+        )
+
+        self.picking_line.action_update_allocation_board(
+            [
+                {
+                    "resolution_id": self.resolutions[0].id,
+                    "group_id": first.id,
+                    "stock_option_id": first_stock.id,
+                    "delta": -1,
+                }
+            ]
+        )
+        board = self.picking_line.action_add_next_pack_bundle(
+            self.resolutions[0].id
+        )
+
+        self.assertEqual(len(board["applied_changes"]), 2)
+        self.assertEqual(first.member_ids.mapped("allocated_packs"), [2, 2, 2])
+        self.assertEqual(second.member_ids.mapped("allocated_packs"), [2, 2, 2])
+        self.assertFalse(board["override_required"])
+        self.assertTrue(board["can_confirm"])
 
     def test_bulk_mode_allows_explicit_unserved_without_a_stock_group(self):
         self.picking_line.action_use_bulk_mode()
