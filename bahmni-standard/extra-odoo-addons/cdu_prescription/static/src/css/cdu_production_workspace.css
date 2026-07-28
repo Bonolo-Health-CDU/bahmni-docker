@@ -100,6 +100,21 @@
     font-size: 13px;
 }
 
+.o_cdu_batch_form.o_cdu_stage_dispensing .oe_title.o_cdu_workspace_hero {
+    width: auto;
+    max-width: none;
+    padding: 16px 24px 15px 28px;
+    box-sizing: border-box;
+}
+
+.o_cdu_batch_form.o_cdu_stage_dispensing .o_cdu_workspace_hero h1 {
+    font-size: clamp(22px, 2vw, 28px);
+}
+
+.o_cdu_batch_form.o_cdu_stage_dispensing .o_cdu_workspace_subtitle {
+    font-size: 12px;
+}
+
 .o_cdu_batch_form .o_cdu_batch_dashboard {
     gap: 16px;
     margin: 0 0 18px;

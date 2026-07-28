@@ -303,7 +303,12 @@ class CduPrescription(models.Model):
             raise ValidationError(_("This action is not allowed for the current prescription status."))
 
     def _action_open_prescription_queue(self, action_xml_id):
-        return self.env["ir.actions.actions"]._for_xml_id(action_xml_id)
+        action = self.env["ir.actions.actions"]._for_xml_id(action_xml_id)
+        # Queue transitions are the end of the current work item. Opening the
+        # queue as the main action replaces the breadcrumb stack instead of
+        # adding another queue/prescription pair after every processed record.
+        action["target"] = "main"
+        return action
 
     def action_mark_patient_verified(self):
         self._ensure_cdu_groups("cdu_prescription.group_cdu_data_clerk")

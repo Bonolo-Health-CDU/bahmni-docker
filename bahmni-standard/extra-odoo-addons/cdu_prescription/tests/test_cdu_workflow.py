@@ -70,6 +70,7 @@ class TestCduPrescriptionWorkflow(TransactionCase):
             verification_action["res_model"],
             "cdu.prescription",
         )
+        self.assertEqual(verification_action["target"], "main")
 
         validation_action = prescription.with_user(
             self.dispensing_officer
@@ -79,6 +80,7 @@ class TestCduPrescriptionWorkflow(TransactionCase):
         self.assertEqual(prescription.state, "awaiting_batching")
         self.assertEqual(prescription.validated_by, self.dispensing_officer)
         self.assertEqual(validation_action["res_model"], "cdu.prescription")
+        self.assertEqual(validation_action["target"], "main")
 
     def test_rejection_history_preserves_multiple_reasons_and_origin(self):
         prescription = self._create_prescription(state="awaiting_validation")
@@ -136,6 +138,55 @@ class TestCduPrescriptionWorkflow(TransactionCase):
             self.assertEqual(dashboard["role"], expected_role)
             self.assertEqual(len(cards), expected_cards)
             self.assertTrue(all(card["action"] for card in cards))
+
+    def test_patient_dashboard_excludes_ordinary_odoo_customers(self):
+        dashboard_model = self.env["res.users"]
+        definition = dashboard_model._cdu_dashboard_card_definitions()["patients"]
+        initial_count = dashboard_model._prepare_cdu_dashboard_card(definition)["count"]
+
+        self.env["res.partner"].create(
+            {
+                "name": "Ordinary Odoo Customer",
+                "customer_rank": 1,
+            }
+        )
+        cdu_patient = self.env["res.partner"].create(
+            {
+                "name": "Additional CDU Patient",
+                "customer_rank": 1,
+                "cdu_eregister_id": "TEST-EREGISTER-DASHBOARD",
+            }
+        )
+
+        card = dashboard_model._prepare_cdu_dashboard_card(definition)
+        self.assertEqual(card["count"], initial_count + 1)
+        self.assertEqual(
+            self.env["res.partner"].search_count(definition["domain"]),
+            card["count"],
+        )
+        self.assertIn(cdu_patient, self.env["res.partner"].search(definition["domain"]))
+
+    def test_validation_is_part_of_intake_and_review(self):
+        definitions = self.env["res.users"]._cdu_dashboard_card_definitions()
+
+        self.assertEqual(definitions["awaiting_validation"]["section"], "intake")
+        self.assertEqual(definitions["awaiting_batching"]["section"], "production")
+
+    def test_prescription_queues_have_clear_empty_state_guidance(self):
+        queue_actions = (
+            "action_cdu_prescription_awaiting_verification",
+            "action_cdu_prescription_awaiting_validation",
+            "action_cdu_prescription_awaiting_batching",
+            "action_cdu_prescription_awaiting_dispensing",
+            "action_cdu_prescription_rejected_to_call_center",
+            "action_cdu_prescription_rejected_to_facility",
+        )
+        for action_name in queue_actions:
+            help_text = self.env.ref(
+                "cdu_prescription.%s" % action_name
+            ).help
+            self.assertTrue(help_text)
+            self.assertNotIn("Create new document", help_text)
 
     def test_operational_prescription_filters_are_registered(self):
         search_view = self.env.ref("cdu_prescription.view_cdu_prescription_search")

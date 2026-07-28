@@ -283,6 +283,10 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_box_search"/>
         <field name="domain">[('state', '=', 'confirmed'), ('dispatch_status', '=', 'pending')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Dispatch queue complete</p>
+            <p>There are no confirmed boxes awaiting dispatch.</p>
+        </field>
     </record>
 
     <record id="action_cdu_boxing_work_queue" model="ir.actions.act_window">
@@ -291,6 +295,10 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_bagging_qa_search"/>
         <field name="domain">[('state', '=', 'confirmed'), ('prescription_id.state', '=', 'awaiting_boxing')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Boxing queue complete</p>
+            <p>There are no approved parcels awaiting boxing. Return to the CDU Dashboard to choose another queue.</p>
+        </field>
     </record>
 
     <record id="action_cdu_awaiting_dispatch" model="ir.actions.act_window">
@@ -299,5 +307,9 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_dispatch')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No prescriptions are awaiting dispatch</p>
+            <p>Prescriptions will appear here after their boxes are confirmed.</p>
+        </field>
     </record>
 </odoo>

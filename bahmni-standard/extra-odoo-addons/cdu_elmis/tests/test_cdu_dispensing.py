@@ -193,6 +193,52 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(summary_line["prescription_count"], 1)
         self.assertNotIn("cdu.regimen", self.env.registry.models)
 
+    def test_product_dosing_instructions_are_independent(self):
+        prescription = self._create_prescription("007", 30)
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create({"prescription_id": prescription.id})
+        first_line, second_line = self.env[
+            "cdu.dispense.stock.selection"
+        ].create(
+            [
+                {
+                    "dispense_id": dispense.id,
+                    "openmrs_drug_name": "First regimen component",
+                    "selected_orderable_name": "First eLMIS Product",
+                },
+                {
+                    "dispense_id": dispense.id,
+                    "openmrs_drug_name": "Second regimen component",
+                    "selected_orderable_name": "Second eLMIS Product",
+                },
+            ]
+        )
+
+        self.assertEqual(
+            first_line.dosage_instructions,
+            prescription.dosage_instructions,
+        )
+        self.assertEqual(
+            second_line.dosage_instructions,
+            prescription.dosage_instructions,
+        )
+
+        first_line.dosage_instructions = "Take the first product in the morning."
+
+        self.assertEqual(
+            first_line.dosage_instructions,
+            "Take the first product in the morning.",
+        )
+        self.assertEqual(
+            second_line.dosage_instructions,
+            "Take one tablet daily.",
+        )
+        self.assertEqual(
+            prescription.dosage_instructions,
+            "Take one tablet daily.",
+        )
+
     def test_next_button_is_removed_and_later_prescriptions_can_reprint(self):
         prescription = self._create_prescription("006", 40)
         dispense = self._create_ready_dispense(prescription)

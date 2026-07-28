@@ -89,9 +89,6 @@
                     <div class="oe_title o_cdu_record_hero">
                         <span class="o_cdu_record_eyebrow">Prescription record</span>
                         <h1><field name="name"/></h1>
-                        <p class="o_cdu_record_subtitle">
-                            Patient, clinical, medicine, and collection information in one operational record.
-                        </p>
                     </div>
                     <group class="o_cdu_summary_grid">
                         <group string="Source" class="o_cdu_section_card">
@@ -255,6 +252,10 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_verification')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Verification queue complete</p>
+            <p>There are no prescriptions awaiting verification. Return to the CDU Dashboard to choose another queue.</p>
+        </field>
     </record>
 
     <record id="action_cdu_prescription_awaiting_validation" model="ir.actions.act_window">
@@ -263,6 +264,10 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_validation')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Validation queue complete</p>
+            <p>There are no prescriptions awaiting validation. Return to the CDU Dashboard to choose another queue.</p>
+        </field>
     </record>
 
     <record id="action_cdu_prescription_awaiting_batching" model="ir.actions.act_window">
@@ -271,6 +276,10 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_batching')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No prescriptions are ready for batching</p>
+            <p>Validated prescriptions will appear here when they are ready to be added to a workload batch.</p>
+        </field>
     </record>
 
     <record id="action_cdu_prescription_awaiting_dispensing" model="ir.actions.act_window">
@@ -280,6 +289,10 @@
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_dispensing')]</field>
         <field name="context">{'search_default_group_batch': 1, 'search_default_group_collection_point': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Dispensing queue complete</p>
+            <p>There are no prescriptions awaiting dispensing. Return to the CDU Dashboard to choose another queue.</p>
+        </field>
     </record>
 
     <record id="action_cdu_prescription_rejected_to_call_center" model="ir.actions.act_window">
@@ -288,5 +301,9 @@
         <field name="view_mode">tree,form</field>
         <field name="search_view_id" ref="view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'rejected_to_call_center')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No prescriptions require call-centre follow-up</p>
+            <p>Prescriptions rejected for patient follow-up will appear here.</p>
+        </field>
     </record>
 </odoo>

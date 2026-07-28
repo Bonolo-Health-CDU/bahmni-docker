@@ -295,5 +295,9 @@
         <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
         <field name="domain">[('state', '=', 'awaiting_bagging_qa')]</field>
         <field name="context">{'search_default_group_batch': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Bagging / QA queue complete</p>
+            <p>There are no prescriptions awaiting bagging and quality assurance. Return to the CDU Dashboard to choose another queue.</p>
+        </field>
     </record>
 </odoo>

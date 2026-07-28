@@ -56,9 +56,10 @@ class CduDispenseStockSelection(models.Model):
     )
     dosage_instructions = fields.Text(
         string="Dosing / Instructions",
-        related="prescription_id.dosage_instructions",
-        readonly=False,
-        store=True,
+        help=(
+            "Product-specific dosing instructions. Initially copied from the "
+            "prescription and then maintained independently for this line."
+        ),
     )
 
     @api.depends("selected_pack_size", "quantity_dispensed")
@@ -98,17 +99,6 @@ class CduDispenseStockSelection(models.Model):
             """
         )
 
-        self.env.cr.execute(
-            """
-            UPDATE cdu_dispense_stock_selection selection
-               SET dosage_instructions = prescription.dosage_instructions
-              FROM cdu_prescription prescription
-             WHERE prescription.id = selection.prescription_id
-               AND COALESCE(selection.dosage_instructions, '') !=
-                   COALESCE(prescription.dosage_instructions, '')
-            """
-        )
-
     def _table_exists(self, table_name):
         self.env.cr.execute("SELECT to_regclass(%s)", (table_name,))
         return bool(self.env.cr.fetchone()[0])
@@ -126,8 +116,23 @@ class CduDispenseStockSelection(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        records = super().create(vals_list)
-        if any(values.get("stock_option_id") for values in vals_list):
+        prepared_values = []
+        for values in vals_list:
+            values = dict(values)
+            if (
+                "dosage_instructions" not in values
+                and values.get("dispense_id")
+            ):
+                dispense = self.env["cdu.dispense"].browse(
+                    values["dispense_id"]
+                )
+                values["dosage_instructions"] = (
+                    dispense.prescription_id.dosage_instructions
+                )
+            prepared_values.append(values)
+
+        records = super().create(prepared_values)
+        if any(values.get("stock_option_id") for values in prepared_values):
             records._sync_stock_option()
         return records
 

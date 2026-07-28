@@ -53,10 +53,13 @@
 
 .o_cdu_prescription_form .o_cdu_record_hero {
     position: relative;
+    width: auto;
+    max-width: none;
     margin: -8px -8px 24px;
-    padding: 22px 24px 20px 28px;
+    padding: 14px 24px 14px 28px;
     border: 1px solid #d8e7eb;
     border-radius: var(--cdu-radius);
+    box-sizing: border-box;
     overflow: hidden;
     background:
         linear-gradient(115deg, rgba(20, 127, 151, 0.1), rgba(255, 255, 255, 0) 56%),
@@ -84,16 +87,10 @@
 .o_cdu_prescription_form .o_cdu_record_hero h1 {
     margin: 0;
     color: var(--cdu-ink);
-    font-size: clamp(24px, 2.25vw, 34px);
+    font-size: clamp(22px, 2vw, 28px);
     font-weight: 750;
     letter-spacing: -0.025em;
     line-height: 1.15;
-}
-
-.o_cdu_prescription_form .o_cdu_record_subtitle {
-    margin: 7px 0 0;
-    color: var(--cdu-ink-soft);
-    font-size: 13px;
 }
 
 .o_cdu_prescription_form .o_cdu_summary_grid {
