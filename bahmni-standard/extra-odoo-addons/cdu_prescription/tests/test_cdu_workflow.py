@@ -36,6 +36,29 @@ class TestCduPrescriptionWorkflow(TransactionCase):
                 "cdu_eregister_id": "TEST-EREGISTER-001",
             }
         )
+        cls.test_medicine = cls.env["cdu.medicine"].create(
+            {"name": "Workflow Test Medicine"}
+        )
+        cls.test_regimen = cls.env["cdu.regimen"].create(
+            {
+                "name": "Workflow Test Regimen",
+                "eregister_name": "TEST-REGIMEN",
+            }
+        )
+        cls.test_regimen_option = cls.env["cdu.regimen.option"].create(
+            {
+                "name": "Standard composition",
+                "regimen_id": cls.test_regimen.id,
+                "is_default": True,
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {"medicine_id": cls.test_medicine.id, "sequence": 10},
+                    )
+                ],
+            }
+        )
 
     def _create_prescription(self, **overrides):
         today = fields.Date.today()
@@ -81,6 +104,79 @@ class TestCduPrescriptionWorkflow(TransactionCase):
         self.assertEqual(prescription.validated_by, self.dispensing_officer)
         self.assertEqual(validation_action["res_model"], "cdu.prescription")
         self.assertEqual(validation_action["target"], "main")
+
+    def test_exact_regimen_match_generates_editable_medicine_rows(self):
+        prescription = self._create_prescription()
+
+        self.assertEqual(prescription.regimen_id, self.test_regimen)
+        self.assertEqual(prescription.regimen_option_id, self.test_regimen_option)
+        self.assertEqual(len(prescription.medicine_line_ids), 1)
+        self.assertEqual(
+            prescription.medicine_line_ids.medicine_id,
+            self.test_medicine,
+        )
+        self.assertEqual(
+            prescription.medicine_line_ids.dosage_instructions,
+            "Take one tablet daily.",
+        )
+        self.assertEqual(prescription.medicine_line_ids.source, "regimen")
+
+    def test_alternative_option_replaces_constituents_and_preserves_manual_additions(self):
+        prescription = self._create_prescription(
+            regimen_prescribed_raw="2k=ABC-3TC-DRV-r"
+        )
+        separate_option = self.env.ref(
+            "cdu_prescription.option_2k_abc_drv_separate"
+        )
+        manual_medicine = self.env["cdu.medicine"].create(
+            {"name": "Workflow Additional Medicine"}
+        )
+        self.env["cdu.prescription.medicine.line"].create(
+            {
+                "prescription_id": prescription.id,
+                "medicine_id": manual_medicine.id,
+                "dosage_instructions": "Take at night.",
+            }
+        )
+
+        prescription.regimen_option_id = separate_option
+
+        self.assertEqual(
+            set(prescription.medicine_line_ids.mapped("medicine_id.name")),
+            {
+                "Abacavir/Lamivudine",
+                "Darunavir",
+                "Ritonavir",
+                "Workflow Additional Medicine",
+            },
+        )
+        self.assertIn(
+            manual_medicine,
+            prescription.medicine_line_ids.filtered(
+                lambda line: line.source == "manual"
+            ).mapped("medicine_id"),
+        )
+        self.assertTrue(prescription.medicine_amended)
+
+    def test_validation_requires_exact_match_complete_dosing_and_amendment_reason(self):
+        unmatched = self._create_prescription(regimen_prescribed_raw="UNKNOWN")
+        self.assertIn(
+            "an exact configured regimen match",
+            unmatched._get_validation_errors(),
+        )
+
+        prescription = self._create_prescription()
+        prescription.medicine_line_ids.dosage_instructions = False
+        errors = prescription._get_validation_errors()
+        self.assertIn("dosage instructions for every medicine", errors)
+        self.assertIn("a reason for the medicine amendment", errors)
+
+        prescription.write({"medicine_amendment_note": "Clinical correction"})
+        prescription.medicine_line_ids.dosage_instructions = "Take after food."
+        self.assertNotIn(
+            "dosage instructions for every medicine",
+            prescription._get_validation_errors(),
+        )
 
     def test_rejection_history_preserves_multiple_reasons_and_origin(self):
         prescription = self._create_prescription(state="awaiting_validation")

@@ -1,0 +1,28 @@
+id,name,eregister_name,active
+regimen_5h_abc_3tc_atv_r,5h ABC/3TC/ATV/r,5h=ABC-3TC-ATV-r,True
+regimen_1k_abc_3tc_dtg,1k ABC/3TC/DTG,1k=ABC-3TC-DTG,True
+regimen_2k_abc_3tc_drv_r,2k ABC/3TC/DRV/r,2k=ABC-3TC-DRV-r,True
+regimen_1p_abc_3tc_lpv_r,1p ABC/3TC/LPV/r,1p=ABC-3TC-LPV-r,True
+regimen_2g_abc_3tc_lpv_r,2g ABC/3TC/LPV/r,2g=ABC-3TC-LPV-r,True
+regimen_5h_abc_3tc_lpv_r,5h ABC/3TC/LPV/r,5h=ABC-3TC-LPV-r,True
+regimen_4h_abc_3tc_lpv_r,4h ABC/3TC/LPV/r,4h=ABC-3TC-LPV-r,True
+regimen_2o_abc_3tc_ral,2o ABC/3TC/RAL,2o=ABC-3TC-RAL,True
+regimen_5g_azt_3tc_atv_r,5g AZT/3TC/ATV/r,5g=AZT-3TC-ATV-r,True
+regimen_1m_azt_3tc_dtg,1m AZT/3TC/DTG,1m=AZT-3TC-DTG,True
+regimen_4l_azt_3tc_dtg,4l AZT/3TC/DTG,4l=AZT-3TC-DTG,True
+regimen_5f_azt_3tc_dtg,5f AZT/3TC/DTG,5f=AZT-3TC-DTG,True
+regimen_2l_azt_3tc_drv_r,2l AZT/3TC/DRV/r,2l=AZT-3TC-DRV-r,True
+regimen_4g_azt_3tc_lpv_r,4g AZT/3TC/LPV/r,4g=AZT-3TC-LPV-r,True
+regimen_1q_azt_3tc_lpv_r,1q AZT/3TC/LPV/r,1q=AZT-3TC-LPV-r,True
+regimen_2c_azt_3tc_lpv_r,2c AZT/3TC/LPV/r,2c=AZT-3TC-LPV-r,True
+regimen_2n_azt_3tc_ral,2n AZT/3TC/RAL,2n=AZT-3TC-RAL,True
+regimen_2i_azt_3tc_tdf_lpv_r,2i AZT/3TC/TDF/LPV/r,2i=AZT-3TC-TDF-LPV-r,True
+regimen_2s_azt_3tc_tdf_dtg,2s AZT/3TC/TDF/DTG,2s=AZT-3TC-TDF-DTG,True
+regimen_tdf_3tc_atv_r,TDF/3TC/ATV/r,TDF-3TC-ATV-r,True
+regimen_4j_tdf_3tc_dtg,4j TDF/3TC/DTG,4j=TDF-3TC-DTG,True
+regimen_2p_tdf_3tc_dtg,2p TDF/3TC/DTG,2p=TDF-3TC-DTG,True
+regimen_1j_tdf_3tc_dtg,1j TDF/3TC/DTG,1j=TDF-3TC-DTG,True
+regimen_2j_tdf_3tc_drv_r,2j TDF/3TC/DRV/r,2j=TDF-3TC-DRV-r,True
+regimen_2d_tdf_3tc_lpv_r,2d TDF/3TC/LPV/r,2d=TDF-3TC-LPV-r,True
+regimen_1n_tdf_3tc_lpv_r,1n TDF/3TC/LPV/r,1n=TDF-3TC-LPV-r,True
+regimen_2m_tdf_3tc_ral,2m TDF/3TC/RAL,2m=TDF-3TC-RAL,True

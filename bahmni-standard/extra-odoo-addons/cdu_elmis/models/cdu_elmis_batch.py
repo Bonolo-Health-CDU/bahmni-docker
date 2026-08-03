@@ -255,6 +255,20 @@ class CduBatch(models.Model):
             batch._link_elmis_lines_to_summary_lines()
             batch.elmis_picking_line_ids._ensure_patient_resolutions()
 
+    def _invalidate_picking_after_prescription_change(self):
+        """Remove every derived eLMIS allocation before rebuilding from medicines."""
+        for batch in self:
+            if batch.picking_confirmed_at:
+                raise ValidationError(
+                    _("Confirmed picking must be reversed before medicines can change.")
+                )
+            batch.patient_allocation_ids.unlink()
+            batch.picking_bulk_group_ids.unlink()
+            batch.picking_resolution_ids.unlink()
+            batch.elmis_picking_fulfilment_line_ids.unlink()
+            batch.elmis_picking_line_ids.unlink()
+        return super()._invalidate_picking_after_prescription_change()
+
     def _generate_unmapped_elmis_picking_lines(self, mapped_prescription_ids):
         self.ensure_one()
         fallback_summary = {}

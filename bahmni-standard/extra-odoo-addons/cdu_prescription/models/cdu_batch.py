@@ -396,23 +396,9 @@ class CduBatch(models.Model):
         self._validate_selected_prescription_repeat_days()
 
         for prescription in self.prescription_ids:
-
-            # -------------------------------------------------
-            # DAYS SUPPLY
-            # -------------------------------------------------
-
-            facility_days = (
-                prescription.facility_days_supply or 0
-            )
-
-            cdu_days = (
-                prescription.cdu_days_supply or 0
-            )
-
-            total_days = (
-                prescription.total_days_supply or 0
-            )
-
+            facility_days = prescription.facility_days_supply or 0
+            cdu_days = prescription.cdu_days_supply or 0
+            total_days = prescription.total_days_supply or 0
             prescription_repeat_days = prescription.repeat_days or 0
             regimen_repeat_days = prescription_repeat_days
             effective_repeat_days = prescription_repeat_days
@@ -420,149 +406,117 @@ class CduBatch(models.Model):
             if operational_days <= 0:
                 continue
 
-            # Picking starts from the regimen text supplied by the source system.
-            # eLMIS product and pack selection remains part of the picking workflow.
-            drug_name = (
-                prescription.regimen_prescribed_raw or _("Unknown Drug")
-            ).strip()
-            if not drug_name:
-                continue
-            # eRegister does not currently provide a structured daily dose.
-            # Picking starts at one daily unit and lets the user correct it
-            # per prescription without changing clinical dosage instructions.
-            daily_dose = 1
-            pack_size = 0
-
-            # -------------------------------------------------
-            # FACILITY SUPPLY
-            # -------------------------------------------------
-
-            facility_units_required = (
-                daily_dose * facility_days
+            medicine_lines = prescription.medicine_line_ids.sorted(
+                lambda line: (line.sequence, line.id)
             )
+            requirements = [
+                (line, (line.medicine_id.name or "").strip())
+                for line in medicine_lines
+                if (line.medicine_id.name or "").strip()
+            ]
+            # Compatibility for prescriptions created before the medicine table
+            # existed. Newly validated prescriptions cannot use this fallback.
+            if not requirements:
+                legacy_name = (prescription.regimen_prescribed_raw or "").strip()
+                if legacy_name:
+                    requirements = [(False, legacy_name)]
 
-            facility_bottles_required = (
-                math.ceil(facility_units_required / pack_size)
-                if facility_units_required > 0 and pack_size > 0
-                else 0
-            )
-
-            # -------------------------------------------------
-            # CDU SUPPLY
-            # -------------------------------------------------
-
-            cdu_units_required = (
-                daily_dose * operational_days
-            )
-
-            cdu_bottles_required = (
-                math.ceil(cdu_units_required / pack_size)
-                if cdu_units_required > 0 and pack_size > 0
-                else 0
-            )
-            picked_units = cdu_bottles_required * pack_size
-            actual_supplied_days = picked_units / daily_dose if daily_dose else 0
-            back_order_days = max(cdu_days - actual_supplied_days, 0)
-            calculated_next_pickup_date = False
-            if prescription.next_drug_pickup_date and actual_supplied_days:
-                calculated_next_pickup_date = (
-                    prescription.next_drug_pickup_date
-                    + timedelta(days=int(actual_supplied_days))
+            for medicine_line, drug_name in requirements:
+                # eRegister supplies free-text instructions rather than a
+                # structured daily dose. Each regimen constituent therefore
+                # starts at one daily unit and can be corrected during picking.
+                daily_dose = 1
+                pack_size = 0
+                facility_units_required = daily_dose * facility_days
+                facility_bottles_required = (
+                    math.ceil(facility_units_required / pack_size)
+                    if facility_units_required > 0 and pack_size > 0
+                    else 0
+                )
+                cdu_units_required = daily_dose * operational_days
+                cdu_bottles_required = (
+                    math.ceil(cdu_units_required / pack_size)
+                    if cdu_units_required > 0 and pack_size > 0
+                    else 0
+                )
+                picked_units = cdu_bottles_required * pack_size
+                actual_supplied_days = picked_units / daily_dose if daily_dose else 0
+                back_order_days = max(cdu_days - actual_supplied_days, 0)
+                calculated_next_pickup_date = False
+                if prescription.next_drug_pickup_date and actual_supplied_days:
+                    calculated_next_pickup_date = (
+                        prescription.next_drug_pickup_date
+                        + timedelta(days=int(actual_supplied_days))
+                    )
+                total_units_required = daily_dose * total_days
+                total_bottles_required = (
+                    math.ceil(total_units_required / pack_size)
+                    if total_units_required > 0 and pack_size > 0
+                    else 0
                 )
 
-            # -------------------------------------------------
-            # TOTAL SUPPLY
-            # -------------------------------------------------
+                patient_line_vals.append(
+                    {
+                        "batch_id": self.id,
+                        "prescription_id": prescription.id,
+                        "prescription_medicine_line_id": (
+                            medicine_line.id if medicine_line else False
+                        ),
+                        "patient_id": prescription.patient_id.id,
+                        "product_id": False,
+                        "drug_name": drug_name,
+                        "facility_days_supply": facility_days,
+                        "cdu_days": cdu_days,
+                        "regimen_repeat_days": regimen_repeat_days,
+                        "prescription_repeat_days": prescription_repeat_days,
+                        "effective_repeat_days": effective_repeat_days,
+                        "repeat_days": effective_repeat_days,
+                        "served_days": int(actual_supplied_days),
+                        "remaining_days": int(back_order_days),
+                        "total_days_supply": total_days,
+                        "daily_dose": daily_dose,
+                        "pack_size": pack_size,
+                        "required_quantity": cdu_units_required,
+                        "required_units": cdu_units_required,
+                        "available_quantity": 0,
+                        "picked_quantity": picked_units,
+                        "picked_units": picked_units,
+                        "packs_to_pick": cdu_bottles_required,
+                        "actual_supplied_days": actual_supplied_days,
+                        "back_order_days": back_order_days,
+                        "recalculated_next_drug_pickup_date": calculated_next_pickup_date,
+                        "calculated_next_pickup_date": calculated_next_pickup_date,
+                        "tablets_required": total_units_required,
+                        "facility_bottles_required": facility_bottles_required,
+                        "cdu_bottles_required": cdu_bottles_required,
+                        "total_bottles_required": total_bottles_required,
+                        "bottles_required": cdu_bottles_required,
+                    }
+                )
 
-            total_units_required = (
-                daily_dose * total_days
-            )
-
-            total_bottles_required = (
-                math.ceil(total_units_required / pack_size)
-                if total_units_required > 0 and pack_size > 0
-                else 0
-            )
-
-            # -------------------------------------------------
-            # CREATE PATIENT PICKING LINE
-            # -------------------------------------------------
-
-            patient_line_vals.append({
-                "batch_id": self.id,
-
-                "prescription_id": prescription.id,
-
-                "patient_id": prescription.patient_id.id,
-
-                "product_id": False,
-                "drug_name": drug_name,
-
-                # DAYS
-                "facility_days_supply": facility_days,
-                "cdu_days": cdu_days,
-                "regimen_repeat_days": regimen_repeat_days,
-                "prescription_repeat_days": prescription_repeat_days,
-                "effective_repeat_days": effective_repeat_days,
-                "repeat_days": effective_repeat_days,
-                "served_days": int(actual_supplied_days),
-                "remaining_days": int(back_order_days),
-                "total_days_supply": total_days,
-
-                # DOSING
-                "daily_dose": daily_dose,
-                "pack_size": pack_size,
-
-                # REPEAT-BASED QUANTITY
-                "required_quantity": cdu_units_required,
-                "required_units": cdu_units_required,
-                "available_quantity": 0,
-                "picked_quantity": picked_units,
-                "picked_units": picked_units,
-                "packs_to_pick": cdu_bottles_required,
-                "actual_supplied_days": actual_supplied_days,
-                "back_order_days": back_order_days,
-                "recalculated_next_drug_pickup_date": calculated_next_pickup_date,
-                "calculated_next_pickup_date": calculated_next_pickup_date,
-
-                # TOTAL TABLETS
-                "tablets_required": total_units_required,
-
-                # BOTTLES
-                "facility_bottles_required": facility_bottles_required,
-                "cdu_bottles_required": cdu_bottles_required,
-                "total_bottles_required": total_bottles_required,
-
-                # IMPORTANT:
-                # Operational warehouse/eLMIS picking
-                # uses CDU quantities ONLY
-                "bottles_required": cdu_bottles_required,
-            })
-
-            # -------------------------------------------------
-            # BATCH SUMMARY
-            # -------------------------------------------------
-
-            key = drug_name
-
-            if key not in summary:
-                summary[key] = {
-                    "product_id": False,
-                    "unmapped_drug_name": drug_name,
-                    "pack_size": pack_size,
-                    "total_tablets": 0,
-                    "total_bottles": 0,
-                    "prescription_count": 0,
-                }
-
-            # Summary reflects CDU operational stock only
-            summary[key]["total_tablets"] += cdu_units_required
-
-            summary[key]["total_bottles"] += cdu_bottles_required
-
-            summary[key]["prescription_count"] += 1
+                key = drug_name.casefold()
+                if key not in summary:
+                    summary[key] = {
+                        "product_id": False,
+                        "unmapped_drug_name": drug_name,
+                        "pack_size": pack_size,
+                        "total_tablets": 0,
+                        "total_bottles": 0,
+                        "prescription_count": 0,
+                    }
+                summary[key]["total_tablets"] += cdu_units_required
+                summary[key]["total_bottles"] += cdu_bottles_required
+                summary[key]["prescription_count"] += 1
 
         return patient_line_vals, list(summary.values())
+
+    def _invalidate_picking_after_prescription_change(self):
+        """Discard stale, unconfirmed picking calculations after a clinical edit."""
+        for batch in self:
+            batch.patient_picking_line_ids.unlink()
+            batch.picking_line_ids.unlink()
+            if batch.state == "picking_generated":
+                batch.state = "confirmed"
 
     def _generate_picking_lines(self):
 

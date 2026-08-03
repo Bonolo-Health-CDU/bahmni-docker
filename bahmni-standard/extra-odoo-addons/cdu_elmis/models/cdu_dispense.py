@@ -174,6 +174,9 @@ class CduDispense(models.Model):
                     self.env["cdu.dispense.stock.selection"].create(
                         {
                             "dispense_id": dispense.id,
+                            "prescription_medicine_line_id": (
+                                allocation.patient_line_id.prescription_medicine_line_id.id
+                            ),
                             "picking_fulfilment_line_id": (
                                 fulfilment.id if fulfilment else False
                             ),
@@ -223,6 +226,20 @@ class CduDispense(models.Model):
                 if matched:
                     fulfilment_lines = matched
 
+            if not fulfilment_lines and prescription.medicine_line_ids:
+                self.env["cdu.dispense.stock.selection"].create(
+                    [
+                        {
+                            "dispense_id": dispense.id,
+                            "prescription_medicine_line_id": medicine_line.id,
+                            "openmrs_drug_name": medicine_line.medicine_id.name,
+                            "quantity_dispensed": 1,
+                        }
+                        for medicine_line in prescription.medicine_line_ids
+                    ]
+                )
+                continue
+
             if not fulfilment_lines and prescription.regimen_prescribed_raw:
                 self.env["cdu.dispense.stock.selection"].create(
                     {
@@ -255,6 +272,11 @@ class CduDispense(models.Model):
                 self.env["cdu.dispense.stock.selection"].create(
                     {
                         "dispense_id": dispense.id,
+                        "prescription_medicine_line_id": (
+                            patient_line.prescription_medicine_line_id.id
+                            if patient_line
+                            else False
+                        ),
                         "picking_fulfilment_line_id": line.id,
                         "openmrs_drug_name": line.openmrs_drug_name,
                         "openmrs_drug_uuid": line.picking_line_id.openmrs_drug_uuid,

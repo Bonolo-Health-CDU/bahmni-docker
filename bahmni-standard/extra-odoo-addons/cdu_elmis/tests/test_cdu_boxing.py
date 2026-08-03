@@ -113,6 +113,9 @@ class TestCduBoxingWorkflow(TransactionCase):
                 self.assertIn('name="%s"' % filter_name, search_view.arch_db)
 
     def test_dispensed_units_are_computed_and_packs_are_hidden_by_default(self):
+        # Quantity editing belongs to active dispensing; confirmed dispensing
+        # selections are intentionally locked.
+        self.dispense.state = "draft"
         selection = self.env["cdu.dispense.stock.selection"].create(
             {
                 "dispense_id": self.dispense.id,

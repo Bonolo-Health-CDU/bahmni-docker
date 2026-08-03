@@ -211,9 +211,10 @@
                             <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
                                 Selections are prefilled from the batch picking lines. Production Floor stock refreshes automatically when dispensing starts and when this page is loaded. Confirm or adjust the exact product, batch, quantity, and dosing instructions.
                             </div>
-                            <field name="stock_selection_ids">
+                            <field name="stock_selection_ids" attrs="{'readonly': [('state', '=', 'confirmed')]}">
                                 <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
                                     <field name="dispense_id" invisible="1"/>
+                                    <field name="prescription_medicine_line_id" invisible="1"/>
                                     <field name="openmrs_drug_name"/>
                                     <field name="stock_option_id" string="Dispense From" options="{'no_create': True, 'no_open': True}"/>
                                     <field name="selected_orderable_name" readonly="1"/>

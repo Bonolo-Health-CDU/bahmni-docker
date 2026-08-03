@@ -1,0 +1,13 @@
+id,name,active
+medicine_abc_3tc,Abacavir/Lamivudine,True
+medicine_atv_r,Atazanavir/ritonavir,True
+medicine_dtg,Dolutegravir,True
+medicine_drv_r,Darunavir/ritonavir,True
+medicine_drv,Darunavir,True
+medicine_rtv,Ritonavir,True
+medicine_lpv_r,Lopinavir/ritonavir,True
+medicine_ral,Raltegravir,True
+medicine_azt_3tc,Zidovudine/Lamivudine,True
+medicine_tdf,Tenofovir,True
+medicine_tdf_3tc,Tenofovir/Lamivudine,True
+medicine_tdf_3tc_dtg,Tenofovir/Lamivudine/Dolutegravir,True

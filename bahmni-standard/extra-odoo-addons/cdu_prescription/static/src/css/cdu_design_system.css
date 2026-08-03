@@ -264,3 +264,14 @@
         white-space: nowrap;
     }
 }
+.o_cdu_prescription_medicine_grid .o_cdu_full_width_card {
+    grid-column: 1 / -1;
+}
+
+.o_cdu_prescription_medicine_grid .o_cdu_full_width_card .o_field_one2many {
+    width: 100%;
+}
+
+.o_cdu_prescription_medicine_grid .o_cdu_full_width_card .o_list_view {
+    margin-top: 0.35rem;
+}

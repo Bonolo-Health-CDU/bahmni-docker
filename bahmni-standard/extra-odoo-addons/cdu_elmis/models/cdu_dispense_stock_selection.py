@@ -31,6 +31,13 @@ class CduDispenseStockSelection(models.Model):
         ondelete="set null",
         index=True,
     )
+    prescription_medicine_line_id = fields.Many2one(
+        "cdu.prescription.medicine.line",
+        string="Prescription Medicine",
+        ondelete="set null",
+        readonly=True,
+        index=True,
+    )
     openmrs_drug_name = fields.Char(string="eRegister Drug / Regimen", required=True)
     openmrs_drug_uuid = fields.Char()
     stock_option_id = fields.Many2one(
@@ -119,15 +126,23 @@ class CduDispenseStockSelection(models.Model):
         prepared_values = []
         for values in vals_list:
             values = dict(values)
+            if values.get("dispense_id"):
+                dispense = self.env["cdu.dispense"].browse(values["dispense_id"])
+                if dispense.state == "confirmed":
+                    raise ValidationError(
+                        _("Dispensing selections are locked after confirmation.")
+                    )
             if (
                 "dosage_instructions" not in values
                 and values.get("dispense_id")
             ):
-                dispense = self.env["cdu.dispense"].browse(
-                    values["dispense_id"]
-                )
+                medicine_line = self.env["cdu.prescription.medicine.line"].browse(
+                    values.get("prescription_medicine_line_id")
+                ).exists()
                 values["dosage_instructions"] = (
-                    dispense.prescription_id.dosage_instructions
+                    medicine_line.dosage_instructions
+                    if medicine_line
+                    else dispense.prescription_id.dosage_instructions
                 )
             prepared_values.append(values)
 
@@ -137,10 +152,21 @@ class CduDispenseStockSelection(models.Model):
         return records
 
     def write(self, vals):
+        if any(line.dispense_id.state == "confirmed" for line in self):
+            raise ValidationError(
+                _("Dispensing selections are locked after confirmation.")
+            )
         result = super().write(vals)
         if "stock_option_id" in vals:
             self._sync_stock_option()
         return result
+
+    def unlink(self):
+        if any(line.dispense_id.state == "confirmed" for line in self):
+            raise ValidationError(
+                _("Dispensing selections are locked after confirmation.")
+            )
+        return super().unlink()
 
     def _sync_stock_option(self):
         for line in self:

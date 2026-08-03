@@ -47,6 +47,13 @@ class CduBatchPatientLine(models.Model):
         required=True,
     )
 
+    prescription_medicine_line_id = fields.Many2one(
+        "cdu.prescription.medicine.line",
+        string="Prescription Medicine",
+        ondelete="set null",
+        index=True,
+    )
+
     patient_id = fields.Many2one(
         "res.partner",
     )

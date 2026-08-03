@@ -147,10 +147,47 @@
                             </group>
                         </page>
                         <page string="Prescription">
-                            <group class="o_cdu_section_grid">
-                                <group string="Medicine" class="o_cdu_section_card">
-                                    <field name="regimen_prescribed_raw"/>
-                                    <field name="dosage_instructions"/>
+                            <group class="o_cdu_section_grid o_cdu_prescription_medicine_grid">
+                                <group string="Regimen &amp; Medicines" class="o_cdu_section_card o_cdu_full_width_card">
+                                    <field name="medicines_locked" invisible="1"/>
+                                    <field name="medicine_amended" invisible="1"/>
+                                    <field name="regimen_prescribed_raw" string="Imported Regimen" readonly="1"/>
+                                    <field name="regimen_mapping_status" widget="badge"
+                                           decoration-success="regimen_mapping_status == 'matched'"
+                                           decoration-danger="regimen_mapping_status == 'unmatched'"
+                                           readonly="1"/>
+                                    <div class="alert alert-warning" role="alert"
+                                         attrs="{'invisible': [('regimen_mapping_status', '!=', 'unmatched')]}">
+                                        This imported regimen has no exact catalogue match. Ask an administrator to configure it before validation.
+                                    </div>
+                                    <div class="alert alert-info" role="alert"
+                                         attrs="{'invisible': [('medicines_locked', '=', False)]}">
+                                        Medicine composition is locked because picking has been confirmed. Dosing can still be adjusted on the dispensing screen until dispensing is confirmed.
+                                    </div>
+                                    <field name="regimen_id" readonly="1" options="{'no_open': True}"/>
+                                    <field name="regimen_option_id"
+                                           attrs="{'readonly': [('medicines_locked', '=', True)]}"
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="dosage_instructions" string="Imported Dosage Instructions" readonly="1"/>
+                                    <field name="medicine_line_ids"
+                                           attrs="{'readonly': [('medicines_locked', '=', True)]}">
+                                        <tree editable="bottom" default_order="sequence, id">
+                                            <field name="sequence" widget="handle"/>
+                                            <field name="medicine_id" options="{'no_create': True, 'no_open': True}"/>
+                                            <field name="dosage_instructions" required="1"/>
+                                            <field name="source" widget="badge" readonly="1"
+                                                   decoration-info="source == 'regimen'"
+                                                   decoration-warning="source == 'manual'"/>
+                                            <field name="last_changed_by" optional="hide" readonly="1"/>
+                                            <field name="last_changed_at" optional="hide" readonly="1"/>
+                                            <field name="source_option_line_id" invisible="1"/>
+                                        </tree>
+                                    </field>
+                                    <field name="medicine_amendment_note"
+                                           placeholder="Explain additions, removals, or alternative changes..."
+                                           attrs="{'invisible': [('medicine_amended', '=', False)], 'required': [('medicine_amended', '=', True)], 'readonly': [('medicines_locked', '=', True)]}"/>
+                                </group>
+                                <group string="Prescription Details" class="o_cdu_section_card">
                                     <field name="prescriber_name"/>
                                     <field name="next_drug_pickup_date" required="1"/>
                                 </group>

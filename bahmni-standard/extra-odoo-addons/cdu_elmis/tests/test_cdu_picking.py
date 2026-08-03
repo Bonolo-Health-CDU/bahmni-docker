@@ -23,6 +23,22 @@ class TestPrescriptionLevelPicking(TransactionCase):
         )
         cls.batch = cls.env["cdu.batch"].create({"state": "confirmed"})
         cls.pickup_date = fields.Date.today()
+        cls.regimen_medicine = cls.env["cdu.medicine"].create(
+            {"name": "REGIMEN-A"}
+        )
+        cls.regimen = cls.env["cdu.regimen"].create(
+            {"name": "Picking Test Regimen", "eregister_name": "REGIMEN-A"}
+        )
+        cls.regimen_option = cls.env["cdu.regimen.option"].create(
+            {
+                "name": "Standard composition",
+                "regimen_id": cls.regimen.id,
+                "is_default": True,
+                "line_ids": [
+                    (0, 0, {"medicine_id": cls.regimen_medicine.id})
+                ],
+            }
+        )
         cls.prescriptions = cls.env["cdu.prescription"]
         cls.patient_lines = cls.env["cdu.batch.patient.line"]
         for index in range(1, 4):

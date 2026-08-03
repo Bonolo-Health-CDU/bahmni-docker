@@ -169,6 +169,22 @@
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_regimens"
+        name="Regimens"
+        parent="menu_cdu_configuration"
+        action="action_cdu_regimen"
+        sequence="25"
+        groups="cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_medicines"
+        name="Medicines"
+        parent="menu_cdu_configuration"
+        action="action_cdu_medicine"
+        sequence="26"
+        groups="cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_onedrive_sources"
         name="OneDrive Sources"
         parent="menu_cdu_configuration"

@@ -1,0 +1,31 @@
+id,name,regimen_id:id,sequence,is_default,active
+option_5h_abc_atv,Standard composition,regimen_5h_abc_3tc_atv_r,10,True,True
+option_1k_abc_dtg,Standard composition,regimen_1k_abc_3tc_dtg,10,True,True
+option_2k_abc_drv_fixed,Fixed-dose darunavir/ritonavir,regimen_2k_abc_3tc_drv_r,10,True,True
+option_2k_abc_drv_separate,Separate darunavir and ritonavir,regimen_2k_abc_3tc_drv_r,20,False,True
+option_1p_abc_lpv,Standard composition,regimen_1p_abc_3tc_lpv_r,10,True,True
+option_2g_abc_lpv,Standard composition,regimen_2g_abc_3tc_lpv_r,10,True,True
+option_5h_abc_lpv,Standard composition,regimen_5h_abc_3tc_lpv_r,10,True,True
+option_4h_abc_lpv,Standard composition,regimen_4h_abc_3tc_lpv_r,10,True,True
+option_2o_abc_ral,Standard composition,regimen_2o_abc_3tc_ral,10,True,True
+option_5g_azt_atv,Standard composition,regimen_5g_azt_3tc_atv_r,10,True,True
+option_1m_azt_dtg,Standard composition,regimen_1m_azt_3tc_dtg,10,True,True
+option_4l_azt_dtg,Standard composition,regimen_4l_azt_3tc_dtg,10,True,True
+option_5f_azt_dtg,Standard composition,regimen_5f_azt_3tc_dtg,10,True,True
+option_2l_azt_drv_fixed,Fixed-dose darunavir/ritonavir,regimen_2l_azt_3tc_drv_r,10,True,True
+option_2l_azt_drv_separate,Separate darunavir and ritonavir,regimen_2l_azt_3tc_drv_r,20,False,True
+option_4g_azt_lpv,Standard composition,regimen_4g_azt_3tc_lpv_r,10,True,True
+option_1q_azt_lpv,Standard composition,regimen_1q_azt_3tc_lpv_r,10,True,True
+option_2c_azt_lpv,Standard composition,regimen_2c_azt_3tc_lpv_r,10,True,True
+option_2n_azt_ral,Standard composition,regimen_2n_azt_3tc_ral,10,True,True
+option_2i_azt_tdf_lpv,Standard composition,regimen_2i_azt_3tc_tdf_lpv_r,10,True,True
+option_2s_azt_tdf_dtg,Standard composition,regimen_2s_azt_3tc_tdf_dtg,10,True,True
+option_tdf_atv,Standard composition,regimen_tdf_3tc_atv_r,10,True,True
+option_4j_tld,Standard composition,regimen_4j_tdf_3tc_dtg,10,True,True
+option_2p_tld,Standard composition,regimen_2p_tdf_3tc_dtg,10,True,True
+option_1j_tld,Standard composition,regimen_1j_tdf_3tc_dtg,10,True,True
+option_2j_tdf_drv_fixed,Fixed-dose darunavir/ritonavir,regimen_2j_tdf_3tc_drv_r,10,True,True
+option_2j_tdf_drv_separate,Separate darunavir and ritonavir,regimen_2j_tdf_3tc_drv_r,20,False,True
+option_2d_tdf_lpv,Standard composition,regimen_2d_tdf_3tc_lpv_r,10,True,True
+option_1n_tdf_lpv,Standard composition,regimen_1n_tdf_3tc_lpv_r,10,True,True
+option_2m_tdf_ral,Standard composition,regimen_2m_tdf_3tc_ral,10,True,True

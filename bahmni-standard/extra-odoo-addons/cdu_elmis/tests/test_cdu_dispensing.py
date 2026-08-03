@@ -4,6 +4,7 @@ from unittest.mock import patch
 from lxml import etree
 
 from odoo import fields
+from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -168,7 +169,7 @@ class TestCduDispensingWorkflow(TransactionCase):
             ],
         )
 
-    def test_raw_regimen_remains_available_to_picking_workflow(self):
+    def test_legacy_raw_regimen_remains_available_to_picking_workflow(self):
         prescription = self._create_prescription("005", 30)
         prescription.next_clinical_visit_date = self.today + timedelta(days=60)
 
@@ -191,7 +192,109 @@ class TestCduDispensingWorkflow(TransactionCase):
         )
         self.assertFalse(summary_line["product_id"])
         self.assertEqual(summary_line["prescription_count"], 1)
-        self.assertNotIn("cdu.regimen", self.env.registry.models)
+        self.assertIn("cdu.regimen", self.env.registry.models)
+
+    def test_regimen_constituents_each_create_a_picking_requirement(self):
+        prescription = self._create_prescription("008", 30)
+        prescription.write({"regimen_prescribed_raw": "2k=ABC-3TC-DRV-r"})
+        prescription.next_clinical_visit_date = self.today + timedelta(days=60)
+
+        patient_lines, summary_lines = self.batch._prepare_picking_line_values()
+        prescription_lines = [
+            values
+            for values in patient_lines
+            if values["prescription_id"] == prescription.id
+        ]
+
+        self.assertEqual(
+            {values["drug_name"] for values in prescription_lines},
+            {"Abacavir/Lamivudine", "Darunavir/ritonavir"},
+        )
+        self.assertTrue(
+            all(values["prescription_medicine_line_id"] for values in prescription_lines)
+        )
+        self.assertTrue(
+            {"Abacavir/Lamivudine", "Darunavir/ritonavir"}.issubset(
+                {values["unmapped_drug_name"] for values in summary_lines}
+            )
+        )
+
+    def test_dispensing_dosage_is_copied_from_matching_prescription_medicine(self):
+        prescription = self._create_prescription("009", 30)
+        prescription.write({"regimen_prescribed_raw": "2k=ABC-3TC-DRV-r"})
+        medicine_line = prescription.medicine_line_ids.filtered(
+            lambda line: line.medicine_id.name == "Darunavir/ritonavir"
+        )
+        medicine_line.dosage_instructions = "Take with the evening meal."
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create({"prescription_id": prescription.id})
+
+        selection = self.env["cdu.dispense.stock.selection"].create(
+            {
+                "dispense_id": dispense.id,
+                "prescription_medicine_line_id": medicine_line.id,
+                "openmrs_drug_name": medicine_line.medicine_id.name,
+            }
+        )
+
+        self.assertEqual(
+            selection.dosage_instructions,
+            "Take with the evening meal.",
+        )
+
+    def test_medicine_change_discards_unconfirmed_picking_calculations(self):
+        prescription = self._create_prescription("010", 30)
+        prescription.write({"regimen_prescribed_raw": "2k=ABC-3TC-DRV-r"})
+        prescription.next_clinical_visit_date = self.today + timedelta(days=60)
+        self.batch._generate_elmis_picking_lines()
+        self.assertTrue(self.batch.elmis_picking_line_ids)
+        self.assertTrue(self.batch.patient_picking_line_ids)
+        additional = self.env["cdu.medicine"].create(
+            {"name": "Dispensing Test Additional Medicine"}
+        )
+
+        self.env["cdu.prescription.medicine.line"].create(
+            {
+                "prescription_id": prescription.id,
+                "medicine_id": additional.id,
+                "dosage_instructions": "Take once daily.",
+            }
+        )
+
+        self.assertFalse(self.batch.elmis_picking_line_ids)
+        self.assertFalse(self.batch.patient_picking_line_ids)
+        self.assertFalse(self.batch.picking_line_ids)
+
+    def test_medicine_table_locks_at_confirmed_picking(self):
+        prescription = self._create_prescription("011", 30)
+        prescription.write({"regimen_prescribed_raw": "2k=ABC-3TC-DRV-r"})
+        medicine_line = prescription.medicine_line_ids[:1]
+        self.batch.picking_confirmed_at = fields.Datetime.now()
+
+        with self.assertRaises(ValidationError):
+            medicine_line.dosage_instructions = "A late clinical change."
+        with self.assertRaises(ValidationError):
+            prescription.regimen_option_id = self.env.ref(
+                "cdu_prescription.option_2k_abc_drv_separate"
+            )
+
+    def test_dispensing_dosage_locks_at_confirmed_dispensing(self):
+        prescription = self._create_prescription("012", 30)
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create({"prescription_id": prescription.id})
+        selection = self.env["cdu.dispense.stock.selection"].create(
+            {
+                "dispense_id": dispense.id,
+                "openmrs_drug_name": "Test Medicine",
+                "dosage_instructions": "Take once daily.",
+            }
+        )
+        dispense.state = "confirmed"
+
+        with self.assertRaises(ValidationError):
+            selection.dosage_instructions = "Changed after confirmation."
 
     def test_product_dosing_instructions_are_independent(self):
         prescription = self._create_prescription("007", 30)

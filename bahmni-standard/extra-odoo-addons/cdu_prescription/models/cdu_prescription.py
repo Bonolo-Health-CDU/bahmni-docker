@@ -60,6 +60,50 @@ class CduPrescription(models.Model):
     latest_vl_result = fields.Char(string="Latest VL Result")
     regimen_prescribed_raw = fields.Char(string="Regimen Prescribed")
     dosage_instructions = fields.Text(string="Dosage Instructions")
+    regimen_id = fields.Many2one(
+        "cdu.regimen",
+        string="Matched Regimen",
+        readonly=True,
+        copy=True,
+    )
+    regimen_option_id = fields.Many2one(
+        "cdu.regimen.option",
+        string="Dispensing Option",
+        domain="[('regimen_id', '=', regimen_id), ('active', '=', True)]",
+        copy=True,
+        tracking=True,
+    )
+    regimen_mapping_status = fields.Selection(
+        [
+            ("missing", "No Regimen"),
+            ("unmatched", "Regimen Not Configured"),
+            ("matched", "Regimen Matched"),
+        ],
+        compute="_compute_regimen_mapping_status",
+        string="Regimen Match",
+    )
+    medicine_line_ids = fields.One2many(
+        "cdu.prescription.medicine.line",
+        "prescription_id",
+        string="Medicines",
+        copy=True,
+    )
+    medicine_amended = fields.Boolean(
+        string="Medicines Amended",
+        copy=True,
+        readonly=True,
+        tracking=True,
+    )
+    medicine_amendment_note = fields.Text(
+        string="Amendment Reason",
+        copy=True,
+        tracking=True,
+        help="Briefly explain why the imported regimen medicines were changed.",
+    )
+    medicines_locked = fields.Boolean(
+        compute="_compute_medicines_locked",
+        string="Medicine Composition Locked",
+    )
     new_or_revisit = fields.Selection(
         [("new", "New"), ("revisit", "Revisit"), ("restarted", "Restarted")],
         string="New or Revisit",
@@ -204,12 +248,28 @@ class CduPrescription(models.Model):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
 
         prescription = super().create(vals)
+        if not vals.get("medicine_line_ids"):
+            prescription.with_context(
+                cdu_skip_medicine_audit=True,
+                cdu_skip_regimen_sync=True,
+            )._sync_regimen_from_raw()
         prescription._sync_repeat_days_from_cdu_days()
         prescription._check_required_next_drug_pickup_date()
 
         return prescription
 
     def write(self, vals):
+        composition_fields = {"regimen_prescribed_raw", "regimen_option_id"}
+        if composition_fields.intersection(vals):
+            self._ensure_medicine_composition_editable()
+        previous_regimens = {
+            prescription.id: prescription.regimen_prescribed_raw
+            for prescription in self
+        }
+        previous_options = {
+            prescription.id: prescription.regimen_option_id.id
+            for prescription in self
+        }
         if vals.get("facility_id"):
             facility = self.env["cdu.facility"].browse(vals["facility_id"])
             vals.setdefault("facility_name", facility.name)
@@ -219,6 +279,56 @@ class CduPrescription(models.Model):
             vals.update(self._patient_snapshot_values(vals["patient_id"], vals))
 
         result = super().write(vals)
+
+        if not self.env.context.get("cdu_skip_regimen_sync"):
+            if "regimen_prescribed_raw" in vals and "medicine_line_ids" not in vals:
+                changed = self.filtered(
+                    lambda prescription: (
+                        (previous_regimens[prescription.id] or "").strip()
+                        != (prescription.regimen_prescribed_raw or "").strip()
+                    )
+                )
+                changed.with_context(
+                    cdu_skip_medicine_audit=True,
+                    cdu_skip_regimen_sync=True,
+                )._sync_regimen_from_raw()
+                if changed:
+                    changed.with_context(cdu_skip_regimen_sync=True).write(
+                        {"medicine_amended": True}
+                    )
+                    changed._invalidate_unconfirmed_picking()
+                    for prescription in changed:
+                        prescription.message_post(
+                            body=_("The prescribed regimen was changed and its medicine list was refreshed.")
+                        )
+            elif "regimen_option_id" in vals and "medicine_line_ids" not in vals:
+                changed = self.filtered(
+                    lambda prescription: (
+                        previous_options[prescription.id]
+                        != prescription.regimen_option_id.id
+                    )
+                )
+                changed.with_context(
+                    cdu_skip_medicine_audit=True,
+                    cdu_skip_regimen_sync=True,
+                )._replace_regimen_medicine_lines()
+                if changed:
+                    changed.with_context(cdu_skip_regimen_sync=True).write(
+                        {"medicine_amended": True}
+                    )
+                    changed._invalidate_unconfirmed_picking()
+                    for prescription in changed:
+                        prescription.message_post(
+                            body=_("The regimen dispensing option was changed.")
+                        )
+
+            if "dosage_instructions" in vals:
+                unchanged = self.filtered(lambda prescription: not prescription.medicine_amended)
+                unchanged.medicine_line_ids.filtered(
+                    lambda line: line.source == "regimen"
+                ).with_context(cdu_skip_medicine_audit=True).write(
+                    {"dosage_instructions": vals.get("dosage_instructions") or False}
+                )
 
         duration_fields = {
             "prescription_date",
@@ -231,6 +341,148 @@ class CduPrescription(models.Model):
         if "next_drug_pickup_date" in vals:
             self._check_required_next_drug_pickup_date()
         return result
+
+    def copy(self, default=None):
+        # A back-order or other system copy represents the same clinical
+        # prescription. Copy its medicine rows without recording a new manual
+        # amendment merely because the ORM recreated the one2many records.
+        return super(
+            CduPrescription,
+            self.with_context(cdu_skip_medicine_audit=True),
+        ).copy(default)
+
+    @api.depends("regimen_prescribed_raw", "regimen_id")
+    def _compute_regimen_mapping_status(self):
+        for prescription in self:
+            if not (prescription.regimen_prescribed_raw or "").strip():
+                prescription.regimen_mapping_status = "missing"
+            elif prescription.regimen_id:
+                prescription.regimen_mapping_status = "matched"
+            else:
+                prescription.regimen_mapping_status = "unmatched"
+
+    @api.depends("batch_id")
+    def _compute_medicines_locked(self):
+        for prescription in self:
+            batch = prescription.batch_id
+            prescription.medicines_locked = bool(
+                batch
+                and "picking_confirmed_at" in batch._fields
+                and batch.picking_confirmed_at
+            )
+
+    def _ensure_medicine_composition_editable(self):
+        # Read the confirmation boundary directly. The non-stored UI helper may
+        # be cached when picking is confirmed in the same transaction.
+        locked = self.filtered(
+            lambda prescription: (
+                prescription.batch_id
+                and "picking_confirmed_at" in prescription.batch_id._fields
+                and prescription.batch_id.picking_confirmed_at
+            )
+        )
+        if locked:
+            raise ValidationError(
+                _(
+                    "The medicines are locked because picking has been confirmed. "
+                    "Reverse the confirmed picking before changing the prescription composition."
+                )
+            )
+
+    def _invalidate_unconfirmed_picking(self):
+        batches = self.mapped("batch_id")
+        for batch in batches:
+            if "picking_confirmed_at" in batch._fields and batch.picking_confirmed_at:
+                continue
+            batch._invalidate_picking_after_prescription_change()
+
+    def _sync_regimen_from_raw(self):
+        Regimen = self.env["cdu.regimen"]
+        for prescription in self:
+            regimen = Regimen.find_exact(prescription.regimen_prescribed_raw)
+            option = regimen._get_default_option() if regimen else self.env["cdu.regimen.option"]
+            prescription.with_context(cdu_skip_regimen_sync=True).write(
+                {
+                    "regimen_id": regimen.id if regimen else False,
+                    "regimen_option_id": option.id if option else False,
+                }
+            )
+            prescription._replace_regimen_medicine_lines()
+
+    def _replace_regimen_medicine_lines(self):
+        Line = self.env["cdu.prescription.medicine.line"]
+        for prescription in self:
+            existing_regimen_lines = prescription.medicine_line_ids.filtered(
+                lambda line: line.source == "regimen"
+            )
+            dosage_by_medicine = {
+                line.medicine_id.id: line.dosage_instructions
+                for line in existing_regimen_lines
+            }
+            manual_medicine_ids = set(
+                prescription.medicine_line_ids.filtered(
+                    lambda line: line.source == "manual"
+                ).mapped("medicine_id").ids
+            )
+            existing_regimen_lines.with_context(cdu_skip_medicine_audit=True).unlink()
+            option = prescription.regimen_option_id
+            if not option:
+                continue
+            values = []
+            for option_line in option.line_ids.sorted(lambda line: (line.sequence, line.id)):
+                if option_line.medicine_id.id in manual_medicine_ids:
+                    continue
+                values.append(
+                    {
+                        "prescription_id": prescription.id,
+                        "sequence": option_line.sequence,
+                        "medicine_id": option_line.medicine_id.id,
+                        "dosage_instructions": dosage_by_medicine.get(
+                            option_line.medicine_id.id,
+                            prescription.dosage_instructions or False,
+                        ),
+                        "source": "regimen",
+                        "source_option_line_id": option_line.id,
+                    }
+                )
+            if values:
+                Line.with_context(cdu_skip_medicine_audit=True).create(values)
+
+    @api.onchange("regimen_prescribed_raw")
+    def _onchange_regimen_prescribed_raw(self):
+        for prescription in self:
+            regimen = self.env["cdu.regimen"].find_exact(
+                prescription.regimen_prescribed_raw
+            )
+            prescription.regimen_id = regimen
+            prescription.regimen_option_id = (
+                regimen._get_default_option() if regimen else False
+            )
+            prescription._onchange_regimen_option_id()
+
+    @api.onchange("regimen_option_id")
+    def _onchange_regimen_option_id(self):
+        for prescription in self:
+            option = prescription.regimen_option_id
+            if not option:
+                prescription.medicine_line_ids = [(5, 0, 0)]
+                continue
+            prescription.medicine_line_ids = [(5, 0, 0)] + [
+                (
+                    0,
+                    0,
+                    {
+                        "sequence": option_line.sequence,
+                        "medicine_id": option_line.medicine_id.id,
+                        "dosage_instructions": prescription.dosage_instructions or False,
+                        "source": "regimen",
+                        "source_option_line_id": option_line.id,
+                    },
+                )
+                for option_line in option.line_ids.sorted(
+                    lambda line: (line.sequence, line.id)
+                )
+            ]
     
     def _check_required_next_drug_pickup_date(self):
         for prescription in self:
@@ -496,8 +748,19 @@ class CduPrescription(models.Model):
             missing.append("drug pickup point")
         if not self.regimen_prescribed_raw:
             missing.append("regimen prescribed")
-        if not (self.dosage_instructions or "").strip():
-            missing.append("dosage instructions")
+        if self.regimen_prescribed_raw and not self.regimen_id:
+            missing.append("an exact configured regimen match")
+        if self.regimen_id and not self.regimen_option_id:
+            missing.append("a dispensing option")
+        if not self.medicine_line_ids:
+            missing.append("at least one prescription medicine")
+        incomplete_medicines = self.medicine_line_ids.filtered(
+            lambda line: not (line.dosage_instructions or "").strip()
+        )
+        if incomplete_medicines:
+            missing.append("dosage instructions for every medicine")
+        if self.medicine_amended and not (self.medicine_amendment_note or "").strip():
+            missing.append("a reason for the medicine amendment")
         if not self.next_drug_pickup_date:
             missing.append("next drug pickup date")
         return missing
