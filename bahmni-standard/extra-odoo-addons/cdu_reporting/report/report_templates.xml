@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="report_cdu_summary">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-set="payload" t-value="doc.get_report_payload()"/>
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2 style="color:#16324f;">BONOLO HEALTH</h2>
+                        <h3 t-esc="payload['title']"/>
+                        <p>
+                            <strong>Reporting Period:</strong>
+                            <span t-esc="payload['date_from']"/> – <span t-esc="payload['date_to']"/>
+                        </p>
+                        <h4>Summary</h4>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr t-foreach="payload['summary']" t-as="row">
+                                    <td><span t-esc="row[0]"/></td>
+                                    <td class="text-end"><span t-esc="row[1]"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h4 t-if="payload['by_district']">Performance by District</h4>
+                        <table t-if="payload['by_district']" class="table table-sm">
+                            <thead><tr><th>District</th><th class="text-end">Records</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="payload['by_district']" t-as="row">
+                                    <td><span t-esc="row[0]"/></td><td class="text-end"><span t-esc="row[1]"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h4 t-if="payload['by_facility']">Performance by Facility</h4>
+                        <table t-if="payload['by_facility']" class="table table-sm">
+                            <thead><tr><th>Facility</th><th class="text-end">Records</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="payload['by_facility']" t-as="row">
+                                    <td><span t-esc="row[0]"/></td><td class="text-end"><span t-esc="row[1]"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="text-muted">Detailed patient records are intentionally excluded from this management PDF. Use Excel or CSV for authorised detail export.</p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
+

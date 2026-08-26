@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Patient enrolment -->
+    <record id="view_cdu_report_enrolment_tree" model="ir.ui.view">
+        <field name="name">cdu.report.enrolment.tree</field>
+        <field name="model">cdu.report.enrolment</field>
+        <field name="arch" type="xml">
+            <tree string="Patient Enrolment" create="0" edit="0" delete="0">
+                <field name="patient_name"/><field name="enrolment_date"/><field name="new_or_repeat"/>
+                <field name="facility_name"/><field name="district_name"/><field name="programme"/>
+                <field name="gender"/><field name="age"/><field name="age_group"/>
+                <field name="collection_point_name"/><field name="pup_type"/><field name="pup_district"/>
+                <field name="next_collection_date"/>
+            </tree>
+        </field>
+    </record>
+    <record id="view_cdu_report_enrolment_pivot" model="ir.ui.view">
+        <field name="name">cdu.report.enrolment.pivot</field><field name="model">cdu.report.enrolment</field>
+        <field name="arch" type="xml"><pivot string="Patient Enrolment">
+            <field name="district_name" type="row"/><field name="new_or_repeat" type="col"/>
+            <field name="record_count" type="measure"/><field name="new_count" type="measure"/><field name="repeat_count" type="measure"/>
+        </pivot></field>
+    </record>
+    <record id="view_cdu_report_enrolment_graph" model="ir.ui.view">
+        <field name="name">cdu.report.enrolment.graph</field><field name="model">cdu.report.enrolment</field>
+        <field name="arch" type="xml"><graph string="Enrolments by Month" type="bar">
+            <field name="enrolment_date" interval="month"/><field name="record_count" type="measure"/>
+        </graph></field>
+    </record>
+    <record id="view_cdu_report_enrolment_search" model="ir.ui.view">
+        <field name="name">cdu.report.enrolment.search</field><field name="model">cdu.report.enrolment</field>
+        <field name="arch" type="xml"><search string="Patient Enrolment">
+            <field name="patient_name"/><field name="facility_id"/><field name="district_name"/><field name="programme"/>
+            <field name="gender"/><field name="age_group"/><field name="collection_point_id"/><field name="pup_type"/>
+            <filter name="new" string="New" domain="[('new_or_repeat','=','new')]"/>
+            <filter name="repeat" string="Repeat" domain="[('new_or_repeat','=','repeat')]"/>
+            <separator/><filter name="enrolment_date" string="Enrolment Date" date="enrolment_date"/>
+            <group expand="0" string="Group By">
+                <filter name="group_month" string="Month" context="{'group_by':'enrolment_date:month'}"/>
+                <filter name="group_facility" string="Facility" context="{'group_by':'facility_id'}"/>
+                <filter name="group_district" string="District" context="{'group_by':'district_name'}"/>
+                <filter name="group_programme" string="Programme" context="{'group_by':'programme'}"/>
+                <filter name="group_gender" string="Gender" context="{'group_by':'gender'}"/>
+                <filter name="group_age" string="Age Group" context="{'group_by':'age_group'}"/>
+                <filter name="group_pup" string="PUP" context="{'group_by':'collection_point_id'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="action_cdu_report_enrolment" model="ir.actions.act_window">
+        <field name="name">Patient Enrolment</field><field name="res_model">cdu.report.enrolment</field>
+        <field name="view_mode">tree,pivot,graph</field><field name="search_view_id" ref="view_cdu_report_enrolment_search"/>
+    </record>
+
+    <!-- Verification -->
+    <record id="view_cdu_report_verification_tree" model="ir.ui.view">
+        <field name="name">cdu.report.verification.tree</field><field name="model">cdu.report.verification</field>
+        <field name="arch" type="xml"><tree string="Prescription Verification" create="0" edit="0" delete="0">
+            <field name="patient_name"/><field name="prescription_number"/><field name="facility_name"/><field name="district_name"/>
+            <field name="receipt_date"/><field name="verification_status"/><field name="verification_date"/>
+            <field name="verifier_id"/><field name="rejection_reason"/>
+        </tree></field>
+    </record>
+    <record id="view_cdu_report_verification_pivot" model="ir.ui.view">
+        <field name="name">cdu.report.verification.pivot</field><field name="model">cdu.report.verification</field>
+        <field name="arch" type="xml"><pivot string="Prescription Verification">
+            <field name="district_name" type="row"/><field name="verification_status" type="col"/><field name="record_count" type="measure"/>
+        </pivot></field>
+    </record>
+    <record id="view_cdu_report_verification_graph" model="ir.ui.view">
+        <field name="name">cdu.report.verification.graph</field><field name="model">cdu.report.verification</field>
+        <field name="arch" type="xml"><graph string="Verification Trends" type="bar">
+            <field name="receipt_date" interval="month"/><field name="verification_status"/><field name="record_count" type="measure"/>
+        </graph></field>
+    </record>
+    <record id="view_cdu_report_verification_search" model="ir.ui.view">
+        <field name="name">cdu.report.verification.search</field><field name="model">cdu.report.verification</field>
+        <field name="arch" type="xml"><search string="Prescription Verification">
+            <field name="patient_name"/><field name="prescription_number"/><field name="facility_id"/><field name="district_name"/><field name="verifier_id"/>
+            <filter name="awaiting" string="Awaiting Verification" domain="[('verification_status','=','awaiting_verification')]"/>
+            <filter name="verified" string="Verified" domain="[('verification_status','=','verified')]"/>
+            <filter name="submitted" string="Submitted for Validation" domain="[('verification_status','=','submitted_for_validation')]"/>
+            <filter name="rejected" string="Rejected" domain="[('verification_status','=','rejected')]"/>
+            <separator/><filter name="receipt_date" string="Receipt Date" date="receipt_date"/><filter name="verification_date" string="Verification Date" date="verification_date"/>
+            <group expand="0" string="Group By">
+                <filter name="group_status" string="Status" context="{'group_by':'verification_status'}"/>
+                <filter name="group_facility" string="Facility" context="{'group_by':'facility_id'}"/>
+                <filter name="group_district" string="District" context="{'group_by':'district_name'}"/>
+                <filter name="group_month" string="Month" context="{'group_by':'receipt_date:month'}"/>
+                <filter name="group_verifier" string="Verifier" context="{'group_by':'verifier_id'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="action_cdu_report_verification" model="ir.actions.act_window">
+        <field name="name">Prescription Verification</field><field name="res_model">cdu.report.verification</field>
+        <field name="view_mode">tree,pivot,graph</field><field name="search_view_id" ref="view_cdu_report_verification_search"/>
+    </record>
+
+    <!-- Validation -->
+    <record id="view_cdu_report_validation_tree" model="ir.ui.view">
+        <field name="name">cdu.report.validation.tree</field><field name="model">cdu.report.validation</field>
+        <field name="arch" type="xml"><tree string="Prescription Validation" create="0" edit="0" delete="0">
+            <field name="patient_name"/><field name="prescription_number"/><field name="facility_name"/><field name="district_name"/>
+            <field name="validation_received_date"/><field name="validation_date"/><field name="validation_status"/>
+            <field name="validator_id"/><field name="rejection_reason"/>
+        </tree></field>
+    </record>
+    <record id="view_cdu_report_validation_pivot" model="ir.ui.view">
+        <field name="name">cdu.report.validation.pivot</field><field name="model">cdu.report.validation</field>
+        <field name="arch" type="xml"><pivot string="Prescription Validation">
+            <field name="district_name" type="row"/><field name="validation_status" type="col"/><field name="record_count" type="measure"/>
+        </pivot></field>
+    </record>
+    <record id="view_cdu_report_validation_graph" model="ir.ui.view">
+        <field name="name">cdu.report.validation.graph</field><field name="model">cdu.report.validation</field>
+        <field name="arch" type="xml"><graph string="Validation Trends" type="bar">
+            <field name="validation_received_date" interval="month"/><field name="validation_status"/><field name="record_count" type="measure"/>
+        </graph></field>
+    </record>
+    <record id="view_cdu_report_validation_search" model="ir.ui.view">
+        <field name="name">cdu.report.validation.search</field><field name="model">cdu.report.validation</field>
+        <field name="arch" type="xml"><search string="Prescription Validation">
+            <field name="patient_name"/><field name="prescription_number"/><field name="facility_id"/><field name="district_name"/><field name="validator_id"/>
+            <filter name="awaiting" string="Awaiting Validation" domain="[('validation_status','=','awaiting_validation')]"/>
+            <filter name="validated" string="Validated" domain="[('validation_status','=','validated')]"/>
+            <filter name="released" string="Released for Batching" domain="[('validation_status','=','released_for_batching')]"/>
+            <filter name="rejected" string="Rejected" domain="[('validation_status','=','rejected')]"/>
+            <separator/><filter name="received" string="Date Received" date="validation_received_date"/><filter name="validation_date" string="Validation Date" date="validation_date"/>
+            <group expand="0" string="Group By">
+                <filter name="group_status" string="Status" context="{'group_by':'validation_status'}"/>
+                <filter name="group_facility" string="Facility" context="{'group_by':'facility_id'}"/>
+                <filter name="group_district" string="District" context="{'group_by':'district_name'}"/>
+                <filter name="group_month" string="Month" context="{'group_by':'validation_received_date:month'}"/>
+                <filter name="group_validator" string="Validator" context="{'group_by':'validator_id'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="action_cdu_report_validation" model="ir.actions.act_window">
+        <field name="name">Prescription Validation</field><field name="res_model">cdu.report.validation</field>
+        <field name="view_mode">tree,pivot,graph</field><field name="search_view_id" ref="view_cdu_report_validation_search"/>
+    </record>
+
+    <!-- Dispensing -->
+    <record id="view_cdu_report_dispensing_tree" model="ir.ui.view">
+        <field name="name">cdu.report.dispensing.tree</field><field name="model">cdu.report.dispensing</field>
+        <field name="arch" type="xml"><tree string="Dispensing" create="0" edit="0" delete="0">
+            <field name="patient_name"/><field name="prescription_number"/><field name="facility_name"/><field name="district_name"/>
+            <field name="production_received_at"/><field name="dispensing_date"/><field name="dispenser_id"/>
+            <field name="item_count" sum="Items"/><field name="total_quantity_dispensed" sum="Quantity"/>
+            <field name="dispensing_status"/><field name="fulfilment_status"/><field name="collection_point_name"/>
+            <field name="pup_type"/><field name="collect_go_status"/>
+        </tree></field>
+    </record>
+    <record id="view_cdu_report_dispensing_pivot" model="ir.ui.view">
+        <field name="name">cdu.report.dispensing.pivot</field><field name="model">cdu.report.dispensing</field>
+        <field name="arch" type="xml"><pivot string="Dispensing">
+            <field name="district_name" type="row"/><field name="dispensing_status" type="col"/>
+            <field name="record_count" type="measure"/><field name="item_count" type="measure"/><field name="total_quantity_dispensed" type="measure"/>
+        </pivot></field>
+    </record>
+    <record id="view_cdu_report_dispensing_graph" model="ir.ui.view">
+        <field name="name">cdu.report.dispensing.graph</field><field name="model">cdu.report.dispensing</field>
+        <field name="arch" type="xml"><graph string="Dispensing by Month" type="bar">
+            <field name="production_received_at" interval="month"/><field name="dispensing_status"/><field name="record_count" type="measure"/>
+        </graph></field>
+    </record>
+    <record id="view_cdu_report_dispensing_search" model="ir.ui.view">
+        <field name="name">cdu.report.dispensing.search</field><field name="model">cdu.report.dispensing</field>
+        <field name="arch" type="xml"><search string="Dispensing">
+            <field name="patient_name"/><field name="prescription_number"/><field name="facility_id"/><field name="district_name"/>
+            <field name="programme"/><field name="collection_point_id"/><field name="pup_type"/><field name="dispenser_id"/>
+            <field name="medicine_names"/><field name="dispensing_status"/><field name="fulfilment_status"/>
+            <filter name="dispensed" string="Dispensed" domain="[('dispensing_status','=','dispensed')]"/>
+            <filter name="rejected" string="Rejected" domain="[('dispensing_status','=','rejected')]"/>
+            <filter name="dispatched" string="Dispatched" domain="[('dispensing_status','=','dispatched')]"/>
+            <filter name="collected" string="Collected" domain="[('dispensing_status','=','collected')]"/>
+            <filter name="returned" string="Returned" domain="[('dispensing_status','=','returned')]"/>
+            <separator/><filter name="received" string="Received for Production" date="production_received_at"/><filter name="dispensing_date" string="Dispensing Date" date="dispensing_date"/>
+            <group expand="0" string="Group By">
+                <filter name="group_status" string="Status" context="{'group_by':'dispensing_status'}"/>
+                <filter name="group_fulfilment" string="Fulfilment" context="{'group_by':'fulfilment_status'}"/>
+                <filter name="group_facility" string="Facility" context="{'group_by':'facility_id'}"/>
+                <filter name="group_district" string="District" context="{'group_by':'district_name'}"/>
+                <filter name="group_pup" string="PUP" context="{'group_by':'collection_point_id'}"/>
+                <filter name="group_month" string="Month" context="{'group_by':'production_received_at:month'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="action_cdu_report_dispensing" model="ir.actions.act_window">
+        <field name="name">Dispensing</field><field name="res_model">cdu.report.dispensing</field>
+        <field name="view_mode">tree,pivot,graph</field><field name="search_view_id" ref="view_cdu_report_dispensing_search"/>
+    </record>
+
+    <!-- Parcel production -->
+    <record id="view_cdu_report_parcel_production_tree" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.production.tree</field><field name="model">cdu.report.parcel.production</field>
+        <field name="arch" type="xml"><tree string="Parcel Production" create="0" edit="0" delete="0">
+            <field name="parcel_reference"/><field name="production_date"/><field name="patient_name"/><field name="prescription_number"/>
+            <field name="facility_name"/><field name="district_name"/><field name="packager_id"/>
+            <field name="collection_point_name"/><field name="pup_type"/><field name="pup_district"/>
+            <field name="dispatch_status"/><field name="next_collection_date"/>
+        </tree></field>
+    </record>
+    <record id="view_cdu_report_parcel_production_pivot" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.production.pivot</field><field name="model">cdu.report.parcel.production</field>
+        <field name="arch" type="xml"><pivot string="Parcel Production">
+            <field name="collection_point_id" type="row"/><field name="dispatch_status" type="col"/><field name="record_count" type="measure"/>
+        </pivot></field>
+    </record>
+    <record id="view_cdu_report_parcel_production_graph" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.production.graph</field><field name="model">cdu.report.parcel.production</field>
+        <field name="arch" type="xml"><graph string="Parcel Production Trends" type="bar">
+            <field name="production_date" interval="month"/><field name="record_count" type="measure"/>
+        </graph></field>
+    </record>
+    <record id="view_cdu_report_parcel_production_search" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.production.search</field><field name="model">cdu.report.parcel.production</field>
+        <field name="arch" type="xml"><search string="Parcel Production">
+            <field name="parcel_reference"/><field name="prescription_number"/><field name="facility_id"/><field name="district_name"/>
+            <field name="packager_id"/><field name="collection_point_id"/><field name="pup_type"/><field name="dispatch_status"/>
+            <filter name="pending" string="Pending Dispatch" domain="[('dispatch_status','=','pending_dispatch')]"/>
+            <filter name="dispatched" string="Dispatched" domain="[('dispatch_status','=','dispatched')]"/>
+            <separator/><filter name="production_date" string="Production Date" date="production_date"/><filter name="collection_date" string="Next Collection Date" date="next_collection_date"/>
+            <group expand="0" string="Group By">
+                <filter name="group_month" string="Month" context="{'group_by':'production_date:month'}"/>
+                <filter name="group_facility" string="Facility" context="{'group_by':'facility_id'}"/>
+                <filter name="group_district" string="District" context="{'group_by':'district_name'}"/>
+                <filter name="group_pup" string="PUP" context="{'group_by':'collection_point_id'}"/>
+                <filter name="group_packager" string="Packager" context="{'group_by':'packager_id'}"/>
+                <filter name="group_status" string="Dispatch Status" context="{'group_by':'dispatch_status'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="action_cdu_report_parcel_production" model="ir.actions.act_window">
+        <field name="name">Parcel Production</field><field name="res_model">cdu.report.parcel.production</field>
+        <field name="view_mode">tree,pivot,graph</field><field name="search_view_id" ref="view_cdu_report_parcel_production_search"/>
+    </record>
+
+    <!-- Parcel forecast -->
+    <record id="view_cdu_report_parcel_forecast_tree" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.forecast.tree</field><field name="model">cdu.report.parcel.forecast</field>
+        <field name="arch" type="xml"><tree string="Parcel Forecast" create="0" edit="0" delete="0">
+            <field name="forecast_date"/><field name="collection_point_name"/><field name="district_name"/><field name="programme"/>
+            <field name="patients_due" sum="Patients Due"/><field name="forecasted_parcels" sum="Forecast"/>
+            <field name="actual_parcels" sum="Actual"/><field name="variance" sum="Variance"/><field name="variance_percentage"/>
+        </tree></field>
+    </record>
+    <record id="view_cdu_report_parcel_forecast_pivot" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.forecast.pivot</field><field name="model">cdu.report.parcel.forecast</field>
+        <field name="arch" type="xml"><pivot string="Parcel Forecast">
+            <field name="district_name" type="row"/><field name="forecast_date" interval="month" type="col"/>
+            <field name="forecasted_parcels" type="measure"/><field name="actual_parcels" type="measure"/><field name="variance" type="measure"/>
+        </pivot></field>
+    </record>
+    <record id="view_cdu_report_parcel_forecast_graph" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.forecast.graph</field><field name="model">cdu.report.parcel.forecast</field>
+        <field name="arch" type="xml"><graph string="Forecasted Parcels by Month" type="bar">
+            <field name="forecast_date" interval="month"/><field name="forecasted_parcels" type="measure"/><field name="actual_parcels" type="measure"/>
+        </graph></field>
+    </record>
+    <record id="view_cdu_report_parcel_forecast_search" model="ir.ui.view">
+        <field name="name">cdu.report.parcel.forecast.search</field><field name="model">cdu.report.parcel.forecast</field>
+        <field name="arch" type="xml"><search string="Parcel Forecast">
+            <field name="forecast_date"/><field name="collection_point_id"/><field name="district_name"/><field name="programme"/><field name="pup_type"/>
+            <filter name="forecast_date_filter" string="Forecast Period" date="forecast_date"/>
+            <group expand="0" string="Group By">
+                <filter name="group_day" string="Day" context="{'group_by':'forecast_date:day'}"/>
+                <filter name="group_week" string="Week" context="{'group_by':'forecast_date:week'}"/>
+                <filter name="group_month" string="Month" context="{'group_by':'forecast_date:month'}"/>
+                <filter name="group_quarter" string="Quarter" context="{'group_by':'forecast_date:quarter'}"/>
+                <filter name="group_district" string="District" context="{'group_by':'district_name'}"/>
+                <filter name="group_pup" string="PUP" context="{'group_by':'collection_point_id'}"/>
+                <filter name="group_programme" string="Programme" context="{'group_by':'programme'}"/>
+            </group>
+        </search></field>
+    </record>
+    <record id="action_cdu_report_parcel_forecast" model="ir.actions.act_window">
+        <field name="name">Parcel Forecasting</field><field name="res_model">cdu.report.parcel.forecast</field>
+        <field name="view_mode">tree,pivot,graph</field><field name="search_view_id" ref="view_cdu_report_parcel_forecast_search"/>
+    </record>
+</odoo>
+

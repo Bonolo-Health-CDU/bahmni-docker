@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="module_category_cdu_reporting" model="ir.module.category">
+        <field name="name">CDU Reporting</field>
+        <field name="sequence">31</field>
+    </record>
+
+    <record id="group_cdu_reporting_user" model="res.groups">
+        <field name="name">Reporting User</field>
+        <field name="category_id" ref="module_category_cdu_reporting"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_cdu_reporting_manager" model="res.groups">
+        <field name="name">Reporting Manager</field>
+        <field name="category_id" ref="module_category_cdu_reporting"/>
+        <field name="implied_ids" eval="[(4, ref('group_cdu_reporting_user'))]"/>
+    </record>
+
+    <record id="cdu_prescription.group_cdu_admin" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('cdu_reporting.group_cdu_reporting_manager'))]"/>
+    </record>
+</odoo>
+

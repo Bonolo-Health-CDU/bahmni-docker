@@ -1,0 +1,22 @@
+{
+    "name": "CDU Reporting",
+    "summary": "Operational and management reporting for the Central Dispensing Unit",
+    "description": "Shared operational and management reports for CDU workflows.",
+    "version": "16.0.1.0.0",
+    "category": "Healthcare/Reporting",
+    "author": "Ministry of Health",
+    "license": "LGPL-3",
+    "depends": ["cdu_elmis"],
+    "data": [
+        "security/reporting_security.xml",
+        "security/ir.model.access.csv",
+        "views/report_views.xml",
+        "views/report_wizard_views.xml",
+        "report/report_templates.xml",
+        "report/report_actions.xml",
+        "views/report_menu.xml",
+    ],
+    "installable": True,
+    "application": False,
+    "post_init_hook": "post_init_hook",
+}
