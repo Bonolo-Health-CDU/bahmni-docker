@@ -144,20 +144,35 @@
                     </div>
 
                     <notebook class="o_cdu_workspace_notebook">
-                        <page string="Dispense Selections">
+                        <page string="Regimen">
                             <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
-                                Selections are prefilled from the batch picking lines. Production Floor stock refreshes automatically when dispensing starts and when this page is loaded. Confirm or adjust the exact product, batch, quantity, and dosing instructions.
+                                Products are prefilled from the patient prescription and batch picking lines. Add or remove products as needed, then confirm the exact product, batch, quantity, and dosing instructions.
                             </div>
-                            <field name="stock_selection_ids">
-                                <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
+                            <div class="o_cdu_elmis_section_title">Regimen Products</div>
+                            <field name="stock_selection_ids"
+                                   string="Regimen Products"
+                                   class="o_cdu_regimen_product_list"
+                                   attrs="{'readonly': [('state', '!=', 'draft')]}">
+                                <tree editable="bottom">
+                                    <control>
+                                        <create string="Add Product"/>
+                                    </control>
                                     <field name="dispense_id" invisible="1"/>
-                                    <field name="openmrs_drug_name"/>
-                                    <field name="stock_option_id" string="Dispense From" options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="selected_orderable_name" readonly="1"/>
-                                    <field name="selected_pack_size" string="Pack Size" readonly="1"/>
-                                    <field name="selected_lot" readonly="1"/>
-                                    <field name="selected_lot_expiry" readonly="1"/>
-                                    <field name="selected_stock_on_hand" string="Available Packs" readonly="1"/>
+                                    <field name="stock_option_id"
+                                           string="Product"
+                                           class="o_cdu_regimen_product_column"
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="dosage_instructions"
+                                           string="Dosage / Instructions"
+                                           class="o_cdu_regimen_dosage_column"/>
+                                    <field name="openmrs_drug_name"
+                                           string="Prescribed Product / Regimen"
+                                           optional="hide"/>
+                                    <field name="selected_orderable_name" readonly="1" optional="hide"/>
+                                    <field name="selected_pack_size" string="Pack Size" readonly="1" optional="hide"/>
+                                    <field name="selected_lot" readonly="1" optional="hide"/>
+                                    <field name="selected_lot_expiry" readonly="1" optional="hide"/>
+                                    <field name="selected_stock_on_hand" string="Available Packs" readonly="1" optional="hide"/>
                                     <field name="quantity_dispensed"
                                            string="Dispensed Packs"
                                            widget="cdu_no_trailing_zeros_float"
@@ -166,13 +181,18 @@
                                            string="Dispensed Units"
                                            widget="cdu_no_trailing_zeros_float"
                                            readonly="1"/>
-                                    <field name="dosage_instructions"/>
                                     <field name="selected_orderable_code" optional="hide"/>
                                     <field name="selected_orderable_id" optional="hide"/>
                                     <field name="selected_lot_id" optional="hide"/>
                                     <field name="picking_fulfilment_line_id" optional="hide"/>
                                 </tree>
                             </field>
+                            <group class="o_cdu_regimen_schedule">
+                                <field name="duration_days" readonly="1"/>
+                                <field name="next_drug_pickup_date"
+                                       string="Next Refill Date"
+                                       readonly="1"/>
+                            </group>
                         </page>
                         <page string="Available CDU Production Floor Stock">
                             <div class="alert alert-info o_cdu_elmis_empty_stock_hint"

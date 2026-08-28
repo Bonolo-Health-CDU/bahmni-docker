@@ -77,7 +77,7 @@ class CduPrescription(models.Model):
                 }
                 for prescription in prescriptions
             ]
-            self.env["cdu.prescription.status.history"].with_context(
+            self.env["cdu.prescription.status.history"].sudo().with_context(
                 cdu_reporting_history_internal=True
             ).create(history_values)
         return prescriptions
@@ -110,8 +110,7 @@ class CduPrescription(models.Model):
                     }
                 )
             if history_values:
-                self.env["cdu.prescription.status.history"].with_context(
+                self.env["cdu.prescription.status.history"].sudo().with_context(
                     cdu_reporting_history_internal=True
                 ).create(history_values)
         return result
-

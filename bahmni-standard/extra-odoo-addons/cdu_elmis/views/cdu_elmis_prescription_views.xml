@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_prescription_form_elmis_products" model="ir.ui.view">
+        <field name="name">cdu.prescription.form.elmis.products</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('o_cdu_regimen_heading')]" position="inside">
+                <button name="action_refresh_elmis_product_catalog"
+                        string="Refresh eLMIS Products"
+                        type="object"
+                        class="btn btn-secondary mt-2"
+                        groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center', 'rejected_to_facility'))]}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -4,6 +4,7 @@ from unittest.mock import patch
 from lxml import etree
 
 from odoo import fields
+from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -161,3 +162,169 @@ class TestCduDispensingWorkflow(TransactionCase):
             self.admin
         ).action_reprint_dispensing_labels()
         self.assertEqual(action["type"], "ir.actions.report")
+
+    def test_regimen_products_have_independent_dosage_and_stable_order(self):
+        prescription = self._create_prescription("005", 30)
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create({"prescription_id": prescription.id})
+        first_line = dispense.stock_selection_ids
+        second_line = self.env["cdu.dispense.stock.selection"].create(
+            {
+                "dispense_id": dispense.id,
+                "openmrs_drug_name": "AAA Second Product",
+                "dosage_instructions": "Take two tablets at night.",
+            }
+        )
+
+        self.assertEqual(
+            first_line.dosage_instructions,
+            prescription.dosage_instructions,
+        )
+        first_line.dosage_instructions = "Take one tablet each morning."
+
+        self.assertEqual(
+            second_line.dosage_instructions,
+            "Take two tablets at night.",
+        )
+        self.assertEqual(
+            prescription.dosage_instructions,
+            "Take one tablet daily.",
+        )
+        self.assertEqual(dispense.stock_selection_ids, first_line | second_line)
+
+    def test_product_selection_supplies_the_regimen_product_name(self):
+        prescription = self._create_prescription("006", 30)
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create({"prescription_id": prescription.id})
+        option = self.env["cdu.dispense.stock.option"].create(
+            {
+                "dispense_id": dispense.id,
+                "facility_code": "TEST-CDU",
+                "program_code": "TEST-PROGRAM",
+                "orderable_code": "DYNAMIC-PRODUCT",
+                "orderable_name": "Dynamic Product",
+                "pack_size": 30,
+                "lot": "DYNAMIC-LOT",
+                "stock_on_hand": 20,
+            }
+        )
+
+        line = self.env["cdu.dispense.stock.selection"].create(
+            {
+                "dispense_id": dispense.id,
+                "stock_option_id": option.id,
+            }
+        )
+
+        self.assertEqual(line.openmrs_drug_name, "Dynamic Product")
+        self.assertEqual(
+            line.dosage_instructions,
+            prescription.dosage_instructions,
+        )
+
+    def test_elmis_stock_products_feed_verification_and_propagate_to_dispensing(self):
+        option_values = {
+            "batch_id": self.batch.id,
+            "facility_code": "TEST-CDU-STORE",
+            "program_code": "TEST-PROGRAM",
+            "orderable_code": "ELMIS-TLD-30",
+            "orderable_id": "ELMIS-TLD-UUID",
+            "orderable_name": "Tenofovir Lamivudine Dolutegravir Tablets 30",
+            "pack_size": 30,
+            "lot": "TLD-FEFO-LOT",
+            "stock_on_hand": 20,
+            "expiration_date": self.today + timedelta(days=365),
+        }
+        option = self.env["cdu.elmis.stock.option"].create(option_values)
+        product = self.env["product.product"].search(
+            [("product_tmpl_id.cdu_elmis_orderable_id", "=", "ELMIS-TLD-UUID")],
+            limit=1,
+        )
+        self.assertTrue(product)
+        self.assertTrue(product.product_tmpl_id.cdu_is_drug)
+        self.assertEqual(product.product_tmpl_id.cdu_pack_size, 30)
+
+        prescription = self._create_prescription("ELMIS-PROPAGATION", 30)
+        prescription.write(
+            {
+                "next_clinical_visit_date": self.today + timedelta(days=60),
+                "repeat_days": 30,
+            }
+        )
+        prescription.product_line_ids.with_context(
+            cdu_allow_product_line_sync=True
+        ).write(
+            {
+                "product_id": product.id,
+                "dosage_instructions": "Take one tablet every morning.",
+            }
+        )
+        self.batch._generate_elmis_picking_lines()
+        self.batch._apply_prescription_product_stock_options()
+
+        picking_line = self.batch.elmis_picking_line_ids.filtered(
+            lambda line: line.summary_line_id.product_id == product
+        )
+        self.assertTrue(picking_line)
+        self.assertEqual(
+            picking_line.fulfilment_line_ids.selected_stock_option_id,
+            option,
+        )
+
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create({"prescription_id": prescription.id})
+        dispense_line = dispense.stock_selection_ids.filtered(
+            lambda line: line.selected_orderable_id == "ELMIS-TLD-UUID"
+        )
+        self.assertTrue(dispense_line)
+        self.assertEqual(
+            dispense_line.dosage_instructions,
+            "Take one tablet every morning.",
+        )
+
+    def test_regimen_products_are_locked_after_confirmation(self):
+        prescription = self._create_prescription("007", 30)
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create({"prescription_id": prescription.id})
+        line = dispense.stock_selection_ids
+        dispense.state = "confirmed"
+
+        with self.assertRaises(ValidationError):
+            line.write({"dosage_instructions": "Changed after confirmation"})
+        with self.assertRaises(ValidationError):
+            line.unlink()
+        with self.assertRaises(ValidationError):
+            self.env["cdu.dispense.stock.selection"].create(
+                {
+                    "dispense_id": dispense.id,
+                    "openmrs_drug_name": "Late Product",
+                }
+            )
+
+    def test_regimen_view_uses_an_inline_dynamic_product_list(self):
+        view = self.env.ref("cdu_elmis.view_cdu_dispense_form")
+        arch = etree.fromstring(view.arch_db.encode())
+        product_list = arch.xpath(".//field[@name='stock_selection_ids']")[0]
+        tree = product_list.xpath("./tree")[0]
+        field_names = [field.get("name") for field in tree.xpath("./field")]
+
+        self.assertEqual(tree.get("editable"), "bottom")
+        self.assertEqual(
+            tree.xpath("./control/create")[0].get("string"),
+            "Add Product",
+        )
+        self.assertIn("state", product_list.get("attrs"))
+        self.assertLess(
+            field_names.index("stock_option_id"),
+            field_names.index("dosage_instructions"),
+        )
+        self.assertTrue(arch.xpath(".//field[@name='duration_days']"))
+        self.assertTrue(
+            arch.xpath(
+                ".//field[@name='next_drug_pickup_date'][@string='Next Refill Date']"
+            )
+        )

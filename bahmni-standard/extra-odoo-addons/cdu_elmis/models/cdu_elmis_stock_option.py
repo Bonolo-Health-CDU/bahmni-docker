@@ -41,6 +41,12 @@ class CduElmisStockOption(models.Model):
     )
     name = fields.Char(compute="_compute_name", store=True)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        self.env["product.template"]._sync_cdu_elmis_product_catalog(vals_list)
+        return records
+
     def init(self):
         self.env.cr.execute(
             """

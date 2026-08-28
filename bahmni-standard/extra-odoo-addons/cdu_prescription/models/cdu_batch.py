@@ -549,7 +549,6 @@ class CduBatch(models.Model):
                 prescription.total_days_supply or 0
             )
 
-            regimen = prescription.regimen_id
             prescription_repeat_days = prescription.repeat_days or 0
             regimen_repeat_days = prescription_repeat_days
             effective_repeat_days = prescription_repeat_days
@@ -557,23 +556,43 @@ class CduBatch(models.Model):
             if operational_days <= 0:
                 continue
 
-            # If there is no regimen, we create a virtual line for the raw drug name
-            # to ensure it appears in the picking list.
-            lines = regimen.line_ids if regimen else [None]
+            # The prescription line selected during verification is authoritative.
+            # Older records without product lines retain the former regimen/raw fallback.
+            if prescription.product_line_ids:
+                medicines = [
+                    (
+                        line.product_id,
+                        (
+                            line.product_id.product_tmpl_id.cdu_default_daily_dose
+                            if line.product_id
+                            else 1.0
+                        ),
+                        (
+                            line.product_id.display_name
+                            if line.product_id
+                            else line.imported_product_name
+                        ),
+                    )
+                    for line in prescription.product_line_ids.sorted(
+                        key=lambda product_line: (product_line.sequence, product_line.id)
+                    )
+                ]
+            elif prescription.regimen_id:
+                medicines = [
+                    (line.product_id, line.daily_dose or 0, line.product_id.display_name)
+                    for line in prescription.regimen_id.line_ids
+                ]
+            else:
+                medicines = [
+                    (
+                        self.env["product.product"],
+                        1.0,
+                        (prescription.regimen_prescribed_raw or "Unknown Drug").strip(),
+                    )
+                ]
 
-            for line in lines:
-
-                if line is not None:
-                    product = line.product_id
-                    daily_dose = line.daily_dose or 0
-                    pack_size = product.product_tmpl_id.cdu_pack_size or 0
-                    drug_name = product.display_name
-                else:
-                    # Fallback for unmapped prescriptions
-                    product = self.env['product.product'] # Empty
-                    daily_dose = 1.0 # Assume 1 unit/day
-                    pack_size = 0
-                    drug_name = (prescription.regimen_prescribed_raw or "Unknown Drug").strip()
+            for product, daily_dose, drug_name in medicines:
+                pack_size = product.product_tmpl_id.cdu_pack_size if product else 0
 
                 if not drug_name:
                     continue

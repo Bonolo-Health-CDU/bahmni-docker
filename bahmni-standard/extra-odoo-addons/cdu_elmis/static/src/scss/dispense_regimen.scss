@@ -1,0 +1,44 @@
+.o_cdu_regimen_product_list {
+    .o_list_table {
+        table-layout: fixed;
+    }
+
+    .o_cdu_regimen_product_column {
+        width: 35%;
+    }
+
+    .o_cdu_regimen_dosage_column {
+        width: 50%;
+        white-space: normal;
+    }
+}
+
+.o_cdu_regimen_schedule {
+    margin-top: 1rem;
+}
+
+@media (max-width: 767.98px) {
+    .o_cdu_regimen_product_list {
+        .o_list_table {
+            table-layout: auto;
+        }
+
+        th[data-name="dispensed_units"],
+        td[name="dispensed_units"] {
+            display: none;
+        }
+
+        .o_cdu_regimen_product_column,
+        .o_cdu_regimen_dosage_column {
+            width: auto;
+        }
+    }
+
+    .o_cdu_regimen_schedule.o_group {
+        display: block;
+
+        .o_group_col_6 {
+            width: 100%;
+        }
+    }
+}

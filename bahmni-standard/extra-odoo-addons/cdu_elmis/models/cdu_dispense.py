@@ -58,6 +58,11 @@ class CduDispense(models.Model):
         store=True,
         readonly=True,
     )
+    duration_days = fields.Integer(
+        string="Duration Days",
+        related="prescription_id.cdu_days_supply",
+        readonly=True,
+    )
     collection_point_id = fields.Many2one(
         "cdu.collection.point",
         related="prescription_id.collection_point_id",
@@ -175,6 +180,23 @@ class CduDispense(models.Model):
                 if matched:
                     fulfilment_lines = matched
 
+            if not fulfilment_lines and prescription.product_line_ids:
+                for prescription_line in prescription.product_line_ids:
+                    self.env["cdu.dispense.stock.selection"].create(
+                        {
+                            "dispense_id": dispense.id,
+                            "openmrs_drug_name": (
+                                prescription_line.product_id.display_name
+                                or prescription_line.imported_product_name
+                            ),
+                            "quantity_dispensed": 1,
+                            "dosage_instructions": (
+                                prescription_line.dosage_instructions
+                            ),
+                        }
+                    )
+                continue
+
             if not fulfilment_lines and prescription.regimen_prescribed_raw:
                 self.env["cdu.dispense.stock.selection"].create(
                     {
@@ -203,6 +225,31 @@ class CduDispense(models.Model):
                         if prescription_count
                         else line.quantity_picked
                     )
+                product = (
+                    patient_line.product_id
+                    or line.picking_line_id.summary_line_id.product_id
+                )
+                prescription_line = prescription.product_line_ids.filtered(
+                    lambda product_line, product=product: (
+                        product
+                        and product_line.product_id == product
+                    )
+                )[:1]
+                if not prescription_line:
+                    candidate_names = {
+                        (line.openmrs_drug_name or "").strip().lower(),
+                        (line.selected_orderable_name or "").strip().lower(),
+                    }
+                    prescription_line = prescription.product_line_ids.filtered(
+                        lambda product_line, candidate_names=candidate_names: (
+                            (
+                                product_line.imported_product_name
+                                or product_line.product_id.display_name
+                                or ""
+                            ).strip().lower()
+                            in candidate_names
+                        )
+                    )[:1]
                 self.env["cdu.dispense.stock.selection"].create(
                     {
                         "dispense_id": dispense.id,
@@ -218,6 +265,11 @@ class CduDispense(models.Model):
                         "selected_lot_expiry": line.selected_lot_expiry,
                         "selected_stock_on_hand": line.selected_stock_on_hand,
                         "quantity_dispensed": quantity or 1,
+                        "dosage_instructions": (
+                            prescription_line.dosage_instructions
+                            if prescription_line
+                            else prescription.dosage_instructions
+                        ),
                     }
                 )
 

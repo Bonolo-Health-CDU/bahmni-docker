@@ -20,6 +20,7 @@ class CduElmisStockService(models.AbstractModel):
         program_code=None,
         use_cache=True,
         batch=None,
+        use_user_token=True,
     ):
         program_code = program_code or self._get_required_param(
             "cdu.elmis.default_program_code",
@@ -45,7 +46,7 @@ class CduElmisStockService(models.AbstractModel):
             params["orderableCode"] = orderable_code
 
         try:
-            auth = self._auth_context(use_user_token=True)
+            auth = self._auth_context(use_user_token=use_user_token)
             response = requests.get(
                 endpoint,
                 params=params,
@@ -82,10 +83,35 @@ class CduElmisStockService(models.AbstractModel):
                 success=False,
                 error_message=str(error)[:250],
                 batch=batch,
-                auth_mode="user_token",
-                elmis_username=self.env.user.cdu_elmis_username,
+                auth_mode="user_token" if use_user_token else "system_api_key",
+                elmis_username=(
+                    self.env.user.cdu_elmis_username if use_user_token else False
+                ),
             )
             raise UserError("Could not reach eLMIS for stock query: %s" % error) from error
+
+    def refresh_product_catalog(self):
+        """Refresh the verification-stage medicine list from current CDU stock."""
+        params = self.env["ir.config_parameter"].sudo()
+        facility_code = self._get_required_param(
+            "cdu.elmis.cdu_store_facility_code", "CDU Store Facility Code"
+        )
+        program_code = self._get_required_param(
+            "cdu.elmis.default_program_code", "Default Program Code"
+        )
+        payload = self.get_stock_card_summaries(
+            facility_code=facility_code,
+            program_code=program_code,
+            use_cache=False,
+            use_user_token=False,
+        )
+        parser = self.env["cdu.batch"].new({})
+        values = parser._stock_options_from_payload(
+            payload,
+            facility_code=facility_code,
+            program_code=program_code,
+        )
+        return self.env["product.template"]._sync_cdu_elmis_product_catalog(values)
 
     def post_stock_event(self, facility_code, program_code, items, call_type, batch=None):
         if not items:

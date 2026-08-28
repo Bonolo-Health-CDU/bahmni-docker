@@ -202,6 +202,7 @@ class CduBatch(models.Model):
             
             for item in summary_vals:
                 product = self.env["product.product"].browse(item["product_id"]).exists()
+                template = product.product_tmpl_id if product else self.env["product.template"]
                 elmis_line_vals.append({
                     "batch_id": batch.id,
                     "openmrs_drug_name": item["unmapped_drug_name"],
@@ -210,6 +211,9 @@ class CduBatch(models.Model):
                         if product
                         else False
                     ),
+                    "selected_orderable_code": template.cdu_drug_code or False,
+                    "selected_orderable_id": template.cdu_elmis_orderable_id or False,
+                    "selected_orderable_name": product.display_name or False,
                     "quantity_to_pick": item["total_bottles"] or 0.0,
                     "prescription_count": item["prescription_count"],
                 })
@@ -1060,6 +1064,46 @@ class CduBatch(models.Model):
         if option_values:
             self.env["cdu.elmis.stock.option"].create(option_values)
         self._rebuild_elmis_stock_summaries()
+        self._apply_prescription_product_stock_options()
+
+    def _apply_prescription_product_stock_options(self):
+        """Carry verification product choices into picking and select their FEFO lot."""
+        for batch in self:
+            batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
+            for picking_line in batch.elmis_picking_line_ids:
+                product = picking_line.summary_line_id.product_id
+                template = product.product_tmpl_id
+                if not template:
+                    continue
+                orderable_id = template.cdu_elmis_orderable_id
+                orderable_code = template.cdu_drug_code
+                if not orderable_id and not orderable_code:
+                    continue
+                fulfilment_line = picking_line.fulfilment_line_ids.filtered(
+                    lambda line: not line.selected_stock_option_id
+                )[:1]
+                if not fulfilment_line:
+                    continue
+                options = batch.elmis_stock_option_ids.filtered(
+                    lambda option: (
+                        orderable_id
+                        and option.orderable_id == orderable_id
+                    )
+                    or (
+                        orderable_code
+                        and option.orderable_code == orderable_code
+                    )
+                )
+                if not options:
+                    continue
+                option = options.sorted(
+                    key=lambda stock: (
+                        stock.expiration_date or fields.Date.to_date("9999-12-31"),
+                        stock.lot or "",
+                        stock.id,
+                    )
+                )[:1]
+                fulfilment_line.selected_stock_option_id = option.id
 
     def _rebuild_elmis_stock_summaries(self):
         Summary = self.env["cdu.elmis.stock.summary"]

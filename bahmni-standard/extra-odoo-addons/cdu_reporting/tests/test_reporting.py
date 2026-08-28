@@ -37,6 +37,13 @@ class TestCduReporting(TransactionCase):
                 "cdu_date_of_birth": cls.today.replace(year=cls.today.year - 30),
             }
         )
+        cls.product = cls.env["product.template"].create(
+            {
+                "name": "Reporting TDF/3TC/DTG",
+                "type": "product",
+                "cdu_is_drug": True,
+            }
+        ).product_variant_id
         cls.batch = cls.env["cdu.batch"].create({})
 
         cls.completed = cls._create_prescription("COMPLETED", "new", cls.facility)
@@ -58,7 +65,8 @@ class TestCduReporting(TransactionCase):
                 }
             )
         cls.dispense = cls.env["cdu.dispense"].with_context(
-            cdu_skip_auto_refresh_production_stock=True
+            cdu_skip_auto_refresh_production_stock=True,
+            cdu_allow_dispense_line_sync=True,
         ).create(
             {
                 "prescription_id": cls.completed.id,
@@ -67,8 +75,12 @@ class TestCduReporting(TransactionCase):
                 "confirmed_at": cls.now,
             }
         )
-        cls.dispense.stock_selection_ids.unlink()
-        cls.env["cdu.dispense.stock.selection"].create(
+        cls.dispense.with_context(
+            cdu_allow_dispense_line_sync=True
+        ).stock_selection_ids.unlink()
+        cls.env["cdu.dispense.stock.selection"].with_context(
+            cdu_allow_dispense_line_sync=True
+        ).create(
             [
                 {
                     "dispense_id": cls.dispense.id,
@@ -152,7 +164,7 @@ class TestCduReporting(TransactionCase):
 
     @classmethod
     def _create_prescription(cls, suffix, new_or_revisit, facility):
-        return cls.env["cdu.prescription"].create(
+        prescription = cls.env["cdu.prescription"].create(
             {
                 "source_key": "RPT-%s" % suffix,
                 "facility_id": facility.id,
@@ -163,8 +175,11 @@ class TestCduReporting(TransactionCase):
                 "next_drug_pickup_date": cls.today + timedelta(days=30),
                 "collection_point_id": cls.pup.id,
                 "regimen_prescribed_raw": "TDF/3TC/DTG",
+                "dosage_instructions": "Take one tablet daily.",
             }
         )
+        prescription.product_line_ids.product_id = cls.product.id
+        return prescription
 
     @classmethod
     def _reject(cls, prescription, stage):
@@ -251,6 +266,22 @@ class TestCduReporting(TransactionCase):
             self.assertIn(state, states)
         with self.assertRaises(AccessError):
             self.completed.status_history_ids[:1].write({"reason": "Changed"})
+
+    def test_operational_user_transition_creates_system_managed_history(self):
+        data_clerk = self.env.ref("cdu_prescription.user_cdu_data_clerk")
+        prescription = self._create_prescription(
+            "DATA-CLERK-HISTORY",
+            "new",
+            self.facility,
+        )
+
+        prescription.with_user(data_clerk).action_mark_patient_verified()
+        history = prescription.status_history_ids.filtered(
+            lambda event: event.new_status == "awaiting_validation"
+        )
+
+        self.assertTrue(history)
+        self.assertEqual(history[:1].changed_by, data_clerk)
 
     def test_wizard_filters_and_exports_same_dataset(self):
         wizard = self.env["cdu.report.wizard"].create(

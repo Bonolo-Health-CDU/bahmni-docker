@@ -14,6 +14,34 @@ class CduPrescription(models.Model):
         )
     )
 
+    def action_refresh_elmis_product_catalog(self):
+        self.ensure_one()
+        self._ensure_cdu_groups(
+            "cdu_prescription.group_cdu_data_clerk",
+            "cdu_prescription.group_cdu_dispensing_officer",
+        )
+        self._ensure_states(
+            (
+                "awaiting_verification",
+                "awaiting_validation",
+                "rejected_to_call_center",
+                "rejected_to_facility",
+            )
+        )
+        products = self.env["cdu.elmis.stock.service"].refresh_product_catalog()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("eLMIS products refreshed"),
+                "message": _("%s available medicines are ready for selection.")
+                % len(products),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
     def action_open_dispensing(self):
         self.ensure_one()
         self._ensure_cdu_groups(

@@ -34,6 +34,62 @@
     color: #4f5b66;
 }
 
+.o_cdu_prescription_form .o_cdu_regimen_heading {
+    border-bottom: 2px solid #005baa;
+    margin: 4px 0 12px;
+    padding-bottom: 8px;
+}
+
+.o_cdu_prescription_form .o_cdu_regimen_heading h3 {
+    color: #173a5e;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 3px;
+}
+
+.o_cdu_prescription_form .o_cdu_regimen_heading p {
+    color: #5f6b78;
+    margin: 0;
+}
+
+.o_cdu_prescription_form .o_cdu_prescription_regimen_list .o_list_table {
+    table-layout: fixed;
+}
+
+.o_cdu_prescription_form .o_cdu_prescription_regimen_list .o_cdu_regimen_product_column {
+    width: 35%;
+}
+
+.o_cdu_prescription_form .o_cdu_prescription_regimen_list .o_cdu_regimen_dosage_column {
+    width: 50%;
+    white-space: normal;
+}
+
+.o_cdu_prescription_form .o_cdu_regimen_schedule {
+    margin-top: 16px;
+}
+
+@media (max-width: 767.98px) {
+    .o_cdu_prescription_form .o_cdu_prescription_regimen_list .o_list_table {
+        table-layout: auto;
+    }
+
+    .o_cdu_prescription_form .o_cdu_prescription_regimen_list :is(
+        .o_cdu_regimen_product_column,
+        .o_cdu_regimen_dosage_column
+    ) {
+        width: auto;
+    }
+
+    .o_cdu_prescription_form .o_cdu_regimen_schedule.o_group {
+        display: block;
+    }
+
+    .o_cdu_prescription_form .o_cdu_regimen_schedule .o_group_col_6 {
+        width: 100%;
+    }
+}
+
 .o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) .o_input,
 .o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) input,
 .o_cdu_prescription_form .o_required_modifier:not(.o_readonly_modifier) textarea,

@@ -61,6 +61,11 @@ class CduPrescription(models.Model):
     latest_vl_result = fields.Char(string="Latest VL Result")
     regimen_prescribed_raw = fields.Char(string="Regimen Prescribed")
     dosage_instructions = fields.Text(string="Dosage Instructions")
+    product_line_ids = fields.One2many(
+        "cdu.prescription.product.line",
+        "prescription_id",
+        string="Regimen Products",
+    )
     regimen_id = fields.Many2one(
         "cdu.regimen",
         string="Mapped Regimen",
@@ -215,6 +220,7 @@ class CduPrescription(models.Model):
                 vals["regimen_id"] = regimen.id
 
         prescription = super().create(vals)
+        prescription._seed_product_lines()
         prescription._sync_repeat_days_from_cdu_days()
         prescription._check_required_next_drug_pickup_date()
 
@@ -245,6 +251,40 @@ class CduPrescription(models.Model):
         if "next_drug_pickup_date" in vals:
             self._check_required_next_drug_pickup_date()
         return result
+
+    def _seed_product_lines(self):
+        ProductLine = self.env["cdu.prescription.product.line"]
+        for prescription in self.filtered(lambda record: not record.product_line_ids):
+            values = []
+            if prescription.regimen_id.line_ids:
+                for index, regimen_line in enumerate(
+                    prescription.regimen_id.line_ids, start=1
+                ):
+                    values.append(
+                        {
+                            "prescription_id": prescription.id,
+                            "sequence": index * 10,
+                            "product_id": regimen_line.product_id.id,
+                            "imported_product_name": regimen_line.product_id.display_name,
+                            "dosage_instructions": prescription.dosage_instructions,
+                            "source": "regimen",
+                        }
+                    )
+            elif prescription.regimen_prescribed_raw or prescription.dosage_instructions:
+                raw_product = (prescription.regimen_prescribed_raw or "").split(
+                    "=", 1
+                )[-1].strip()
+                values.append(
+                    {
+                        "prescription_id": prescription.id,
+                        "sequence": 10,
+                        "imported_product_name": raw_product or False,
+                        "dosage_instructions": prescription.dosage_instructions,
+                        "source": "legacy",
+                    }
+                )
+            if values:
+                ProductLine.with_context(cdu_allow_product_line_sync=True).create(values)
     
     def _check_required_next_drug_pickup_date(self):
         for prescription in self:
@@ -366,6 +406,18 @@ class CduPrescription(models.Model):
     def action_mark_patient_verified(self):
         self._ensure_cdu_groups("cdu_prescription.group_cdu_data_clerk")
         self._ensure_states(("awaiting_verification",))
+        errors_by_prescription = []
+        for prescription in self:
+            missing = prescription._get_regimen_product_errors()
+            if missing:
+                errors_by_prescription.append(
+                    "%s: %s" % (prescription.display_name, ", ".join(missing))
+                )
+        if errors_by_prescription:
+            raise ValidationError(
+                _("Verification cannot continue. Please complete:\n%s")
+                % "\n".join(errors_by_prescription)
+            )
         self.write({
             "state": "awaiting_validation",
             "verified_by": self.env.user.id,
@@ -547,12 +599,24 @@ class CduPrescription(models.Model):
             missing.append("patient")
         if not self.drug_pickup_point_raw and not self.collection_point_id:
             missing.append("drug pickup point")
-        if not self.regimen_prescribed_raw:
-            missing.append("regimen prescribed")
-        if not (self.dosage_instructions or "").strip():
-            missing.append("dosage instructions")
+        missing.extend(self._get_regimen_product_errors())
         if not self.next_drug_pickup_date:
             missing.append("next drug pickup date")
+        return missing
+
+    def _get_regimen_product_errors(self):
+        self.ensure_one()
+        missing = []
+        if not self.product_line_ids:
+            missing.append("at least one regimen product")
+            return missing
+        if any(not line.product_id for line in self.product_line_ids):
+            missing.append("selected product for every regimen row")
+        if any(
+            not (line.dosage_instructions or "").strip()
+            for line in self.product_line_ids
+        ):
+            missing.append("dosage instructions for every regimen product")
         return missing
 
     @api.depends(

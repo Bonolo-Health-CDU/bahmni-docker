@@ -151,19 +151,51 @@
                             </group>
                         </page>
                         <page string="Prescription">
+                            <div class="o_cdu_regimen_heading">
+                                <h3>Regimen</h3>
+                                <p>Add or remove products directly in the table. Each product has its own dosage instructions.</p>
+                            </div>
+                            <field name="product_line_ids"
+                                   string="Regimen Products"
+                                   class="o_cdu_prescription_regimen_list"
+                                   attrs="{'readonly': [('state', 'not in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center', 'rejected_to_facility'))]}">
+                                <tree editable="bottom" default_order="sequence, id">
+                                    <control>
+                                        <create string="Add Product"/>
+                                    </control>
+                                    <field name="sequence" invisible="1"/>
+                                    <field name="product_id"
+                                           string="Product"
+                                           class="o_cdu_regimen_product_column"
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="imported_product_name"
+                                           string="Imported Product / Regimen"
+                                           readonly="1"/>
+                                    <field name="dosage_instructions"
+                                           string="Dosage / Instructions"
+                                           class="o_cdu_regimen_dosage_column"/>
+                                    <field name="source" optional="hide"/>
+                                </tree>
+                            </field>
+                            <group class="o_cdu_regimen_schedule">
+                                <field name="cdu_days_supply"
+                                       string="Duration Days"
+                                       readonly="1"/>
+                                <field name="next_drug_pickup_date"
+                                       string="Next Refill Date"
+                                       required="1"/>
+                            </group>
                             <group class="o_cdu_section_grid">
-                                <group string="Medicine" class="o_cdu_section_card">
-                                    <field name="regimen_prescribed_raw"/>
-                                    <field name="dosage_instructions"/>
+                                <group string="Prescription Source" class="o_cdu_section_card">
+                                    <field name="regimen_prescribed_raw" string="Imported Regimen"/>
+                                    <field name="dosage_instructions" invisible="1"/>
                                     <field name="prescriber_name"/>
-                                    <field name="next_drug_pickup_date" required="1"/>
                                     <field name="regimen_id"/>
                                 </group>
                                 <group string="Collection &amp; Supply" class="o_cdu_section_card">
                                     <field name="collection_point_id"/>
                                     <field name="e_locker_district"/>
                                     <field name="facility_days_supply" readonly="1"/>
-                                    <field name="cdu_days_supply" readonly="1"/>
                                 </group>
                             </group>
                         </page>

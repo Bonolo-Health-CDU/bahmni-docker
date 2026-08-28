@@ -18,6 +18,7 @@
         "wizards/cdu_elmis_auth_wizard_views.xml",
         "wizards/cdu_elmis_picking_wizard_views.xml",
         "wizards/cdu_label_print_wizard_views.xml",
+        "views/cdu_elmis_prescription_views.xml",
         "views/cdu_dispense_views.xml",
         "views/cdu_bagging_qa_views.xml",
         "views/cdu_box_views.xml",
@@ -35,6 +36,7 @@
     "assets": {
         "web.assets_backend": [
             "cdu_elmis/static/src/scss/box_bag_label_scanner.scss",
+            "cdu_elmis/static/src/scss/dispense_regimen.scss",
             "cdu_elmis/static/src/js/no_trailing_zeros_float_field.js",
             "cdu_elmis/static/src/js/dispensing_labels_print.js",
             "cdu_elmis/static/src/js/box_parcel_scanner.js",
