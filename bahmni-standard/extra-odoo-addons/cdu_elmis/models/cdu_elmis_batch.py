@@ -198,27 +198,10 @@ class CduBatch(models.Model):
         for batch in self:
             patient_line_vals, summary_vals = batch._prepare_picking_line_values()
 
-            elmis_line_vals = []
-            
-            for item in summary_vals:
-                product = self.env["product.product"].browse(item["product_id"]).exists()
-                template = product.product_tmpl_id if product else self.env["product.template"]
-                elmis_line_vals.append({
-                    "batch_id": batch.id,
-                    "openmrs_drug_name": item["unmapped_drug_name"],
-                    "openmrs_drug_uuid": (
-                        product.product_tmpl_id.cdu_openmrs_drug_uuid
-                        if product
-                        else False
-                    ),
-                    "selected_orderable_code": template.cdu_drug_code or False,
-                    "selected_orderable_id": template.cdu_elmis_orderable_id or False,
-                    "selected_orderable_name": product.display_name or False,
-                    "quantity_to_pick": item["total_bottles"] or 0.0,
-                    "prescription_count": item["prescription_count"],
-                })
-            
-            # Use write with command tuples to ensure generated lines are refreshed in UI.
+            # Summary lines are grouped by product ID, so create them before the
+            # eLMIS lines and link the records directly. Linking by display name
+            # is ambiguous when separate product records share the same name.
+            batch.elmis_picking_line_ids.unlink()
             batch.write({
                 "patient_picking_line_ids": [(5, 0, 0)] + [
                     (0, 0, values) for values in patient_line_vals
@@ -226,10 +209,31 @@ class CduBatch(models.Model):
                 "picking_line_ids": [(5, 0, 0)] + [
                     (0, 0, values) for values in summary_vals
                 ],
-                "elmis_picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in elmis_line_vals]
             })
             batch.flush_recordset(["patient_picking_line_ids", "picking_line_ids"])
-            batch._link_elmis_lines_to_summary_lines()
+
+            elmis_line_vals = []
+
+            for summary_line in batch.picking_line_ids:
+                product = summary_line.product_id
+                template = product.product_tmpl_id if product else self.env["product.template"]
+                elmis_line_vals.append({
+                    "batch_id": batch.id,
+                    "summary_line_id": summary_line.id,
+                    "openmrs_drug_name": summary_line.unmapped_drug_name,
+                    "openmrs_drug_uuid": (
+                        template.cdu_openmrs_drug_uuid
+                        if product
+                        else False
+                    ),
+                    "selected_orderable_code": template.cdu_drug_code or False,
+                    "selected_orderable_id": template.cdu_elmis_orderable_id or False,
+                    "selected_orderable_name": product.display_name or False,
+                    "quantity_to_pick": summary_line.total_bottles or 0.0,
+                    "prescription_count": summary_line.prescription_count,
+                })
+
+            self.env["cdu.picking.line"].create(elmis_line_vals)
             batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
 
     def _generate_unmapped_elmis_picking_lines(self, mapped_prescription_ids):
@@ -656,15 +660,51 @@ class CduBatch(models.Model):
 
     def _link_elmis_lines_to_summary_lines(self):
         for batch in self:
-            summary_lines_by_name = {
-                (line.unmapped_drug_name or "").strip().lower(): line
-                for line in batch.picking_line_ids
-            }
+            used_summary_lines = batch.elmis_picking_line_ids.mapped("summary_line_id")
             for line in batch.elmis_picking_line_ids:
+                if (
+                    line.summary_line_id
+                    and line.summary_line_id.batch_id == batch
+                ):
+                    continue
                 key = (line.openmrs_drug_name or "").strip().lower()
-                summary_line = summary_lines_by_name.get(key)
-                if summary_line:
-                    line.summary_line_id = summary_line.id
+                candidates = batch.picking_line_ids.filtered(
+                    lambda summary_line: (
+                        (summary_line.unmapped_drug_name or "").strip().lower() == key
+                        and summary_line not in used_summary_lines
+                    )
+                )
+                if not candidates:
+                    continue
+
+                # Stable integration identifiers disambiguate legacy unlinked
+                # rows where possible. The first unused same-name summary is a
+                # safe final fallback because the relationship is one-to-one.
+                matching_candidates = candidates.filtered(
+                    lambda summary_line: (
+                        summary_line.product_id
+                        and (
+                            (
+                                line.openmrs_drug_uuid
+                                and summary_line.product_id.product_tmpl_id.cdu_openmrs_drug_uuid
+                                == line.openmrs_drug_uuid
+                            )
+                            or (
+                                line.selected_orderable_id
+                                and summary_line.product_id.product_tmpl_id.cdu_elmis_orderable_id
+                                == line.selected_orderable_id
+                            )
+                            or (
+                                line.selected_orderable_code
+                                and summary_line.product_id.product_tmpl_id.cdu_drug_code
+                                == line.selected_orderable_code
+                            )
+                        )
+                    )
+                )
+                summary_line = (matching_candidates or candidates).sorted("id")[:1]
+                line.summary_line_id = summary_line.id
+                used_summary_lines |= summary_line
 
     def _build_picking_stock_event_items(self, reason_name):
         self.ensure_one()

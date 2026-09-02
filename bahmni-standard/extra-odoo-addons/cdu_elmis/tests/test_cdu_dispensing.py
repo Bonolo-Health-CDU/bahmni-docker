@@ -285,6 +285,71 @@ class TestCduDispensingWorkflow(TransactionCase):
             "Take one tablet every morning.",
         )
 
+    def test_picking_generation_links_same_named_products_by_summary_id(self):
+        product_name = "Same Named Multi-line Medicine"
+        first_template = self.env["product.template"].create(
+            {
+                "name": product_name,
+                "type": "product",
+                "cdu_is_drug": True,
+                "cdu_pack_size": 30,
+                "cdu_default_daily_dose": 1,
+                "cdu_drug_code": "SAME-NAME-ONE",
+            }
+        )
+        second_template = self.env["product.template"].create(
+            {
+                "name": product_name,
+                "type": "product",
+                "cdu_is_drug": True,
+                "cdu_pack_size": 60,
+                "cdu_default_daily_dose": 2,
+                "cdu_drug_code": "SAME-NAME-TWO",
+            }
+        )
+        prescription = self._create_prescription("SAME-NAME-PRODUCTS", 30)
+        prescription.write(
+            {
+                "cdu_days_supply": 30,
+                "repeat_days": 30,
+                "total_days_supply": 30,
+            }
+        )
+        product_lines = prescription.product_line_ids.with_context(
+            cdu_allow_product_line_sync=True
+        )
+        product_lines.write({"product_id": first_template.product_variant_id.id})
+        self.env["cdu.prescription.product.line"].with_context(
+            cdu_allow_product_line_sync=True
+        ).create(
+            {
+                "prescription_id": prescription.id,
+                "sequence": 20,
+                "product_id": second_template.product_variant_id.id,
+                "source": "manual",
+            }
+        )
+
+        self.batch._generate_elmis_picking_lines()
+
+        self.assertEqual(len(self.batch.picking_line_ids), 2)
+        self.assertEqual(len(self.batch.elmis_picking_line_ids), 2)
+        self.assertSetEqual(
+            set(self.batch.elmis_picking_line_ids.mapped("summary_line_id").ids),
+            set(self.batch.picking_line_ids.ids),
+        )
+        self.assertSetEqual(
+            set(
+                self.batch.elmis_picking_line_ids.mapped(
+                    "summary_line_id.product_id"
+                ).ids
+            ),
+            {
+                first_template.product_variant_id.id,
+                second_template.product_variant_id.id,
+            },
+        )
+
     def test_regimen_products_are_locked_after_confirmation(self):
         prescription = self._create_prescription("007", 30)
         dispense = self.env["cdu.dispense"].with_context(
