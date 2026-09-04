@@ -113,7 +113,9 @@ class TestCduBoxingWorkflow(TransactionCase):
                 self.assertIn('name="%s"' % filter_name, search_view.arch_db)
 
     def test_dispensed_units_are_computed_and_packs_are_hidden_by_default(self):
-        selection = self.env["cdu.dispense.stock.selection"].create(
+        selection = self.env["cdu.dispense.stock.selection"].with_context(
+            cdu_allow_dispense_line_sync=True
+        ).create(
             {
                 "dispense_id": self.dispense.id,
                 "openmrs_drug_name": "TEST-BOXING-REGIMEN",

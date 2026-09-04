@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <xpath expr="//div[hasclass('o_cdu_regimen_heading')]" position="inside">
                 <button name="action_refresh_elmis_product_catalog"
-                        string="Refresh eLMIS Products"
+                        string="Refresh Medicine Catalogue"
                         type="object"
                         class="btn btn-secondary mt-2"
                         groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"

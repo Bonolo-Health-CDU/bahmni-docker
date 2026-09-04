@@ -21,12 +21,16 @@ class CduElmisStockService(models.AbstractModel):
         use_cache=True,
         batch=None,
         use_user_token=True,
+        non_empty_only=True,
     ):
         program_code = program_code or self._get_required_param(
             "cdu.elmis.default_program_code",
             "Default Program Code",
         )
-        orderable_key = orderable_code or "ALL"
+        orderable_key = "%s:%s" % (
+            orderable_code or "ALL",
+            "NONEMPTY" if non_empty_only else "CATALOGUE",
+        )
 
         if use_cache:
             cached = self.get_cached_stock(facility_code, program_code, orderable_key)
@@ -40,7 +44,7 @@ class CduElmisStockService(models.AbstractModel):
         params = {
             "facilityId": facility_id,
             "programId": program_id,
-            "nonEmptyOnly": "true",
+            "nonEmptyOnly": "true" if non_empty_only else "false",
         }
         if orderable_code:
             params["orderableCode"] = orderable_code
@@ -91,8 +95,7 @@ class CduElmisStockService(models.AbstractModel):
             raise UserError("Could not reach eLMIS for stock query: %s" % error) from error
 
     def refresh_product_catalog(self):
-        """Refresh the verification-stage medicine list from current CDU stock."""
-        params = self.env["ir.config_parameter"].sudo()
+        """Refresh the local clinical catalogue, including items with no usable stock."""
         facility_code = self._get_required_param(
             "cdu.elmis.cdu_store_facility_code", "CDU Store Facility Code"
         )
@@ -104,14 +107,144 @@ class CduElmisStockService(models.AbstractModel):
             program_code=program_code,
             use_cache=False,
             use_user_token=False,
+            non_empty_only=False,
         )
-        parser = self.env["cdu.batch"].new({})
-        values = parser._stock_options_from_payload(
-            payload,
+        eligible = self._eligible_orderables_from_stock_summaries(payload)
+        eligible_ids = set(eligible)
+        reference_orderables = self._get_all_reference_records(
+            "api/orderables", {"size": 2000}
+        )
+        values = []
+        for record in reference_orderables:
+            orderable_id = str(record.get("id") or "").strip()
+            if orderable_id not in eligible_ids:
+                continue
+            values.append(self._catalog_values_from_orderable(record, eligible[orderable_id]))
+
+        resolved_ids = {value["orderable_id"] for value in values}
+        for orderable_id, fallback in eligible.items():
+            if orderable_id in resolved_ids:
+                continue
+            fallback_values = self._catalog_values_from_orderable(fallback, fallback)
+            if fallback_values.get("orderable_name"):
+                values.append(fallback_values)
+
+        products = self.env["product.template"]._sync_cdu_elmis_product_catalog(
+            values,
             facility_code=facility_code,
             program_code=program_code,
+            complete=True,
         )
-        return self.env["product.template"]._sync_cdu_elmis_product_catalog(values)
+        params = self.env["ir.config_parameter"].sudo()
+        params.set_param("cdu.elmis.catalog_last_sync_at", fields.Datetime.now())
+        params.set_param("cdu.elmis.catalog_last_sync_count", len(products))
+        return products
+
+    def cron_refresh_product_catalog(self):
+        params = self.env["ir.config_parameter"].sudo()
+        required_keys = (
+            "cdu.elmis.base_url",
+            "cdu.elmis.api_key",
+            "cdu.elmis.cdu_store_facility_code",
+            "cdu.elmis.default_program_code",
+        )
+        if any(not params.get_param(key) for key in required_keys):
+            return False
+        self.refresh_product_catalog()
+        return True
+
+    def _eligible_orderables_from_stock_summaries(self, payload):
+        summaries = self.env["cdu.batch"].new({})._extract_stock_summaries(payload)
+        eligible = {}
+        for summary in summaries:
+            orderable = summary.get("orderable") or {}
+            if not isinstance(orderable, dict):
+                orderable = {"id": orderable}
+            orderable_id = str(
+                orderable.get("id")
+                or summary.get("orderableId")
+                or summary.get("orderableCode")
+                or ""
+            ).strip()
+            if orderable_id:
+                fallback = dict(orderable)
+                fallback.setdefault("id", orderable_id)
+                fallback.setdefault(
+                    "fullProductName",
+                    summary.get("orderableName")
+                    or summary.get("orderableDisplayName"),
+                )
+                eligible[orderable_id] = fallback
+            for entry in summary.get("canFulfillForMe") or []:
+                entry_orderable = entry.get("orderable") or {}
+                if not isinstance(entry_orderable, dict):
+                    entry_orderable = {"id": entry_orderable}
+                entry_id = str(entry_orderable.get("id") or "").strip()
+                if entry_id and entry_id not in eligible:
+                    fallback = dict(entry_orderable)
+                    fallback.setdefault("id", entry_id)
+                    fallback.setdefault("fullProductName", entry.get("orderableName"))
+                    eligible[entry_id] = fallback
+        return eligible
+
+    def _catalog_values_from_orderable(self, record, fallback=None):
+        fallback = fallback or {}
+        dispensable = record.get("dispensable") or fallback.get("dispensable") or {}
+        if not isinstance(dispensable, dict):
+            dispensable = {}
+        return {
+            "orderable_id": str(record.get("id") or fallback.get("id") or "").strip(),
+            "orderable_code": str(
+                record.get("productCode")
+                or record.get("code")
+                or fallback.get("productCode")
+                or fallback.get("code")
+                or ""
+            ).strip(),
+            "orderable_name": str(
+                record.get("fullProductName")
+                or record.get("fullName")
+                or record.get("name")
+                or fallback.get("fullProductName")
+                or fallback.get("name")
+                or ""
+            ).strip(),
+            "pack_size": (
+                record.get("netContent")
+                or record.get("packSize")
+                or fallback.get("netContent")
+                or fallback.get("packSize")
+                or 0
+            ),
+            "dosage_form": str(
+                dispensable.get("dispensingUnit")
+                or dispensable.get("displayName")
+                or ""
+            ).strip(),
+        }
+
+    def _get_all_reference_records(self, path, params=None):
+        query = dict(params or {})
+        query.setdefault("size", 2000)
+        records = []
+        page = 0
+        while True:
+            query["page"] = page
+            payload = self._get_reference_payload(path, dict(query))
+            if isinstance(payload, list):
+                records.extend(payload)
+                break
+            content = payload.get("content") or []
+            records.extend(content)
+            if payload.get("last") is True:
+                break
+            total_pages = payload.get("totalPages")
+            if total_pages is not None and page + 1 >= int(total_pages):
+                break
+            if len(content) < int(query["size"]):
+                break
+            page += 1
+        return records
 
     def post_stock_event(self, facility_code, program_code, items, call_type, batch=None):
         if not items:

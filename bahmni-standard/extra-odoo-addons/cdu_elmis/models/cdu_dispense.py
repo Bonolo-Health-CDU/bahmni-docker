@@ -624,5 +624,6 @@ class CduDispense(models.Model):
             "res_model": "cdu.dispense",
             "res_id": self.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "current",
         }

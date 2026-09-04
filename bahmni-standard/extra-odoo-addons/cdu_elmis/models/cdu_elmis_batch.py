@@ -217,6 +217,10 @@ class CduBatch(models.Model):
             for summary_line in batch.picking_line_ids:
                 product = summary_line.product_id
                 template = product.product_tmpl_id if product else self.env["product.template"]
+                mappings = template.cdu_elmis_orderable_catalog_ids.filtered("active")
+                sole_mapping = mappings if len(mappings) == 1 else self.env[
+                    "cdu.elmis.orderable.catalog"
+                ]
                 elmis_line_vals.append({
                     "batch_id": batch.id,
                     "summary_line_id": summary_line.id,
@@ -226,9 +230,23 @@ class CduBatch(models.Model):
                         if product
                         else False
                     ),
-                    "selected_orderable_code": template.cdu_drug_code or False,
-                    "selected_orderable_id": template.cdu_elmis_orderable_id or False,
-                    "selected_orderable_name": product.display_name or False,
+                    "selected_orderable_code": (
+                        sole_mapping.orderable_code
+                        or template.cdu_drug_code
+                        or False
+                    ),
+                    "selected_orderable_id": (
+                        sole_mapping.orderable_id
+                        or template.cdu_elmis_orderable_id
+                        or False
+                    ),
+                    "selected_orderable_name": (
+                        sole_mapping.full_name
+                        or product.with_context(
+                            cdu_generic_catalog_label=True
+                        ).display_name
+                        or False
+                    ),
                     "quantity_to_pick": summary_line.total_bottles or 0.0,
                     "prescription_count": summary_line.prescription_count,
                 })
@@ -1115,9 +1133,14 @@ class CduBatch(models.Model):
                 template = product.product_tmpl_id
                 if not template:
                     continue
-                orderable_id = template.cdu_elmis_orderable_id
-                orderable_code = template.cdu_drug_code
-                if not orderable_id and not orderable_code:
+                mappings = template.cdu_elmis_orderable_catalog_ids.filtered("active")
+                orderable_ids = set(mappings.mapped("orderable_id"))
+                orderable_codes = set(mappings.mapped("orderable_code"))
+                if template.cdu_elmis_orderable_id:
+                    orderable_ids.add(template.cdu_elmis_orderable_id)
+                if template.cdu_drug_code and not mappings:
+                    orderable_codes.add(template.cdu_drug_code)
+                if not orderable_ids and not orderable_codes:
                     continue
                 fulfilment_line = picking_line.fulfilment_line_ids.filtered(
                     lambda line: not line.selected_stock_option_id
@@ -1125,13 +1148,14 @@ class CduBatch(models.Model):
                 if not fulfilment_line:
                     continue
                 options = batch.elmis_stock_option_ids.filtered(
-                    lambda option: (
-                        orderable_id
-                        and option.orderable_id == orderable_id
+                    lambda option: option.stock_on_hand > 0
+                    and (
+                        not option.expiration_date
+                        or option.expiration_date >= fields.Date.context_today(batch)
                     )
-                    or (
-                        orderable_code
-                        and option.orderable_code == orderable_code
+                    and (
+                        option.orderable_id in orderable_ids
+                        or option.orderable_code in orderable_codes
                     )
                 )
                 if not options:
@@ -1210,6 +1234,12 @@ class CduBatch(models.Model):
                 stock_on_hand_units = self._coerce_quantity_units(card.get("stockOnHand"))
                 if stock_on_hand_units <= 0:
                     continue
+                expiration_date = fields.Date.to_date(card.get("expirationDate"))
+                if (
+                    expiration_date
+                    and expiration_date < fields.Date.context_today(self)
+                ):
+                    continue
                 card_pack_size = (
                     self._extract_elmis_pack_size(card, orderable_name)
                     or pack_size
@@ -1231,7 +1261,7 @@ class CduBatch(models.Model):
                         "lot": card.get("lot"),
                         "stock_on_hand": stock_on_hand_packs,
                         "stock_on_hand_units": stock_on_hand_units,
-                        "expiration_date": fields.Date.to_date(card.get("expirationDate")),
+                        "expiration_date": expiration_date,
                         "occurred_date": fields.Date.to_date(card.get("occurredDate")),
                     }
                 )
@@ -1249,6 +1279,10 @@ class CduBatch(models.Model):
         for entry in summary.get("canFulfillForMe") or []:
             stock_on_hand_units = self._coerce_quantity_units(entry.get("stockOnHand"))
             if stock_on_hand_units <= 0:
+                continue
+
+            expiration_date = fields.Date.to_date(entry.get("lotExpirationDate"))
+            if expiration_date and expiration_date < fields.Date.context_today(self):
                 continue
 
             orderable = entry.get("orderable") or {}
@@ -1273,9 +1307,7 @@ class CduBatch(models.Model):
                     "lot_id": lot_id,
                     "stock_on_hand": stock_on_hand_packs,
                     "stock_on_hand_units": stock_on_hand_units,
-                    "expiration_date": fields.Date.to_date(
-                        entry.get("lotExpirationDate")
-                    ),
+                    "expiration_date": expiration_date,
                     "occurred_date": fields.Date.to_date(entry.get("occurredDate")),
                 }
             )

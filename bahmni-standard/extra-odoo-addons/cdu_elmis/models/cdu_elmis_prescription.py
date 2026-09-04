@@ -33,8 +33,8 @@ class CduPrescription(models.Model):
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
-                "title": _("eLMIS products refreshed"),
-                "message": _("%s available medicines are ready for selection.")
+                "title": _("Generic medicine catalogue refreshed"),
+                "message": _("%s eligible medicines are ready for selection, including medicines without usable stock.")
                 % len(products),
                 "type": "success",
                 "sticky": False,
@@ -64,6 +64,7 @@ class CduPrescription(models.Model):
             "res_model": "cdu.dispense",
             "res_id": dispense.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "current",
         }
 

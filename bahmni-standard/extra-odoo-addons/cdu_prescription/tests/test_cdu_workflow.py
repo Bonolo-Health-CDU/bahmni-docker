@@ -256,6 +256,10 @@ class TestCduPrescriptionWorkflow(TransactionCase):
             field_names.index("product_id"),
             field_names.index("dosage_instructions"),
         )
+        product_field = tree.xpath("./field[@name='product_id']")[0]
+        self.assertIn("cdu_generic_catalog_label", product_field.get("context"))
+        self.assertIn("no_create", product_field.get("options"))
+        self.assertIn("no_open", product_field.get("options"))
         self.assertTrue(
             arch.xpath(".//field[@name='cdu_days_supply'][@string='Duration Days']")
         )

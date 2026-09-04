@@ -1,4 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cdu_elmis_orderable_catalog_data_clerk,cdu.elmis.orderable.catalog data clerk,model_cdu_elmis_orderable_catalog,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_elmis_orderable_catalog_dispensing_officer,cdu.elmis.orderable.catalog dispensing officer,model_cdu_elmis_orderable_catalog,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_elmis_orderable_catalog_admin,cdu.elmis.orderable.catalog admin,model_cdu_elmis_orderable_catalog,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_elmis_api_log_dispensing_officer,cdu.elmis.api.log dispensing officer,model_cdu_elmis_api_log,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
 access_cdu_elmis_api_log_admin,cdu.elmis.api.log admin,model_cdu_elmis_api_log,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_collect_go_api_log_dispensing_officer,cdu.collect.go.api.log dispensing officer,model_cdu_collect_go_api_log,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0

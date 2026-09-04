@@ -167,6 +167,7 @@
                                     <field name="product_id"
                                            string="Product"
                                            class="o_cdu_regimen_product_column"
+                                           context="{'cdu_generic_catalog_label': True}"
                                            options="{'no_create': True, 'no_open': True}"/>
                                     <field name="imported_product_name"
                                            string="Imported Product / Regimen"

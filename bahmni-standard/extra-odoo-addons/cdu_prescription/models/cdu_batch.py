@@ -592,7 +592,12 @@ class CduBatch(models.Model):
                 ]
 
             for product, daily_dose, drug_name in medicines:
-                pack_size = product.product_tmpl_id.cdu_pack_size if product else 0
+                pack_size = (
+                    product.product_tmpl_id.cdu_pack_size
+                    if product
+                    and product.product_tmpl_id.cdu_catalog_source != "elmis"
+                    else 0
+                )
 
                 if not drug_name:
                     continue

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_elmis_orderable_catalog_tree" model="ir.ui.view">
+        <field name="name">cdu.elmis.orderable.catalog.tree</field>
+        <field name="model">cdu.elmis.orderable.catalog</field>
+        <field name="arch" type="xml">
+            <tree default_order="generic_label, full_name">
+                <field name="generic_label"/>
+                <field name="medicine_tmpl_id"/>
+                <field name="full_name"/>
+                <field name="orderable_code"/>
+                <field name="pack_size"/>
+                <field name="facility_code"/>
+                <field name="program_code"/>
+                <field name="active"/>
+                <field name="last_seen_at"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_elmis_orderable_catalog_form" model="ir.ui.view">
+        <field name="name">cdu.elmis.orderable.catalog.form</field>
+        <field name="model">cdu.elmis.orderable.catalog</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="medicine_tmpl_id"/>
+                        <field name="generic_label" readonly="1"/>
+                        <field name="full_name" readonly="1"/>
+                        <field name="orderable_id" readonly="1"/>
+                        <field name="orderable_code" readonly="1"/>
+                        <field name="pack_size" readonly="1"/>
+                        <field name="dosage_form" readonly="1"/>
+                        <field name="facility_code" readonly="1"/>
+                        <field name="program_code" readonly="1"/>
+                        <field name="active"/>
+                        <field name="last_seen_at" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_elmis_orderable_catalog" model="ir.actions.act_window">
+        <field name="name">Medicine Catalogue Mappings</field>
+        <field name="res_model">cdu.elmis.orderable.catalog</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'active_test': False}</field>
+    </record>
+</odoo>

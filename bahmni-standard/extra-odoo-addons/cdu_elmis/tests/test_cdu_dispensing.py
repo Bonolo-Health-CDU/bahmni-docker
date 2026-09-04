@@ -87,12 +87,11 @@ class TestCduDispensingWorkflow(TransactionCase):
         second_prescription = self._create_prescription("002", 20)
         first_dispense = self._create_ready_dispense(first_prescription)
         second_dispense = self._create_ready_dispense(second_prescription)
-        expected_next = second_dispense._action_open()
 
         with patch.object(
-            type(second_prescription),
-            "action_open_dispensing",
-            return_value=expected_next,
+            type(second_dispense),
+            "_auto_refresh_production_stock",
+            return_value=False,
         ):
             result = first_dispense.with_user(
                 self.admin
@@ -104,6 +103,7 @@ class TestCduDispensingWorkflow(TransactionCase):
         )
         self.assertEqual(result["params"]["report_action"]["type"], "ir.actions.report")
         self.assertEqual(result["params"]["next"]["res_id"], second_dispense.id)
+        self.assertEqual(result["params"]["next"]["views"], [(False, "form")])
         self.assertEqual(first_dispense.state, "confirmed")
         self.assertTrue(first_dispense.labels_printed)
         self.assertEqual(first_prescription.state, "awaiting_bagging_qa")
@@ -231,20 +231,36 @@ class TestCduDispensingWorkflow(TransactionCase):
             "program_code": "TEST-PROGRAM",
             "orderable_code": "ELMIS-TLD-30",
             "orderable_id": "ELMIS-TLD-UUID",
-            "orderable_name": "Tenofovir Lamivudine Dolutegravir Tablets 30",
+            "orderable_name": "Tenofovir/Lamivudine/Dolutegravir 300/300/50Mg Tablets 30",
             "pack_size": 30,
             "lot": "TLD-FEFO-LOT",
             "stock_on_hand": 20,
             "expiration_date": self.today + timedelta(days=365),
         }
+        self.env["product.template"]._sync_cdu_elmis_product_catalog(
+            [option_values],
+            facility_code="TEST-CDU-STORE",
+            program_code="TEST-PROGRAM",
+            complete=True,
+        )
         option = self.env["cdu.elmis.stock.option"].create(option_values)
         product = self.env["product.product"].search(
-            [("product_tmpl_id.cdu_elmis_orderable_id", "=", "ELMIS-TLD-UUID")],
+            [
+                (
+                    "product_tmpl_id.cdu_elmis_orderable_catalog_ids.orderable_id",
+                    "=",
+                    "ELMIS-TLD-UUID",
+                )
+            ],
             limit=1,
         )
         self.assertTrue(product)
         self.assertTrue(product.product_tmpl_id.cdu_is_drug)
-        self.assertEqual(product.product_tmpl_id.cdu_pack_size, 30)
+        self.assertEqual(product.product_tmpl_id.cdu_pack_size, 0)
+        self.assertEqual(
+            product.with_context(cdu_generic_catalog_label=True).display_name,
+            "Tenofovir/Lamivudine/Dolutegravir 300/300/50Mg",
+        )
 
         prescription = self._create_prescription("ELMIS-PROPAGATION", 30)
         prescription.write(
@@ -284,6 +300,244 @@ class TestCduDispensingWorkflow(TransactionCase):
             dispense_line.dosage_instructions,
             "Take one tablet every morning.",
         )
+
+    def test_catalog_merges_pack_variants_into_one_generic_medicine(self):
+        templates = self.env["product.template"]._sync_cdu_elmis_product_catalog(
+            [
+                {
+                    "orderable_id": "ABC-30",
+                    "orderable_code": "ABC30",
+                    "orderable_name": "Abacavir/Lamivudine 600/300Mg Tablets 30",
+                    "pack_size": 30,
+                },
+                {
+                    "orderable_id": "ABC-60",
+                    "orderable_code": "ABC60",
+                    "orderable_name": "Abacavir/Lamivudine 600/300Mg Tablets 60",
+                    "pack_size": 60,
+                },
+            ],
+            facility_code="TEST-CDU-STORE",
+            program_code="TEST-PROGRAM",
+            complete=True,
+        )
+
+        self.assertEqual(len(templates), 1)
+        self.assertEqual(templates.cdu_generic_name, "Abacavir/Lamivudine")
+        self.assertEqual(templates.cdu_strength, "600/300Mg")
+        self.assertEqual(templates.cdu_verification_label, "Abacavir/Lamivudine 600/300Mg")
+        self.assertEqual(len(templates.cdu_elmis_orderable_catalog_ids), 2)
+        self.assertSetEqual(
+            set(templates.cdu_elmis_orderable_catalog_ids.mapped("pack_size")),
+            {30, 60},
+        )
+
+    def test_catalog_sync_is_idempotent_and_retires_missing_mappings(self):
+        values = [
+            {
+                "orderable_id": "RETAINED",
+                "orderable_name": "Stable Medicine 10Mg Tablets 30",
+                "pack_size": 30,
+            },
+            {
+                "orderable_id": "RETIRED",
+                "orderable_name": "Retired Medicine 20Mg Tablets 30",
+                "pack_size": 30,
+            },
+        ]
+        Product = self.env["product.template"]
+        Product._sync_cdu_elmis_product_catalog(
+            values,
+            facility_code="TEST-CDU-STORE",
+            program_code="TEST-PROGRAM",
+            complete=True,
+        )
+        Product._sync_cdu_elmis_product_catalog(
+            values[:1],
+            facility_code="TEST-CDU-STORE",
+            program_code="TEST-PROGRAM",
+            complete=True,
+        )
+        mappings = self.env["cdu.elmis.orderable.catalog"].with_context(
+            active_test=False
+        ).search(
+            [
+                ("facility_code", "=", "TEST-CDU-STORE"),
+                ("program_code", "=", "TEST-PROGRAM"),
+                ("orderable_id", "in", ["RETAINED", "RETIRED"]),
+            ]
+        )
+
+        self.assertEqual(len(mappings), 2)
+        self.assertTrue(mappings.filtered(lambda mapping: mapping.orderable_id == "RETAINED").active)
+        self.assertFalse(mappings.filtered(lambda mapping: mapping.orderable_id == "RETIRED").active)
+
+    def test_orderable_reference_lookup_is_paginated(self):
+        service = self.env["cdu.elmis.stock.service"]
+        pages = [
+            {"content": [{"id": "PAGE-1"}], "last": False, "totalPages": 2},
+            {"content": [{"id": "PAGE-2"}], "last": True, "totalPages": 2},
+        ]
+        with patch.object(
+            type(service), "_get_reference_payload", side_effect=pages
+        ) as request:
+            records = service._get_all_reference_records(
+                "api/orderables", {"size": 1}
+            )
+
+        self.assertEqual([record["id"] for record in records], ["PAGE-1", "PAGE-2"])
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args_list[0].args[1]["page"], 0)
+        self.assertEqual(request.call_args_list[1].args[1]["page"], 1)
+
+    def test_catalog_refresh_includes_orderables_without_stock(self):
+        params = self.env["ir.config_parameter"].sudo()
+        params.set_param("cdu.elmis.cdu_store_facility_code", "TEST-CDU-STORE")
+        params.set_param("cdu.elmis.default_program_code", "TEST-PROGRAM")
+        service = self.env["cdu.elmis.stock.service"]
+        summaries = [
+            {"orderable": {"id": "WITH-STOCK"}, "stockOnHand": 100},
+            {"orderable": {"id": "ZERO-STOCK"}, "stockOnHand": 0},
+        ]
+        reference = [
+            {
+                "id": "WITH-STOCK",
+                "productCode": "WITH",
+                "fullProductName": "Medicine A 10Mg Tablets 30",
+                "netContent": 30,
+            },
+            {
+                "id": "ZERO-STOCK",
+                "productCode": "ZERO",
+                "fullProductName": "Medicine B 20Mg Tablets 60",
+                "netContent": 60,
+            },
+        ]
+
+        with patch.object(
+            type(service), "get_stock_card_summaries", return_value=summaries
+        ) as stock_query, patch.object(
+            type(service), "_get_all_reference_records", return_value=reference
+        ):
+            products = service.refresh_product_catalog()
+
+        self.assertEqual(len(products), 2)
+        self.assertTrue(stock_query.call_args.kwargs["non_empty_only"] is False)
+        self.assertSetEqual(
+            set(products.mapped("cdu_verification_label")),
+            {"Medicine A 10Mg", "Medicine B 20Mg"},
+        )
+
+    def test_picking_stock_parser_excludes_zero_and_expired_lots(self):
+        payload = {
+            "content": [
+                {
+                    "canFulfillForMe": [
+                        {
+                            "orderable": {"id": "VALID"},
+                            "orderableName": "Valid 10Mg Tablets 30",
+                            "packSize": 30,
+                            "stockOnHand": 60,
+                            "lotCode": "VALID-LOT",
+                            "lotExpirationDate": fields.Date.to_string(
+                                self.today + timedelta(days=30)
+                            ),
+                        },
+                        {
+                            "orderable": {"id": "ZERO"},
+                            "orderableName": "Zero 10Mg Tablets 30",
+                            "packSize": 30,
+                            "stockOnHand": 0,
+                            "lotCode": "ZERO-LOT",
+                        },
+                        {
+                            "orderable": {"id": "EXPIRED"},
+                            "orderableName": "Expired 10Mg Tablets 30",
+                            "packSize": 30,
+                            "stockOnHand": 60,
+                            "lotCode": "EXPIRED-LOT",
+                            "lotExpirationDate": fields.Date.to_string(
+                                self.today - timedelta(days=1)
+                            ),
+                        },
+                    ]
+                }
+            ]
+        }
+
+        values = self.batch._stock_options_from_payload(
+            payload, "TEST-CDU-STORE", "TEST-PROGRAM"
+        )
+
+        self.assertEqual(len(values), 1)
+        self.assertEqual(values[0]["orderable_id"], "VALID")
+
+    def test_generic_quantity_is_converted_to_packs_only_at_picking(self):
+        medicine = self.env["product.template"]._sync_cdu_elmis_product_catalog(
+            [
+                {
+                    "orderable_id": "PACK-30",
+                    "orderable_code": "PACK30",
+                    "orderable_name": "Deferred Medicine 10Mg Tablets 30",
+                    "pack_size": 30,
+                },
+                {
+                    "orderable_id": "PACK-60",
+                    "orderable_code": "PACK60",
+                    "orderable_name": "Deferred Medicine 10Mg Tablets 60",
+                    "pack_size": 60,
+                },
+            ],
+            facility_code="TEST-CDU-STORE",
+            program_code="TEST-PROGRAM",
+            complete=True,
+        )
+        prescription = self._create_prescription("DEFERRED-PACK", 30)
+        prescription.write(
+            {
+                "cdu_days_supply": 30,
+                "repeat_days": 30,
+                "total_days_supply": 30,
+            }
+        )
+        prescription.product_line_ids.with_context(
+            cdu_allow_product_line_sync=True
+        ).write(
+            {
+                "product_id": medicine.product_variant_id.id,
+                "dosage_instructions": "Take one tablet daily.",
+            }
+        )
+
+        self.batch._generate_elmis_picking_lines()
+        summary = self.batch.picking_line_ids.filtered(
+            lambda line: line.product_id == medicine.product_variant_id
+        )
+        self.assertEqual(summary.total_tablets, 30)
+        self.assertEqual(summary.pack_size, 0)
+        self.assertEqual(summary.total_bottles, 0)
+
+        selected_option = self.env["cdu.elmis.stock.option"].create(
+            {
+                "batch_id": self.batch.id,
+                "facility_code": "TEST-CDU-STORE",
+                "program_code": "TEST-PROGRAM",
+                "orderable_code": "PACK60",
+                "orderable_id": "PACK-60",
+                "orderable_name": "Deferred Medicine 10Mg Tablets 60",
+                "pack_size": 60,
+                "lot": "EARLIEST-USABLE",
+                "stock_on_hand": 10,
+                "stock_on_hand_units": 600,
+                "expiration_date": self.today + timedelta(days=30),
+            }
+        )
+        self.batch._apply_prescription_product_stock_options()
+
+        fulfilment = self.batch.elmis_picking_line_ids.fulfilment_line_ids
+        self.assertEqual(fulfilment.selected_stock_option_id, selected_option)
+        self.assertEqual(fulfilment.selected_pack_size, 60)
+        self.assertEqual(fulfilment.picking_line_id.quantity_to_pick, 1)
 
     def test_picking_generation_links_same_named_products_by_summary_id(self):
         product_name = "Same Named Multi-line Medicine"
