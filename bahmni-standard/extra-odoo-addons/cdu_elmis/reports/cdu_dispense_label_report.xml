@@ -287,35 +287,39 @@
                     </div>
 
                     <t t-if="label_layout in ('all', 'medicine') and dispense.stock_selection_ids">
-                        <div t-foreach="dispense.stock_selection_ids" t-as="line" class="page cdu-print-page">
-                            <div class="cdu-print-sheet cdu-medicine-label">
-                                <div class="cdu-org"><span t-esc="facility_name"/></div>
-                                <div t-if="prescription.facility_code" class="cdu-muted">
-                                    <span t-field="prescription.facility_code"/>
+                        <t t-foreach="dispense.stock_selection_ids" t-as="line">
+                            <t t-foreach="range(int(line.quantity_dispensed or 0))" t-as="label_copy">
+                                <div class="page cdu-print-page">
+                                    <div class="cdu-print-sheet cdu-medicine-label">
+                                        <div class="cdu-org"><span t-esc="facility_name"/></div>
+                                        <div t-if="prescription.facility_code" class="cdu-muted">
+                                            <span t-field="prescription.facility_code"/>
+                                        </div>
+                                        <div class="cdu-drug">
+                                            <span t-esc="line.selected_orderable_name or line.openmrs_drug_name"/>
+                                        </div>
+                                        <div class="cdu-directions">
+                                            <span t-field="line.dosage_instructions"/>
+                                        </div>
+                                        <div class="cdu-script-repeat">
+                                            <div><span t-esc="script_number"/></div>
+                                            <div>Repeat 1</div>
+                                        </div>
+                                        <div>
+                                            <span t-if="dispense.labels_printed_at" t-field="dispense.labels_printed_at"/>
+                                            <span t-if="not dispense.labels_printed_at and dispense.confirmed_at" t-field="dispense.confirmed_at"/>
+                                        </div>
+                                        <div style="font-size: 16px; margin-top: 5mm;">
+                                            <span t-field="dispense.patient_name"/>
+                                        </div>
+                                        <div style="font-size: 15px; margin-top: 12mm;">
+                                            Dispenser:
+                                            <span t-field="dispense.labels_printed_by"/>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="cdu-drug">
-                                    <span t-esc="line.selected_orderable_name or line.openmrs_drug_name"/>
-                                </div>
-                                <div class="cdu-directions">
-                                    <span t-field="line.dosage_instructions"/>
-                                </div>
-                                <div class="cdu-script-repeat">
-                                    <div><span t-esc="script_number"/></div>
-                                    <div>Repeat 1</div>
-                                </div>
-                                <div>
-                                    <span t-if="dispense.labels_printed_at" t-field="dispense.labels_printed_at"/>
-                                    <span t-if="not dispense.labels_printed_at and dispense.confirmed_at" t-field="dispense.confirmed_at"/>
-                                </div>
-                                <div style="font-size: 16px; margin-top: 5mm;">
-                                    <span t-field="dispense.patient_name"/>
-                                </div>
-                                <div style="font-size: 15px; margin-top: 12mm;">
-                                    Dispenser:
-                                    <span t-field="dispense.labels_printed_by"/>
-                                </div>
-                            </div>
-                        </div>
+                            </t>
+                        </t>
                     </t>
                     <div t-if="label_layout in ('all', 'medicine') and not dispense.stock_selection_ids" class="page cdu-print-page">
                         <div class="cdu-print-sheet cdu-medicine-label">
@@ -368,7 +372,7 @@
                                 <span t-field="dispense.patient_name"/>
                             </div>
                             <div class="cdu-bag-section">
-                                Produced By:<span t-esc="facility_name"/>
+                                Produced By:<span>Bonolo Health</span>
                             </div>
                         </div>
                     </div>

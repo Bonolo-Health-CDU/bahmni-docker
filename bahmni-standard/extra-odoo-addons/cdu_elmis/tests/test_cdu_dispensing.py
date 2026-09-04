@@ -1,7 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
-from lxml import etree
+from lxml import etree, html as lxml_html
 
 from odoo import fields
 from odoo.exceptions import ValidationError
@@ -108,6 +108,73 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertTrue(first_dispense.labels_printed)
         self.assertEqual(first_prescription.state, "awaiting_bagging_qa")
         self.assertEqual(second_prescription.state, "awaiting_dispensing")
+
+    def test_medicine_label_count_matches_bottles_dispensed_per_product(self):
+        prescription = self._create_prescription("LABEL-COPIES", 15)
+        dispense = self._create_ready_dispense(prescription)
+        dispense.stock_selection_ids.quantity_dispensed = 2
+        second_option = self.env["cdu.dispense.stock.option"].create(
+            {
+                "dispense_id": dispense.id,
+                "facility_code": "TEST-CDU",
+                "program_code": "TEST-PROGRAM",
+                "orderable_code": "SECOND-ORDERABLE",
+                "orderable_name": "Second Test Medicine",
+                "pack_size": 90,
+                "lot": "SECOND-LOT",
+                "stock_on_hand": 20,
+            }
+        )
+        self.env["cdu.dispense.stock.selection"].create(
+            {
+                "dispense_id": dispense.id,
+                "openmrs_drug_name": "Second Test Medicine",
+                "stock_option_id": second_option.id,
+                "quantity_dispensed": 3,
+                "dosage_instructions": "Take two tablets daily.",
+            }
+        )
+
+        html, _report_type = self.env["ir.actions.report"].with_context(
+            cdu_label_layout="medicine"
+        )._render_qweb_html(
+            "cdu_elmis.report_cdu_dispense_labels",
+            dispense.ids,
+        )
+        document = lxml_html.fromstring(html)
+        labels = document.xpath(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), "
+            "' cdu-medicine-label ')]"
+        )
+        drug_names = [
+            " ".join(
+                label.xpath(
+                    ".//div[contains(concat(' ', normalize-space(@class), ' '), "
+                    "' cdu-drug ')]//text()"
+                )
+            ).strip()
+            for label in labels
+        ]
+
+        self.assertEqual(len(labels), 5)
+        self.assertEqual(drug_names.count("Test Medicine"), 2)
+        self.assertEqual(drug_names.count("Second Test Medicine"), 3)
+
+        bag_html, _report_type = self.env["ir.actions.report"].with_context(
+            cdu_label_layout="bag"
+        )._render_qweb_html(
+            "cdu_elmis.report_cdu_dispense_labels",
+            dispense.ids,
+        )
+        bag_document = lxml_html.fromstring(bag_html)
+        produced_by = bag_document.xpath(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), "
+            "' cdu-bag-section ')][contains(., 'Produced By:')]"
+        )
+        self.assertEqual(
+            " ".join(produced_by[0].text_content().split()),
+            "Produced By:Bonolo Health",
+        )
 
     def test_exhausted_batch_returns_to_dispensing_work_queue(self):
         prescription = self._create_prescription("003", 30)

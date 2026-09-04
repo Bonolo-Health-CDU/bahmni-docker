@@ -113,7 +113,7 @@
                         </div>
                         <div>
                             <div class="cdu-box-label-heading">Produced By:</div>
-                            <div class="cdu-box-label-value"><span t-esc="box.get_produced_by()"/></div>
+                            <div class="cdu-box-label-value"><span>Bonolo Health</span></div>
                         </div>
                     </div>
                 </t>
@@ -235,7 +235,7 @@
                                 </div>
                                 <div class="cdu-box-manifest-field">
                                     <strong>Produced By:</strong>
-                                    <span t-esc="box.get_produced_by()"/>
+                                    <span>Bonolo Health</span>
                                 </div>
                             </div>
                             <div class="cdu-box-manifest-summary">

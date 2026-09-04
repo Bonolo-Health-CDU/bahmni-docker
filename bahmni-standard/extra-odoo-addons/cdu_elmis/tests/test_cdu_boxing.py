@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from lxml import etree
+from lxml import etree, html as lxml_html
 
 from odoo import fields
 from odoo.exceptions import UserError
@@ -97,6 +97,43 @@ class TestCduBoxingWorkflow(TransactionCase):
 
         with self.assertRaises(UserError):
             box.action_scan_bag_label("NOT-A-CDU-BAG-LABEL")
+
+    def test_box_documents_are_produced_by_bonolo_health(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        box.action_scan_bag_label(self.prescription.name)
+
+        report_html, _report_type = self.env["ir.actions.report"]._render_qweb_html(
+            "cdu_elmis.report_cdu_box_label",
+            box.ids,
+        )
+        document = lxml_html.fromstring(report_html)
+        produced_by_heading = document.xpath(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), "
+            "' cdu-box-label-heading ')][normalize-space(.) = 'Produced By:']"
+        )
+        produced_by_value = produced_by_heading[0].getnext()
+
+        self.assertEqual(
+            " ".join(produced_by_value.text_content().split()),
+            "Bonolo Health",
+        )
+
+        manifest_html, _report_type = self.env[
+            "ir.actions.report"
+        ]._render_qweb_html(
+            "cdu_elmis.report_cdu_box_manifest",
+            box.ids,
+        )
+        manifest_document = lxml_html.fromstring(manifest_html)
+        manifest_produced_by = manifest_document.xpath(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), "
+            "' cdu-box-manifest-field ')][strong[normalize-space(.) = "
+            "'Produced By:']]"
+        )
+        self.assertEqual(
+            " ".join(manifest_produced_by[0].text_content().split()),
+            "Produced By: Bonolo Health",
+        )
 
     def test_boxing_filters_are_registered(self):
         for view_xmlid in (
