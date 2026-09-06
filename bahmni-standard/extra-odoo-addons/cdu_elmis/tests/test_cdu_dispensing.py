@@ -82,6 +82,54 @@ class TestCduDispensingWorkflow(TransactionCase):
         )
         return dispense
 
+    def _create_patient_picking_context(
+        self,
+        prescription,
+        required_packs=2,
+        picked_packs=2,
+        pack_size=30,
+        daily_dose=1,
+        cdu_days=60,
+    ):
+        patient_line = self.env["cdu.batch.patient.line"].create(
+            {
+                "batch_id": self.batch.id,
+                "prescription_id": prescription.id,
+                "patient_id": prescription.patient_id.id,
+                "drug_name": prescription.regimen_prescribed_raw,
+                "cdu_days": cdu_days,
+                "effective_repeat_days": cdu_days,
+                "prescription_repeat_days": cdu_days,
+                "repeat_days": cdu_days,
+                "daily_dose": daily_dose,
+                "pack_size": pack_size,
+                "required_units": required_packs * pack_size,
+                "required_quantity": required_packs * pack_size,
+                "picked_units": picked_packs * pack_size,
+                "picked_quantity": picked_packs * pack_size,
+                "packs_to_pick": required_packs,
+                "cdu_bottles_required": required_packs,
+                "bottles_required": required_packs,
+            }
+        )
+        picking_line = self.env["cdu.picking.line"].create(
+            {
+                "batch_id": self.batch.id,
+                "openmrs_drug_name": prescription.regimen_prescribed_raw,
+                "quantity_to_pick": required_packs,
+                "quantity_picked": picked_packs,
+            }
+        )
+        fulfilment_line = self.env["cdu.picking.fulfilment.line"].create(
+            {
+                "batch_id": self.batch.id,
+                "picking_line_id": picking_line.id,
+                "selected_pack_size": pack_size,
+                "quantity_picked": picked_packs,
+            }
+        )
+        return patient_line, picking_line, fulfilment_line
+
     def test_confirm_prints_labels_and_opens_next_prescription_in_batch(self):
         first_prescription = self._create_prescription("001", 10)
         second_prescription = self._create_prescription("002", 20)
@@ -107,6 +155,8 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(first_dispense.state, "confirmed")
         self.assertTrue(first_dispense.labels_printed)
         self.assertEqual(first_prescription.state, "awaiting_bagging_qa")
+        self.assertEqual(first_prescription.dispensing_status, "fully_dispensed")
+        self.assertFalse(first_prescription.dispensing_back_order_short)
         self.assertEqual(second_prescription.state, "awaiting_dispensing")
 
     def test_cancel_draft_dispensing_job_returns_to_work_queue(self):
@@ -121,6 +171,7 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(dispense.cancelled_by, self.admin)
         self.assertTrue(dispense.cancelled_at)
         self.assertEqual(prescription.state, "awaiting_dispensing")
+        self.assertEqual(prescription.dispensing_status, "cancelled")
         self.assertEqual(result["tag"], "display_notification")
         self.assertEqual(
             result["params"]["next"]["id"],
@@ -143,6 +194,7 @@ class TestCduDispensingWorkflow(TransactionCase):
         ):
             action = prescription.with_user(self.admin).action_open_dispensing()
         dispense.invalidate_recordset()
+        prescription.invalidate_recordset()
 
         self.assertEqual(action["res_id"], dispense.id)
         self.assertEqual(dispense.state, "draft")
@@ -150,6 +202,36 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertFalse(dispense.cancelled_at)
         self.assertTrue(dispense.stock_selection_ids)
         self.assertFalse(old_selection_ids.intersection(dispense.stock_selection_ids.ids))
+        self.assertEqual(prescription.dispensing_status, "not_dispensed")
+
+    def test_confirm_dispensing_marks_partial_with_back_order_details(self):
+        prescription = self._create_prescription("PARTIAL", 10)
+        self._create_patient_picking_context(
+            prescription,
+            required_packs=2,
+            picked_packs=2,
+            pack_size=30,
+            daily_dose=1,
+            cdu_days=60,
+        )
+        dispense = self._create_ready_dispense(prescription)
+        dispense.stock_selection_ids.quantity_dispensed = 1
+
+        dispense.with_user(self.admin).action_confirm_dispensing()
+        prescription.invalidate_recordset()
+
+        self.assertEqual(prescription.dispensing_status, "partially_dispensed")
+        self.assertEqual(prescription.dispensing_back_order_packs, 1)
+        self.assertEqual(prescription.dispensing_back_order_units, 30)
+        self.assertEqual(prescription.dispensing_back_order_days, 30)
+        self.assertEqual(
+            prescription.dispensing_back_order_short,
+            "1 pack, 30 units, 30 days",
+        )
+        self.assertIn(
+            "TEST-DISPENSING-REGIMEN: 1 pack, 30 units, 30 days",
+            prescription.dispensing_back_order_summary,
+        )
 
     def test_medicine_label_count_matches_bottles_dispensed_per_product(self):
         prescription = self._create_prescription("LABEL-COPIES", 15)
@@ -764,4 +846,56 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertIn(
             'name="cancelled"',
             self.env.ref("cdu_elmis.view_cdu_dispense_search").arch_db,
+        )
+
+        prescription_tree = self.env["cdu.prescription"].with_user(self.admin).get_view(
+            view_id=self.env.ref("cdu_prescription.view_cdu_prescription_tree").id,
+            view_type="tree",
+        )
+        prescription_tree_arch = etree.fromstring(
+            prescription_tree["arch"].encode()
+        )
+        dispensing_status_field = prescription_tree_arch.xpath(
+            ".//field[@name='dispensing_status']"
+        )[0]
+        self.assertEqual(dispensing_status_field.get("widget"), "badge")
+        self.assertIn(
+            "partially_dispensed",
+            dispensing_status_field.get("decoration-warning"),
+        )
+        self.assertTrue(
+            prescription_tree_arch.xpath(
+                ".//field[@name='dispensing_back_order_short']"
+            )
+        )
+
+        prescription_form = self.env["cdu.prescription"].with_user(self.admin).get_view(
+            view_id=self.env.ref("cdu_prescription.view_cdu_prescription_form").id,
+            view_type="form",
+        )
+        prescription_form_arch = etree.fromstring(prescription_form["arch"].encode())
+        self.assertTrue(
+            prescription_form_arch.xpath(
+                ".//field[@name='dispensing_back_order_summary']"
+            )
+        )
+
+        prescription_search = self.env["cdu.prescription"].with_user(
+            self.admin
+        ).get_view(
+            view_id=self.env.ref("cdu_prescription.view_cdu_prescription_search").id,
+            view_type="search",
+        )
+        prescription_search_arch = etree.fromstring(
+            prescription_search["arch"].encode()
+        )
+        self.assertTrue(
+            prescription_search_arch.xpath(
+                ".//filter[@name='dispensing_partially_dispensed']"
+            )
+        )
+        self.assertTrue(
+            prescription_search_arch.xpath(
+                ".//filter[@name='group_dispensing_status']"
+            )
         )

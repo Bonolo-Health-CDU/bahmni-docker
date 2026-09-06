@@ -1,5 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <record id="view_cdu_prescription_tree_elmis_dispensing_status" model="ir.ui.view">
+        <field name="name">cdu.prescription.tree.elmis.dispensing.status</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="before">
+                <field name="dispensing_status"
+                       widget="badge"
+                       optional="show"
+                       decoration-info="dispensing_status == 'not_dispensed'"
+                       decoration-success="dispensing_status == 'fully_dispensed'"
+                       decoration-warning="dispensing_status == 'partially_dispensed'"
+                       decoration-muted="dispensing_status == 'cancelled'"/>
+                <field name="dispensing_back_order_short"
+                       optional="show"
+                       attrs="{'invisible': [('dispensing_status', '!=', 'partially_dispensed')]}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_cdu_prescription_form_elmis_dispensing_status" model="ir.ui.view">
+        <field name="name">cdu.prescription.form.elmis.dispensing.status</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[hasclass('o_cdu_summary_grid')]//field[@name='batch_id']" position="after">
+                <field name="dispensing_status"
+                       widget="badge"
+                       readonly="1"/>
+                <field name="dispensing_back_order_short"
+                       readonly="1"
+                       attrs="{'invisible': [('dispensing_status', '!=', 'partially_dispensed')]}"/>
+                <field name="dispensing_back_order_summary"
+                       readonly="1"
+                       attrs="{'invisible': [('dispensing_status', '!=', 'partially_dispensed')]}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_cdu_prescription_search_elmis_dispensing_status" model="ir.ui.view">
+        <field name="name">cdu.prescription.search.elmis.dispensing.status</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='dispatched']" position="after">
+                <separator/>
+                <filter string="Not Dispensed" name="dispensing_not_dispensed" domain="[('dispensing_status', '=', 'not_dispensed')]"/>
+                <filter string="Fully Dispensed" name="dispensing_fully_dispensed" domain="[('dispensing_status', '=', 'fully_dispensed')]"/>
+                <filter string="Partially Dispensed" name="dispensing_partially_dispensed" domain="[('dispensing_status', '=', 'partially_dispensed')]"/>
+                <filter string="Dispensing Cancelled" name="dispensing_cancelled" domain="[('dispensing_status', '=', 'cancelled')]"/>
+            </xpath>
+            <xpath expr="//filter[@name='group_state']" position="after">
+                <filter string="Dispensing Status" name="group_dispensing_status" context="{'group_by': 'dispensing_status'}"/>
+            </xpath>
+        </field>
+    </record>
+
     <record id="view_cdu_prescription_form_elmis_products" model="ir.ui.view">
         <field name="name">cdu.prescription.form.elmis.products</field>
         <field name="model">cdu.prescription</field>
