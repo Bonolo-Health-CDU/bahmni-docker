@@ -1,3 +1,16 @@
+.o_cdu_stage_dispensing .o_cdu_cancel_dispensing_button {
+    background: #F3F4F6;
+    color: #4B5563;
+    border: 1px solid #D1D5DB;
+}
+
+.o_cdu_stage_dispensing .o_cdu_cancel_dispensing_button:hover,
+.o_cdu_stage_dispensing .o_cdu_cancel_dispensing_button:focus {
+    background: #E5E7EB;
+    color: #374151;
+    border-color: #9CA3AF;
+}
+
 .o_cdu_regimen_product_list {
     .o_list_table {
         table-layout: fixed;

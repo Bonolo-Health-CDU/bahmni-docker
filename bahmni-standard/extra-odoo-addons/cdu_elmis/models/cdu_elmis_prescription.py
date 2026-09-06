@@ -53,6 +53,8 @@ class CduPrescription(models.Model):
             [("prescription_id", "=", self.id)],
             limit=1,
         )
+        if dispense and dispense.state == "cancelled":
+            dispense._restart_cancelled_dispensing()
         if not dispense:
             dispense = self.env["cdu.dispense"].create({"prescription_id": self.id})
         auth_action = dispense._auto_refresh_production_stock(silent=False)

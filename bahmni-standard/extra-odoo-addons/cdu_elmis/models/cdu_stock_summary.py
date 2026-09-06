@@ -1,5 +1,7 @@
 from odoo import _, api, fields, models
 
+from .stock_option_schema import ensure_stock_on_hand_units_column
+
 
 STOCK_STATUS_SELECTION = [
     ("expired", "Expired"),
@@ -62,6 +64,7 @@ class CduElmisStockSummary(models.Model):
     def init(self):
         if not table_exists(self.env, "cdu_elmis_stock_option"):
             return
+        ensure_stock_on_hand_units_column(self.env.cr, "cdu_elmis_stock_option")
 
         self.env.cr.execute("DELETE FROM cdu_elmis_stock_summary")
         self.env.cr.execute(
@@ -168,6 +171,7 @@ class CduDispenseStockSummary(models.Model):
     def init(self):
         if not table_exists(self.env, "cdu_dispense_stock_option"):
             return
+        ensure_stock_on_hand_units_column(self.env.cr, "cdu_dispense_stock_option")
 
         self.env.cr.execute("DELETE FROM cdu_dispense_stock_summary")
         self.env.cr.execute(

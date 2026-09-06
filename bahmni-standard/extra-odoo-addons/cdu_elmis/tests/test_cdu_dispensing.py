@@ -4,7 +4,7 @@ from unittest.mock import patch
 from lxml import etree, html as lxml_html
 
 from odoo import fields
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -108,6 +108,48 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertTrue(first_dispense.labels_printed)
         self.assertEqual(first_prescription.state, "awaiting_bagging_qa")
         self.assertEqual(second_prescription.state, "awaiting_dispensing")
+
+    def test_cancel_draft_dispensing_job_returns_to_work_queue(self):
+        prescription = self._create_prescription("CANCEL", 10)
+        dispense = self._create_ready_dispense(prescription)
+
+        result = dispense.with_user(self.admin).action_cancel_dispensing()
+        dispense.invalidate_recordset()
+        prescription.invalidate_recordset()
+
+        self.assertEqual(dispense.state, "cancelled")
+        self.assertEqual(dispense.cancelled_by, self.admin)
+        self.assertTrue(dispense.cancelled_at)
+        self.assertEqual(prescription.state, "awaiting_dispensing")
+        self.assertEqual(result["tag"], "display_notification")
+        self.assertEqual(
+            result["params"]["next"]["id"],
+            self.env.ref("cdu_elmis.action_cdu_dispensing_work_queue").id,
+        )
+
+        with self.assertRaises(UserError):
+            dispense.with_user(self.admin).action_confirm_dispensing()
+
+    def test_start_dispensing_reopens_cancelled_job(self):
+        prescription = self._create_prescription("RESTART-CANCELLED", 10)
+        dispense = self._create_ready_dispense(prescription)
+        old_selection_ids = set(dispense.stock_selection_ids.ids)
+        dispense.with_user(self.admin).action_cancel_dispensing()
+
+        with patch.object(
+            type(dispense),
+            "_auto_refresh_production_stock",
+            return_value=False,
+        ):
+            action = prescription.with_user(self.admin).action_open_dispensing()
+        dispense.invalidate_recordset()
+
+        self.assertEqual(action["res_id"], dispense.id)
+        self.assertEqual(dispense.state, "draft")
+        self.assertFalse(dispense.cancelled_by)
+        self.assertFalse(dispense.cancelled_at)
+        self.assertTrue(dispense.stock_selection_ids)
+        self.assertFalse(old_selection_ids.intersection(dispense.stock_selection_ids.ids))
 
     def test_medicine_label_count_matches_bottles_dispensed_per_product(self):
         prescription = self._create_prescription("LABEL-COPIES", 15)
@@ -713,4 +755,13 @@ class TestCduDispensingWorkflow(TransactionCase):
             arch.xpath(
                 ".//field[@name='next_drug_pickup_date'][@string='Next Refill Date']"
             )
+        )
+        self.assertTrue(arch.xpath(".//button[@name='action_cancel_dispensing']"))
+        self.assertIn(
+            "cancelled",
+            arch.xpath(".//field[@name='state']")[0].get("statusbar_visible"),
+        )
+        self.assertIn(
+            'name="cancelled"',
+            self.env.ref("cdu_elmis.view_cdu_dispense_search").arch_db,
         )

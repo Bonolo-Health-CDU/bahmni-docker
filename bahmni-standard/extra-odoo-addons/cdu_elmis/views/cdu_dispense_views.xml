@@ -28,7 +28,8 @@
         <field name="arch" type="xml">
             <tree class="o_cdu_production_list"
                   default_order="next_drug_pickup_date asc, patient_name asc"
-                  decoration-success="state == 'confirmed'">
+                  decoration-success="state == 'confirmed'"
+                  decoration-muted="state == 'cancelled'">
                 <field name="name"/>
                 <field name="patient_name"/>
                 <field name="patient_identifier"/>
@@ -39,7 +40,8 @@
                 <field name="state"
                        widget="badge"
                        decoration-info="state == 'draft'"
-                       decoration-success="state == 'confirmed'"/>
+                       decoration-success="state == 'confirmed'"
+                       decoration-muted="state == 'cancelled'"/>
             </tree>
         </field>
     </record>
@@ -69,6 +71,13 @@
                             class="btn-danger"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_cancel_dispensing"
+                            string="Cancel Dispensing"
+                            type="object"
+                            class="btn-secondary o_cdu_cancel_dispensing_button"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            confirm="Cancel this dispensing job?&#10;&#10;The prescription will stay in the dispensing work queue and can be started again."
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_print_labels"
                             string="Reprint Labels"
                             type="object"
@@ -81,7 +90,7 @@
                             class="btn-secondary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': ['|', ('state', '!=', 'confirmed'), ('labels_printed', '=', True)]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,cancelled"/>
                 </header>
                 <sheet>
                     <div class="oe_title o_cdu_workspace_hero">
@@ -124,6 +133,10 @@
                                 <field name="production_stock_refreshed_at" nolabel="1" readonly="1"/>
                                 <label for="dispensing_ready"/>
                                 <field name="dispensing_ready" nolabel="1" readonly="1"/>
+                                <label for="cancelled_at" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
+                                <field name="cancelled_at" nolabel="1" readonly="1" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
+                                <label for="cancelled_by" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
+                                <field name="cancelled_by" nolabel="1" readonly="1" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
                             </div>
                         </div>
                         <div class="o_cdu_batch_card">
@@ -322,6 +335,7 @@
                 <separator/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <filter string="Cancelled" name="cancelled" domain="[('state', '=', 'cancelled')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                     <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>

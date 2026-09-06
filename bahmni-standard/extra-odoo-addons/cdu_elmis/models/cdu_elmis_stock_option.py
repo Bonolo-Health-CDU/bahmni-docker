@@ -1,5 +1,7 @@
 from odoo import api, fields, models
 
+from .stock_option_schema import backfill_stock_on_hand_units
+
 
 class CduElmisStockOption(models.Model):
     _name = "cdu.elmis.stock.option"
@@ -42,17 +44,7 @@ class CduElmisStockOption(models.Model):
     name = fields.Char(compute="_compute_name", store=True)
 
     def init(self):
-        self.env.cr.execute(
-            """
-            UPDATE cdu_elmis_stock_option
-               SET stock_on_hand_units = stock_on_hand,
-                   stock_on_hand = FLOOR(
-                       stock_on_hand::numeric / COALESCE(NULLIF(pack_size, 0), 30)
-                   )::integer
-             WHERE stock_on_hand_units IS NULL
-               AND stock_on_hand IS NOT NULL
-            """
-        )
+        backfill_stock_on_hand_units(self.env.cr, "cdu_elmis_stock_option")
 
     @api.depends(
         "orderable_name",

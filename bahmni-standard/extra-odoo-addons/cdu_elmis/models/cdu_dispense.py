@@ -73,6 +73,7 @@ class CduDispense(models.Model):
         [
             ("draft", "Draft"),
             ("confirmed", "Confirmed"),
+            ("cancelled", "Cancelled"),
         ],
         default="draft",
         tracking=True,
@@ -97,6 +98,8 @@ class CduDispense(models.Model):
     dispensing_readiness_message = fields.Text(compute="_compute_dispensing_readiness")
     confirmed_by = fields.Many2one("res.users", readonly=True)
     confirmed_at = fields.Datetime(readonly=True)
+    cancelled_by = fields.Many2one("res.users", readonly=True)
+    cancelled_at = fields.Datetime(readonly=True)
     labels_printed_by = fields.Many2one("res.users", readonly=True)
     labels_printed_at = fields.Datetime(readonly=True)
     labels_printed = fields.Boolean(
@@ -274,6 +277,7 @@ class CduDispense(models.Model):
                 )
 
     @api.depends(
+        "state",
         "stock_selection_ids.stock_option_id",
         "stock_selection_ids.selected_orderable_name",
         "stock_selection_ids.quantity_dispensed",
@@ -293,6 +297,9 @@ class CduDispense(models.Model):
     def _get_dispensing_readiness_errors(self):
         self.ensure_one()
         errors = []
+        if self.state == "cancelled":
+            errors.append(_("Dispensing has been cancelled."))
+            return errors
         if not self.stock_selection_ids:
             errors.append(_("Add at least one dispense stock selection."))
             return errors
@@ -460,6 +467,8 @@ class CduDispense(models.Model):
         for dispense in self:
             if dispense.state == "confirmed":
                 raise UserError(_("Dispensing has already been confirmed for %s.") % dispense.name)
+            if dispense.state != "draft":
+                raise UserError(_("Only draft dispensing jobs can be confirmed."))
             dispense._ensure_dispensing_ready()
             dispense.write(
                 {
@@ -501,6 +510,40 @@ class CduDispense(models.Model):
         if self.state != "draft":
             raise UserError(_("Only an active dispensing task can be rejected."))
         return self.prescription_id.action_reject_to_facility()
+
+    def action_cancel_dispensing(self):
+        self.ensure_one()
+        self._ensure_dispensing_access()
+        if self.state == "cancelled":
+            raise UserError(_("Dispensing has already been cancelled for %s.") % self.name)
+        if self.state != "draft":
+            raise UserError(_("Only draft dispensing jobs can be cancelled."))
+
+        self.write(
+            {
+                "state": "cancelled",
+                "cancelled_by": self.env.user.id,
+                "cancelled_at": fields.Datetime.now(),
+            }
+        )
+        self.sudo().message_post(
+            body=_(
+                "Dispensing job cancelled. The prescription remains in the dispensing work queue."
+            )
+        )
+        action = self.env.ref("cdu_elmis.action_cdu_dispensing_work_queue").read()[0]
+        action["views"] = [(False, "tree"), (False, "form")]
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Dispensing cancelled"),
+                "message": _("The prescription remains available for dispensing."),
+                "type": "warning",
+                "sticky": False,
+                "next": action,
+            },
+        }
 
     def action_mark_labels_printed(self):
         self._ensure_dispensing_access()
@@ -615,6 +658,22 @@ class CduDispense(models.Model):
     def action_open_or_create_for_prescription(self):
         self.ensure_one()
         return self._action_open()
+
+    def _restart_cancelled_dispensing(self):
+        for dispense in self.filtered(lambda record: record.state == "cancelled"):
+            dispense.stock_selection_ids.with_context(
+                cdu_allow_dispense_line_sync=True
+            ).unlink()
+            dispense.stock_summary_ids.unlink()
+            dispense.stock_option_ids.unlink()
+            dispense.write(
+                {
+                    "state": "draft",
+                    "cancelled_by": False,
+                    "cancelled_at": False,
+                }
+            )
+            dispense._prefill_from_picking()
 
     def _action_open(self):
         self.ensure_one()
