@@ -21,6 +21,14 @@
         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_backorder_queue"
+        name="Backorder Queue"
+        parent="cdu_prescription.menu_cdu_prescription_operations"
+        action="action_cdu_backorder_queue"
+        sequence="25"
+        groups="cdu_prescription.group_cdu_data_clerk,cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_awaiting_bagging_qa"
         name="Bagging / QA Work Queue"
         parent="cdu_prescription.menu_cdu_production_operations"

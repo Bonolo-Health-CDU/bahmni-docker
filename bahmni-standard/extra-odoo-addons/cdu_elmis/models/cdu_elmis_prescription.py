@@ -1,3 +1,5 @@
+import math
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_compare, float_is_zero
@@ -5,6 +7,116 @@ from odoo.tools.float_utils import float_compare, float_is_zero
 
 class CduPrescription(models.Model):
     _inherit = "cdu.prescription"
+
+    is_backorder = fields.Boolean(
+        string="Backorder",
+        default=False,
+        copy=False,
+        index=True,
+        tracking=True,
+    )
+    source_prescription_id = fields.Many2one(
+        "cdu.prescription",
+        string="Source Prescription",
+        readonly=True,
+        copy=False,
+        ondelete="restrict",
+        index=True,
+    )
+    root_prescription_id = fields.Many2one(
+        "cdu.prescription",
+        string="Original Prescription",
+        readonly=True,
+        copy=False,
+        ondelete="restrict",
+        index=True,
+    )
+    backorder_child_ids = fields.One2many(
+        "cdu.prescription",
+        "source_prescription_id",
+        string="Subsequent Backorders",
+        readonly=True,
+    )
+    origin_dispense_id = fields.Many2one(
+        "cdu.dispense",
+        string="Origin Dispense",
+        readonly=True,
+        copy=False,
+        ondelete="restrict",
+        index=True,
+    )
+    backorder_sequence = fields.Integer(readonly=True, copy=False)
+    backorder_reason = fields.Selection(
+        [
+            ("stock_unavailable", "Stock unavailable"),
+            ("insufficient_stock", "Insufficient stock"),
+            ("damaged_expired", "Stock damaged or expired"),
+            ("other", "Other"),
+        ],
+        readonly=True,
+        copy=False,
+        tracking=True,
+    )
+    backorder_notes = fields.Text(readonly=True, copy=False)
+    backorder_due_date = fields.Date(readonly=True, copy=False, index=True)
+    backorder_required_units = fields.Float(
+        compute="_compute_backorder_required_quantity",
+        store=True,
+        readonly=True,
+    )
+    backorder_required_packs = fields.Float(
+        compute="_compute_backorder_required_quantity",
+        store=True,
+        readonly=True,
+    )
+    backorder_stock_status = fields.Selection(
+        [
+            ("unknown", "Not checked"),
+            ("unavailable", "Unavailable"),
+            ("partial", "Partially available"),
+            ("available", "Available"),
+        ],
+        string="Stock Availability",
+        default="unknown",
+        readonly=True,
+        copy=False,
+        index=True,
+        tracking=True,
+    )
+    backorder_available_units = fields.Float(
+        string="Available Stock Units",
+        readonly=True,
+        copy=False,
+    )
+    backorder_stock_checked_at = fields.Datetime(
+        string="Stock Checked At",
+        readonly=True,
+        copy=False,
+    )
+    backorder_stock_summary = fields.Text(
+        string="Stock Availability Details",
+        readonly=True,
+        copy=False,
+    )
+    backorder_urgent = fields.Boolean(
+        string="Urgent",
+        default=False,
+        copy=False,
+        tracking=True,
+    )
+    backorder_cancellation_reason = fields.Text(
+        string="Cancellation Reason",
+        copy=False,
+        tracking=True,
+    )
+
+    _sql_constraints = [
+        (
+            "unique_backorder_origin_dispense",
+            "unique(origin_dispense_id)",
+            "A backorder has already been created for this dispensing record.",
+        ),
+    ]
 
     dispense_ids = fields.One2many(
         "cdu.dispense",
@@ -70,6 +182,20 @@ class CduPrescription(models.Model):
         )
     )
     _DISPENSING_FLOAT_PRECISION_DIGITS = 4
+
+    @api.depends(
+        "is_backorder",
+        "product_line_ids.backorder_required_units",
+        "product_line_ids.backorder_required_packs",
+    )
+    def _compute_backorder_required_quantity(self):
+        for prescription in self:
+            prescription.backorder_required_units = sum(
+                prescription.product_line_ids.mapped("backorder_required_units")
+            ) if prescription.is_backorder else 0.0
+            prescription.backorder_required_packs = sum(
+                prescription.product_line_ids.mapped("backorder_required_packs")
+            ) if prescription.is_backorder else 0.0
 
     @api.depends(
         "state",
@@ -214,6 +340,10 @@ class CduPrescription(models.Model):
                     "packs": back_order["packs"],
                     "units": back_order["units"],
                     "days": back_order["days"],
+                    "pack_size": group["pack_size"],
+                    "product_id": group["product_id"],
+                    "imported_product_name": group["medicine"],
+                    "dosage_instructions": group["dosage_instructions"],
                     "summary": self._format_dispensing_back_order_line(
                         group["medicine"],
                         back_order["packs"],
@@ -240,6 +370,18 @@ class CduPrescription(models.Model):
         )
         if required_packs and pack_size:
             required_units = max(required_units, required_packs * pack_size)
+        product_line = patient_line.prescription_product_line_id
+        if not product_line:
+            product_line = self.product_line_ids.filtered(
+                lambda line: (
+                    patient_line.product_id
+                    and line.product_id == patient_line.product_id
+                ) or (
+                    not patient_line.product_id
+                    and self._normalize_dispensing_name(line.imported_product_name)
+                    == self._normalize_dispensing_name(patient_line.drug_name)
+                )
+            )[:1]
         return {
             "medicine": (
                 patient_line.product_id.display_name
@@ -260,6 +402,12 @@ class CduPrescription(models.Model):
                 or 0.0
             ),
             "fallback_back_order_days": patient_line.back_order_days or 0.0,
+            "product_id": patient_line.product_id.id or False,
+            "dosage_instructions": (
+                product_line.dosage_instructions
+                or self.dosage_instructions
+                or False
+            ),
         }
 
     def _new_manual_dispense_group(self, selection):
@@ -279,6 +427,8 @@ class CduPrescription(models.Model):
             "daily_dose": 0.0,
             "expected_days": 0.0,
             "fallback_back_order_days": 0.0,
+            "product_id": False,
+            "dosage_instructions": selection.dosage_instructions or False,
         }
 
     def _get_group_back_order_values(self, group):
@@ -402,6 +552,258 @@ class CduPrescription(models.Model):
             or _("No back order"),
         )
 
+    def _create_backorder_from_dispense(self, dispense, back_order_lines):
+        """Create the outstanding supply as a normal prescription workflow item."""
+        self.ensure_one()
+        existing = self.search([("origin_dispense_id", "=", dispense.id)], limit=1)
+        if existing:
+            return existing
+
+        root = self.root_prescription_id or self
+        sequence = self.search_count(
+            [
+                ("is_backorder", "=", True),
+                "|",
+                ("root_prescription_id", "=", root.id),
+                ("source_prescription_id", "=", root.id),
+            ]
+        ) + 1
+        line_commands = []
+        for index, line in enumerate(back_order_lines, start=1):
+            line_commands.append(
+                (
+                    0,
+                    0,
+                    {
+                        "sequence": index * 10,
+                        "product_id": line["product_id"],
+                        "imported_product_name": line["imported_product_name"],
+                        "dosage_instructions": line["dosage_instructions"],
+                        "source": "backorder",
+                        "backorder_required_packs": line["packs"],
+                        "backorder_required_units": line["units"],
+                        "backorder_required_days": line["days"],
+                        "backorder_pack_size": line["pack_size"],
+                    },
+                )
+            )
+
+        today = fields.Date.context_today(self)
+        maximum_days = max([line["days"] for line in back_order_lines] or [0])
+        values = {
+            "name": "%s/BO-%02d" % (root.name, sequence),
+            "is_backorder": True,
+            "source_prescription_id": self.id,
+            "root_prescription_id": root.id,
+            "origin_dispense_id": dispense.id,
+            "backorder_sequence": sequence,
+            "backorder_reason": dispense.backorder_reason,
+            "backorder_notes": dispense.backorder_notes,
+            "backorder_due_date": today,
+            "state": "awaiting_verification",
+            "prescription_date": today,
+            "next_drug_pickup_date": today,
+            "repeat_days": max(1, int(math.ceil(maximum_days))),
+            "facility_id": self.facility_id.id,
+            "facility_name": self.facility_name,
+            "facility_code": self.facility_code,
+            "patient_id": self.patient_id.id,
+            "patient_identifier": self.patient_identifier,
+            "hiv_program_id": self.hiv_program_id,
+            "national_id": self.national_id,
+            "patient_first_name": self.patient_first_name,
+            "patient_date_of_birth": self.patient_date_of_birth,
+            "patient_gender": self.patient_gender,
+            "patient_phone": self.patient_phone,
+            "patient_address": self.patient_address,
+            "allergies": self.allergies,
+            "has_allergies": self.has_allergies,
+            "hiv_diagnosis_date": self.hiv_diagnosis_date,
+            "latest_vl_collection_date": self.latest_vl_collection_date,
+            "latest_vl_result": self.latest_vl_result,
+            "regimen_prescribed_raw": ", ".join(
+                line["imported_product_name"] for line in back_order_lines
+            ),
+            "dosage_instructions": self.dosage_instructions,
+            "new_or_revisit": self.new_or_revisit,
+            "drug_pickup_point_raw": self.drug_pickup_point_raw,
+            "collection_point_id": self.collection_point_id.id,
+            "e_locker_district": self.e_locker_district,
+            "secondary_contact": self.secondary_contact,
+            "prescriber_name": self.prescriber_name,
+            "next_clinical_visit_date": self.next_clinical_visit_date,
+            "product_line_ids": line_commands,
+        }
+        backorder = self.with_context(cdu_allow_product_line_sync=True).create(values)
+        return backorder
+
+    def action_refresh_backorder_stock(self):
+        backorders = self.filtered("is_backorder")
+        if not backorders:
+            raise UserError(_("Select at least one backorder."))
+        self._ensure_cdu_groups(
+            "cdu_prescription.group_cdu_data_clerk",
+            "cdu_prescription.group_cdu_dispensing_officer",
+        )
+        params = self.env["ir.config_parameter"].sudo()
+        facility_code = params.get_param("cdu.elmis.cdu_store_facility_code")
+        program_code = params.get_param("cdu.elmis.default_program_code")
+        if not facility_code or not program_code:
+            raise UserError(_("Configure the CDU Store Facility and default program first."))
+
+        service = self.env["cdu.elmis.stock.service"]
+        service.invalidate_stock_cache(facility_code, program_code)
+        payload = service.get_stock_card_summaries(
+            facility_code=facility_code,
+            program_code=program_code,
+            use_cache=False,
+            use_user_token=False,
+        )
+        options = self.env["cdu.batch"].new({})._stock_options_from_payload(
+            payload,
+            facility_code=facility_code,
+            program_code=program_code,
+        )
+        checked_at = fields.Datetime.now()
+        for backorder in backorders:
+            summaries = []
+            total_available = 0.0
+            known_line_count = 0
+            fully_available = True
+            for line in backorder.product_line_ids:
+                mappings = line.product_id.product_tmpl_id.cdu_elmis_orderable_catalog_ids.filtered(
+                    lambda mapping: mapping.active
+                    and mapping.facility_code == facility_code
+                    and mapping.program_code == program_code
+                ) if line.product_id else self.env["cdu.elmis.orderable.catalog"]
+                identifiers = set(mappings.mapped("orderable_id")) | set(
+                    mappings.mapped("orderable_code")
+                )
+                matching = [
+                    option for option in options
+                    if (option.get("orderable_id") in identifiers)
+                    or (option.get("orderable_code") in identifiers)
+                ]
+                available_units = sum(
+                    option.get("stock_on_hand_units") or 0.0 for option in matching
+                )
+                required_units = line.backorder_required_units or 0.0
+                known = bool(identifiers)
+                if known:
+                    known_line_count += 1
+                total_available += available_units
+                fully_available = fully_available and known and available_units >= required_units
+                line.with_context(cdu_allow_product_line_sync=True).write(
+                    {
+                        "backorder_available_units": available_units,
+                        "backorder_stock_checked_at": checked_at,
+                    }
+                )
+                summaries.append(
+                    _("%s: %s of %s units available")
+                    % (
+                        line.product_id.display_name or line.imported_product_name,
+                        self._format_dispensing_number(available_units),
+                        self._format_dispensing_number(required_units),
+                    )
+                )
+            if fully_available and backorder.product_line_ids:
+                status = "available"
+            elif total_available > 0:
+                status = "partial"
+            elif known_line_count == len(backorder.product_line_ids):
+                status = "unavailable"
+            else:
+                status = "unknown"
+            backorder.write(
+                {
+                    "backorder_stock_status": status,
+                    "backorder_available_units": total_available,
+                    "backorder_stock_checked_at": checked_at,
+                    "backorder_stock_summary": "\n".join(summaries),
+                }
+            )
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Backorder stock refreshed"),
+                "message": _("CDU Store availability was refreshed from eLMIS."),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
+
+    def action_open_backorder_workflow(self):
+        self.ensure_one()
+        if not self.is_backorder:
+            raise UserError(_("This action is only available for backorders."))
+        if self.state == "awaiting_dispensing":
+            return self.action_open_dispensing()
+        if self.state == "awaiting_bagging_qa":
+            return self.action_open_bagging_qa()
+        if self.state == "awaiting_picking" and self.batch_id:
+            return {
+                "type": "ir.actions.act_window",
+                "name": _("Backorder Picking"),
+                "res_model": "cdu.batch",
+                "res_id": self.batch_id.id,
+                "view_mode": "form",
+                "views": [(False, "form")],
+                "target": "main",
+            }
+        return {
+            "type": "ir.actions.act_window",
+            "name": self.name,
+            "res_model": "cdu.prescription",
+            "res_id": self.id,
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "main",
+        }
+
+    def action_open_backorder_source(self):
+        self.ensure_one()
+        source = self.source_prescription_id
+        if not source:
+            raise UserError(_("This backorder has no source prescription."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": source.name,
+            "res_model": "cdu.prescription",
+            "res_id": source.id,
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "main",
+        }
+
+    def action_open_backorder_chain(self):
+        self.ensure_one()
+        root = self.root_prescription_id or self
+        action = self.env.ref("cdu_elmis.action_cdu_backorder_queue").read()[0]
+        action["domain"] = [
+            "|",
+            ("id", "=", root.id),
+            ("root_prescription_id", "=", root.id),
+        ]
+        action["context"] = {}
+        return self._action_as_main_target(action)
+
+    def action_toggle_backorder_urgent(self):
+        for backorder in self.filtered("is_backorder"):
+            backorder.backorder_urgent = not backorder.backorder_urgent
+        return True
+
+    def action_cancel(self):
+        backorders_without_reason = self.filtered(
+            lambda prescription: prescription.is_backorder
+            and not (prescription.backorder_cancellation_reason or "").strip()
+        )
+        if backorders_without_reason:
+            raise UserError(_("Enter a cancellation reason before cancelling a backorder."))
+        return super().action_cancel()
+
     def action_refresh_elmis_product_catalog(self):
         self.ensure_one()
         self._ensure_cdu_groups(
@@ -503,3 +905,18 @@ class CduPrescription(models.Model):
         if not dispense or dispense.state != "confirmed":
             raise UserError(_("This prescription has no confirmed dispensing record."))
         return dispense.action_print_labels()
+
+
+class CduPrescriptionProductLine(models.Model):
+    _inherit = "cdu.prescription.product.line"
+
+    backorder_available_units = fields.Float(
+        string="Available Stock Units",
+        readonly=True,
+        copy=False,
+    )
+    backorder_stock_checked_at = fields.Datetime(
+        string="Stock Checked At",
+        readonly=True,
+        copy=False,
+    )

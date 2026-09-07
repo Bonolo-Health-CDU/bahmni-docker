@@ -249,9 +249,16 @@ class TestCduDispensingWorkflow(TransactionCase):
         )
         dispense = self._create_ready_dispense(prescription)
         dispense.stock_selection_ids.quantity_dispensed = 1
+        dispense.write(
+            {
+                "backorder_reason": "insufficient_stock",
+                "backorder_notes": "Only one pack was available on the floor.",
+            }
+        )
 
         dispense.with_user(self.admin).action_confirm_dispensing()
         prescription.invalidate_recordset()
+        dispense.invalidate_recordset()
 
         self.assertEqual(prescription.dispensing_status, "partially_dispensed")
         self.assertEqual(prescription.dispensing_back_order_packs, 1)
@@ -265,6 +272,163 @@ class TestCduDispensingWorkflow(TransactionCase):
             "TEST-DISPENSING-REGIMEN: 1 pack, 30 units, 30 days",
             prescription.dispensing_back_order_summary,
         )
+        backorder = dispense.created_backorder_id
+        self.assertTrue(backorder)
+        self.assertTrue(backorder.is_backorder)
+        self.assertEqual(backorder.state, "awaiting_verification")
+        self.assertEqual(backorder.source_prescription_id, prescription)
+        self.assertEqual(backorder.root_prescription_id, prescription)
+        self.assertEqual(backorder.origin_dispense_id, dispense)
+        self.assertEqual(backorder.backorder_reason, "insufficient_stock")
+        self.assertEqual(backorder.backorder_required_packs, 1)
+        self.assertEqual(backorder.backorder_required_units, 30)
+        self.assertEqual(len(backorder.product_line_ids), 1)
+        self.assertEqual(
+            backorder.product_line_ids.backorder_required_days,
+            30,
+        )
+
+    def test_partial_dispense_requires_shortage_reason(self):
+        prescription = self._create_prescription("PARTIAL-REASON", 10)
+        self._create_patient_picking_context(
+            prescription,
+            required_packs=2,
+            picked_packs=2,
+            pack_size=30,
+            daily_dose=1,
+            cdu_days=60,
+        )
+        dispense = self._create_ready_dispense(prescription)
+        dispense.stock_selection_ids.quantity_dispensed = 1
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            "Select a shortage reason",
+        ):
+            dispense.with_user(self.admin).action_confirm_dispensing()
+
+        self.assertEqual(dispense.state, "draft")
+        self.assertFalse(dispense.created_backorder_id)
+
+    def test_backorder_picking_uses_only_outstanding_units(self):
+        product = self.env["product.product"].create(
+            {
+                "name": "Backorder Quantity Medicine",
+                "type": "product",
+                "cdu_is_drug": True,
+                "cdu_catalog_source": "manual",
+                "cdu_pack_size": 30,
+                "cdu_default_daily_dose": 1,
+            }
+        )
+        backorder = self._create_prescription("BACKORDER-PICK", 10)
+        backorder.write(
+            {
+                "is_backorder": True,
+                "repeat_days": 60,
+                "batch_id": False,
+                "state": "awaiting_batching",
+            }
+        )
+        backorder.product_line_ids.with_context(
+            cdu_allow_product_line_sync=True
+        ).write(
+            {
+                "product_id": product.id,
+                "source": "backorder",
+                "backorder_required_packs": 1,
+                "backorder_required_units": 30,
+                "backorder_required_days": 30,
+                "backorder_pack_size": 30,
+            }
+        )
+        batch = self.env["cdu.batch"].create(
+            {"prescription_ids": [(6, 0, backorder.ids)]}
+        )
+
+        patient_values, summary_values = batch._prepare_picking_line_values()
+
+        self.assertEqual(len(patient_values), 1)
+        self.assertEqual(patient_values[0]["required_units"], 30)
+        self.assertEqual(patient_values[0]["packs_to_pick"], 1)
+        self.assertEqual(
+            patient_values[0]["prescription_product_line_id"],
+            backorder.product_line_ids.id,
+        )
+        self.assertEqual(summary_values[0]["total_tablets"], 30)
+        self.assertEqual(summary_values[0]["total_bottles"], 1)
+
+    def test_backorder_queue_refreshes_store_stock_availability(self):
+        product = self.env["product.product"].create(
+            {
+                "name": "Backorder Availability Medicine",
+                "type": "product",
+                "cdu_is_drug": True,
+                "cdu_catalog_source": "elmis",
+                "cdu_pack_size": 0,
+            }
+        )
+        self.env["cdu.elmis.orderable.catalog"].create(
+            {
+                "medicine_tmpl_id": product.product_tmpl_id.id,
+                "orderable_id": "BACKORDER-STOCK-UUID",
+                "orderable_code": "BACKORDER-STOCK-CODE",
+                "full_name": "Backorder Availability Medicine 30",
+                "generic_label": "Backorder Availability Medicine",
+                "pack_size": 30,
+                "facility_code": "TEST-BACKORDER-STORE",
+                "program_code": "TEST-BACKORDER-PROGRAM",
+            }
+        )
+        backorder = self._create_prescription("BACKORDER-STOCK", 10)
+        backorder.write({"is_backorder": True, "batch_id": False})
+        backorder.product_line_ids.with_context(
+            cdu_allow_product_line_sync=True
+        ).write(
+            {
+                "product_id": product.id,
+                "source": "backorder",
+                "backorder_required_packs": 1,
+                "backorder_required_units": 30,
+                "backorder_required_days": 30,
+                "backorder_pack_size": 30,
+            }
+        )
+        params = self.env["ir.config_parameter"].sudo()
+        params.set_param("cdu.elmis.cdu_store_facility_code", "TEST-BACKORDER-STORE")
+        params.set_param("cdu.elmis.default_program_code", "TEST-BACKORDER-PROGRAM")
+        payload = [
+            {
+                "canFulfillForMe": [
+                    {
+                        "stockOnHand": 45,
+                        "lotExpirationDate": fields.Date.to_string(
+                            self.today + timedelta(days=365)
+                        ),
+                        "orderable": {"id": "BACKORDER-STOCK-UUID"},
+                        "lot": {"id": "BACKORDER-STOCK-LOT"},
+                        "lotCode": "BACKORDER-STOCK-LOT",
+                        "orderableName": "Backorder Availability Medicine 30",
+                        "packSize": 30,
+                    }
+                ]
+            }
+        ]
+        Service = type(self.env["cdu.elmis.stock.service"])
+        with patch.object(Service, "invalidate_stock_cache", return_value=True), patch.object(
+            Service,
+            "get_stock_card_summaries",
+            return_value=payload,
+        ):
+            backorder.with_user(self.admin).action_refresh_backorder_stock()
+
+        self.assertEqual(backorder.backorder_stock_status, "available")
+        self.assertEqual(backorder.backorder_available_units, 45)
+        self.assertEqual(
+            backorder.product_line_ids.backorder_available_units,
+            45,
+        )
+        self.assertTrue(backorder.backorder_stock_checked_at)
 
     def test_medicine_label_count_matches_bottles_dispensed_per_product(self):
         prescription = self._create_prescription("LABEL-COPIES", 15)

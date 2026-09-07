@@ -78,6 +78,23 @@ class CduDispense(models.Model):
         default="draft",
         tracking=True,
     )
+    backorder_reason = fields.Selection(
+        [
+            ("stock_unavailable", "Stock unavailable"),
+            ("insufficient_stock", "Insufficient stock"),
+            ("damaged_expired", "Stock damaged or expired"),
+            ("other", "Other"),
+        ],
+        string="Shortage Reason",
+        tracking=True,
+    )
+    backorder_notes = fields.Text(string="Shortage Notes", tracking=True)
+    created_backorder_id = fields.Many2one(
+        "cdu.prescription",
+        string="Created Backorder",
+        compute="_compute_created_backorder",
+        readonly=True,
+    )
     production_stock_refreshed_at = fields.Datetime(string="Production Floor Stock Refreshed At")
     stock_option_ids = fields.One2many(
         "cdu.dispense.stock.option",
@@ -122,6 +139,14 @@ class CduDispense(models.Model):
             "Only one dispense record is allowed per prescription.",
         ),
     ]
+
+    def _compute_created_backorder(self):
+        Backorder = self.env["cdu.prescription"]
+        for dispense in self:
+            dispense.created_backorder_id = Backorder.search(
+                [("origin_dispense_id", "=", dispense.id)],
+                limit=1,
+            )
 
     @api.model
     def create(self, vals):
@@ -470,6 +495,21 @@ class CduDispense(models.Model):
             if dispense.state != "draft":
                 raise UserError(_("Only draft dispensing jobs can be confirmed."))
             dispense._ensure_dispensing_ready()
+            back_order_lines = dispense.prescription_id._get_dispensing_back_order_lines(
+                dispense
+            )
+            if back_order_lines and not dispense.backorder_reason:
+                raise ValidationError(
+                    _("Select a shortage reason before confirming a partial dispense.")
+                )
+            if (
+                back_order_lines
+                and dispense.backorder_reason == "other"
+                and not (dispense.backorder_notes or "").strip()
+            ):
+                raise ValidationError(
+                    _("Enter shortage notes when the shortage reason is Other.")
+                )
             dispense.write(
                 {
                     "state": "confirmed",
@@ -477,6 +517,11 @@ class CduDispense(models.Model):
                     "confirmed_at": fields.Datetime.now(),
                 }
             )
+            if back_order_lines:
+                dispense.prescription_id._create_backorder_from_dispense(
+                    dispense,
+                    back_order_lines,
+                )
             if dispense.prescription_id.state == "awaiting_dispensing":
                 dispense.prescription_id.write({"state": "awaiting_bagging_qa"})
         report_action = self.with_context(
@@ -488,8 +533,10 @@ class CduDispense(models.Model):
             "params": {
                 "report_action": report_action,
                 "title": _("Dispensing confirmed"),
-                "message": _(
-                    "Labels were generated. Continuing the dispensing workflow."
+                "message": (
+                    _("Labels were generated and the shortage was sent to Awaiting Verification as a backorder.")
+                    if self.created_backorder_id
+                    else _("Labels were generated. Continuing the dispensing workflow.")
                 ),
                 "notification_type": "success",
                 "sticky": False,

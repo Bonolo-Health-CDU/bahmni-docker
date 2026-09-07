@@ -206,6 +206,20 @@
                                        string="Next Refill Date"
                                        readonly="1"/>
                             </group>
+                            <group string="Partial Dispense / Backorder">
+                                <field name="backorder_reason"
+                                       attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                                <field name="backorder_notes"
+                                       placeholder="Required context when Other is selected"
+                                       attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                                <field name="created_backorder_id"
+                                       readonly="1"
+                                       attrs="{'invisible': [('created_backorder_id', '=', False)]}"/>
+                                <div class="alert alert-warning" role="alert"
+                                     attrs="{'invisible': [('state', '!=', 'draft')]}">
+                                    If any dispensed quantity is lower than the picked requirement, select a shortage reason. Confirmation will create a backorder in Awaiting Verification for the outstanding quantity.
+                                </div>
+                            </group>
                         </page>
                         <page string="Available CDU Production Floor Stock">
                             <div class="alert alert-info o_cdu_elmis_empty_stock_hint"

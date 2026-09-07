@@ -388,6 +388,10 @@ class CduBatch(models.Model):
             excessive = batch.prescription_ids.filtered(
                 lambda prescription: prescription.repeat_days
                 and prescription.repeat_days > (prescription.cdu_days_supply or 0)
+                and not any(
+                    line.backorder_required_units
+                    for line in prescription.product_line_ids
+                )
             )
             if excessive:
                 names = ", ".join(excessive.mapped("name")[:5])
@@ -572,6 +576,7 @@ class CduBatch(models.Model):
                             if line.product_id
                             else line.imported_product_name
                         ),
+                        line,
                     )
                     for line in prescription.product_line_ids.sorted(
                         key=lambda product_line: (product_line.sequence, product_line.id)
@@ -579,7 +584,7 @@ class CduBatch(models.Model):
                 ]
             elif prescription.regimen_id:
                 medicines = [
-                    (line.product_id, line.daily_dose or 0, line.product_id.display_name)
+                    (line.product_id, line.daily_dose or 0, line.product_id.display_name, False)
                     for line in prescription.regimen_id.line_ids
                 ]
             else:
@@ -588,10 +593,11 @@ class CduBatch(models.Model):
                         self.env["product.product"],
                         1.0,
                         (prescription.regimen_prescribed_raw or "Unknown Drug").strip(),
+                        False,
                     )
                 ]
 
-            for product, daily_dose, drug_name in medicines:
+            for product, daily_dose, drug_name, prescription_product_line in medicines:
                 pack_size = (
                     product.product_tmpl_id.cdu_pack_size
                     if product
@@ -620,18 +626,43 @@ class CduBatch(models.Model):
                 # CDU SUPPLY
                 # -------------------------------------------------
 
-                cdu_units_required = (
-                    daily_dose * operational_days
+                backorder_units = (
+                    prescription_product_line.backorder_required_units
+                    if prescription_product_line
+                    else 0.0
                 )
+                backorder_packs = (
+                    prescription_product_line.backorder_required_packs
+                    if prescription_product_line
+                    else 0.0
+                )
+                backorder_days = (
+                    prescription_product_line.backorder_required_days
+                    if prescription_product_line
+                    else 0.0
+                )
+                backorder_pack_size = (
+                    prescription_product_line.backorder_pack_size
+                    if prescription_product_line
+                    else 0.0
+                )
+                if backorder_pack_size:
+                    pack_size = backorder_pack_size
+
+                cdu_units_required = backorder_units or (daily_dose * operational_days)
 
                 cdu_bottles_required = (
-                    math.ceil(cdu_units_required / pack_size)
+                    backorder_packs
+                    or math.ceil(cdu_units_required / pack_size)
                     if cdu_units_required > 0 and pack_size > 0
                     else 0
                 )
                 picked_units = cdu_bottles_required * pack_size
                 actual_supplied_days = picked_units / daily_dose if daily_dose else 0
-                back_order_days = max(cdu_days - actual_supplied_days, 0)
+                back_order_days = max(
+                    (backorder_days or cdu_days) - actual_supplied_days,
+                    0,
+                )
                 calculated_next_pickup_date = False
                 if prescription.next_drug_pickup_date and actual_supplied_days:
                     calculated_next_pickup_date = (
@@ -661,6 +692,12 @@ class CduBatch(models.Model):
                     "batch_id": self.id,
 
                     "prescription_id": prescription.id,
+
+                    "prescription_product_line_id": (
+                        prescription_product_line.id
+                        if prescription_product_line
+                        else False
+                    ),
 
                     "patient_id": prescription.patient_id.id,
 

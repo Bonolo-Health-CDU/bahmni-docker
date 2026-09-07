@@ -6,6 +6,28 @@
         <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_tree"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='state']" position="before">
+                <field name="is_backorder" invisible="1"/>
+                <field name="backorder_urgent"
+                       widget="boolean_toggle"
+                       optional="show"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="source_prescription_id"
+                       optional="show"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_due_date"
+                       optional="show"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_required_units"
+                       optional="show"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_stock_status"
+                       widget="badge"
+                       optional="show"
+                       decoration-success="backorder_stock_status == 'available'"
+                       decoration-warning="backorder_stock_status == 'partial'"
+                       decoration-danger="backorder_stock_status == 'unavailable'"
+                       decoration-muted="backorder_stock_status == 'unknown'"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
                 <field name="dispensing_status"
                        widget="badge"
                        optional="show"
@@ -25,6 +47,34 @@
         <field name="model">cdu.prescription</field>
         <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_remap_regimens']" position="before">
+                <field name="is_backorder" invisible="1"/>
+                <button name="action_open_backorder_workflow"
+                        string="Open Workflow Task"
+                        type="object"
+                        class="oe_highlight"
+                        attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <button name="action_refresh_backorder_stock"
+                        string="Refresh Stock"
+                        type="object"
+                        class="btn-secondary"
+                        attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <button name="action_open_backorder_source"
+                        string="Open Source"
+                        type="object"
+                        class="btn-secondary"
+                        attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <button name="action_open_backorder_chain"
+                        string="View Chain"
+                        type="object"
+                        class="btn-secondary"
+                        attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <button name="action_toggle_backorder_urgent"
+                        string="Toggle Urgent"
+                        type="object"
+                        class="btn-secondary"
+                        attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+            </xpath>
             <xpath expr="//group[hasclass('o_cdu_summary_grid')]//field[@name='batch_id']" position="after">
                 <field name="dispensing_status"
                        widget="badge"
@@ -35,6 +85,59 @@
                 <field name="dispensing_back_order_summary"
                        readonly="1"
                        attrs="{'invisible': [('dispensing_status', '!=', 'partially_dispensed')]}"/>
+                <field name="source_prescription_id"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="root_prescription_id"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_reason"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_notes"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_due_date"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_urgent"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_required_packs"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_required_units"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_stock_status"
+                       widget="badge"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_available_units"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_stock_checked_at"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_stock_summary"
+                       readonly="1"
+                       attrs="{'invisible': [('is_backorder', '=', False)]}"/>
+                <field name="backorder_cancellation_reason"
+                       placeholder="Required before cancelling a backorder"
+                       attrs="{'invisible': [('is_backorder', '=', False)], 'readonly': [('state', '=', 'cancelled')]}"/>
+            </xpath>
+            <xpath expr="//field[@name='product_line_ids']/tree/field[@name='source']" position="before">
+                <field name="backorder_required_packs"
+                       optional="show"
+                       attrs="{'column_invisible': [('parent.is_backorder', '=', False)]}"/>
+                <field name="backorder_required_units"
+                       optional="show"
+                       attrs="{'column_invisible': [('parent.is_backorder', '=', False)]}"/>
+                <field name="backorder_required_days"
+                       optional="show"
+                       attrs="{'column_invisible': [('parent.is_backorder', '=', False)]}"/>
+                <field name="backorder_available_units"
+                       optional="show"
+                       attrs="{'column_invisible': [('parent.is_backorder', '=', False)]}"/>
             </xpath>
         </field>
     </record>
@@ -46,6 +149,10 @@
         <field name="arch" type="xml">
             <xpath expr="//filter[@name='dispatched']" position="after">
                 <separator/>
+                <filter string="Backorders" name="backorders" domain="[('is_backorder', '=', True)]"/>
+                <filter string="Urgent Backorders" name="urgent_backorders" domain="[('is_backorder', '=', True), ('backorder_urgent', '=', True)]"/>
+                <filter string="Backorder Stock Available" name="backorder_stock_available" domain="[('is_backorder', '=', True), ('backorder_stock_status', '=', 'available')]"/>
+                <separator/>
                 <filter string="Not Dispensed" name="dispensing_not_dispensed" domain="[('dispensing_status', '=', 'not_dispensed')]"/>
                 <filter string="Fully Dispensed" name="dispensing_fully_dispensed" domain="[('dispensing_status', '=', 'fully_dispensed')]"/>
                 <filter string="Partially Dispensed" name="dispensing_partially_dispensed" domain="[('dispensing_status', '=', 'partially_dispensed')]"/>
@@ -53,6 +160,7 @@
             </xpath>
             <xpath expr="//filter[@name='group_state']" position="after">
                 <filter string="Dispensing Status" name="group_dispensing_status" context="{'group_by': 'dispensing_status'}"/>
+                <filter string="Backorder Stock" name="group_backorder_stock" context="{'group_by': 'backorder_stock_status'}"/>
             </xpath>
         </field>
     </record>
@@ -71,5 +179,14 @@
                         attrs="{'invisible': [('state', 'not in', ('awaiting_verification', 'awaiting_validation', 'rejected_to_call_center', 'rejected_to_facility'))]}"/>
             </xpath>
         </field>
+    </record>
+
+    <record id="action_cdu_backorder_queue" model="ir.actions.act_window">
+        <field name="name">Backorder Queue</field>
+        <field name="res_model">cdu.prescription</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="cdu_prescription.view_cdu_prescription_search"/>
+        <field name="domain">[('is_backorder', '=', True)]</field>
+        <field name="context">{'search_default_group_state': 1}</field>
     </record>
 </odoo>

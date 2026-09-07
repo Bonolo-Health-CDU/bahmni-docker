@@ -40,10 +40,31 @@ class CduPrescriptionProductLine(models.Model):
             ("legacy", "Imported prescription"),
             ("regimen", "Mapped regimen"),
             ("manual", "Manually added"),
+            ("backorder", "Backorder"),
         ],
         default="manual",
         required=True,
         readonly=True,
+    )
+    backorder_required_packs = fields.Float(
+        string="Outstanding Packs",
+        readonly=True,
+        copy=False,
+    )
+    backorder_required_units = fields.Float(
+        string="Outstanding Units",
+        readonly=True,
+        copy=False,
+    )
+    backorder_required_days = fields.Float(
+        string="Outstanding Days",
+        readonly=True,
+        copy=False,
+    )
+    backorder_pack_size = fields.Float(
+        string="Backorder Pack Size",
+        readonly=True,
+        copy=False,
     )
 
     def init(self):

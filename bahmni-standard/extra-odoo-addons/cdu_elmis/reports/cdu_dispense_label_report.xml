@@ -395,6 +395,16 @@
                             </div>
                             <div class="cdu-rule"/>
                             <div class="cdu-title">Dispensing Receipt</div>
+                            <div t-if="dispense.created_backorder_id"
+                                 style="border: 1px solid #b45309; background: #fff7ed; padding: 2mm; margin-bottom: 3mm;">
+                                <strong>PARTIAL SUPPLY</strong><br/>
+                                Outstanding medication is recorded as
+                                <span t-field="dispense.created_backorder_id.name"/>.
+                                <div t-if="prescription.dispensing_back_order_summary"
+                                     style="white-space: pre-line; margin-top: 1mm;">
+                                    <span t-field="prescription.dispensing_back_order_summary"/>
+                                </div>
+                            </div>
                             <div class="cdu-row">
                                 <div class="cdu-label-key">Prescription:</div>
                                 <div><span t-esc="script_number"/></div>

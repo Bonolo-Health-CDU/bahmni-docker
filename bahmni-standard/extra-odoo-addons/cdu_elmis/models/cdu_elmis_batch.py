@@ -442,13 +442,18 @@ class CduBatch(models.Model):
         pack_size = pack_size or 0
         for patient_line in patient_lines:
             daily_dose = patient_line.daily_dose or 0
+            product_line = patient_line.prescription_product_line_id
             effective_days = (
                 patient_line.effective_repeat_days
                 or patient_line.prescription_repeat_days
                 or patient_line.repeat_days
                 or 0
             )
-            required_units = daily_dose * effective_days
+            required_units = (
+                product_line.backorder_required_units
+                if product_line and product_line.backorder_required_units
+                else daily_dose * effective_days
+            )
             packs_to_pick = (
                 math.ceil(required_units / pack_size)
                 if required_units > 0 and pack_size > 0
@@ -456,7 +461,12 @@ class CduBatch(models.Model):
             )
             picked_units = packs_to_pick * pack_size
             actual_supplied_days = picked_units / daily_dose if daily_dose else 0
-            back_order_days = max((patient_line.cdu_days or 0) - actual_supplied_days, 0)
+            expected_days = (
+                product_line.backorder_required_days
+                if product_line and product_line.backorder_required_days
+                else patient_line.cdu_days or 0
+            )
+            back_order_days = max(expected_days - actual_supplied_days, 0)
             next_pickup_date = False
             if patient_line.prescription_id.next_drug_pickup_date and actual_supplied_days:
                 next_pickup_date = patient_line.prescription_id.next_drug_pickup_date + timedelta(
@@ -630,7 +640,12 @@ class CduBatch(models.Model):
                 for patient_line in patient_lines.sorted("id"):
                     daily_dose = patient_line.daily_dose or 0
                     effective_repeat_days = patient_line.effective_repeat_days or patient_line.repeat_days or 0
-                    required_quantity = daily_dose * effective_repeat_days
+                    product_line = patient_line.prescription_product_line_id
+                    required_quantity = (
+                        product_line.backorder_required_units
+                        if product_line and product_line.backorder_required_units
+                        else daily_dose * effective_repeat_days
+                    )
                     line_available_quantity = min(required_quantity, available_units)
                     bottle_quantity = (
                         (patient_line.cdu_bottles_required or 0)
@@ -639,7 +654,12 @@ class CduBatch(models.Model):
                     picked_bottle_quantity = min(bottle_quantity, remaining_units)
                     actual_supplied_days = picked_bottle_quantity / daily_dose if daily_dose else 0
                     served_days = int(actual_supplied_days)
-                    back_order_days = max((patient_line.cdu_days or 0) - actual_supplied_days, 0)
+                    expected_days = (
+                        product_line.backorder_required_days
+                        if product_line and product_line.backorder_required_days
+                        else patient_line.cdu_days or 0
+                    )
+                    back_order_days = max(expected_days - actual_supplied_days, 0)
                     recalculated_date = False
                     if patient_line.prescription_id.next_drug_pickup_date:
                         recalculated_date = (
