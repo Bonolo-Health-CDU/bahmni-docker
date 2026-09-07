@@ -533,6 +533,7 @@ class CduDispense(models.Model):
         )
         action = self.env.ref("cdu_elmis.action_cdu_dispensing_work_queue").read()[0]
         action["views"] = [(False, "tree"), (False, "form")]
+        action = self._action_as_main_target(action)
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -612,7 +613,7 @@ class CduDispense(models.Model):
             "cdu_elmis.action_cdu_dispensing_work_queue"
         ).read()[0]
         action["views"] = [(False, "tree"), (False, "form")]
-        return action
+        return self._action_as_main_target(action)
 
     def action_open_next_dispensing_task(self):
         self.ensure_one()
@@ -659,6 +660,11 @@ class CduDispense(models.Model):
         self.ensure_one()
         return self._action_open()
 
+    def _action_as_main_target(self, action):
+        action = dict(action)
+        action["target"] = "main"
+        return action
+
     def _restart_cancelled_dispensing(self):
         for dispense in self.filtered(lambda record: record.state == "cancelled"):
             dispense.stock_selection_ids.with_context(
@@ -684,5 +690,5 @@ class CduDispense(models.Model):
             "res_id": self.id,
             "view_mode": "form",
             "views": [(False, "form")],
-            "target": "current",
+            "target": "main",
         }

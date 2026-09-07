@@ -158,10 +158,11 @@
                                        placeholder="Scan bag label barcode"
                                        nolabel="1"/>
                             </div>
+                            <field name="available_bagging_qa_ids" invisible="1"/>
                             <field name="line_ids" attrs="{'readonly': [('state', '=', 'confirmed')]}">
                                 <tree editable="bottom" default_order="parcel_reference asc">
                                     <field name="bagging_qa_id"
-                                           domain="[('state', '=', 'confirmed'), ('prescription_id.state', '=', 'awaiting_boxing')]"
+                                           domain="[('id', 'in', parent.available_bagging_qa_ids)]"
                                            options="{'no_create': True, 'no_open': True}"/>
                                     <field name="parcel_reference" readonly="1"/>
                                     <field name="patient_name" readonly="1"/>

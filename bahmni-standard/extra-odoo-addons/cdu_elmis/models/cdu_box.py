@@ -1,6 +1,5 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.osv import expression
 from werkzeug import urls
 
 
@@ -19,6 +18,11 @@ class CduBox(models.Model):
     next_drug_pickup_date = fields.Date(string="Next Drug Pickup Date", tracking=True)
     max_parcels = fields.Integer(default=20, required=True, tracking=True)
     line_ids = fields.One2many("cdu.box.line", "box_id", string="Parcels")
+    available_bagging_qa_ids = fields.Many2many(
+        "cdu.bagging.qa",
+        compute="_compute_available_bagging_qa_ids",
+        string="Available Parcels",
+    )
     parcel_count = fields.Integer(compute="_compute_parcel_count", store=True)
     bag_label_scan_input = fields.Text(
         string="Scan Bag Label Barcode",
@@ -133,6 +137,24 @@ class CduBox(models.Model):
     def _compute_parcel_count(self):
         for box in self:
             box.parcel_count = len(box.line_ids)
+
+    @api.depends("line_ids.bagging_qa_id")
+    def _compute_available_bagging_qa_ids(self):
+        BaggingQa = self.env["cdu.bagging.qa"]
+        boxed_parcel_ids = set(
+            self.env["cdu.box.line"].search([]).mapped("bagging_qa_id").ids
+        )
+        for box in self:
+            unavailable_ids = boxed_parcel_ids | set(
+                box.line_ids.mapped("bagging_qa_id").ids
+            )
+            domain = [
+                ("state", "=", "confirmed"),
+                ("prescription_id.state", "=", "awaiting_boxing"),
+            ]
+            if unavailable_ids:
+                domain.append(("id", "not in", list(unavailable_ids)))
+            box.available_bagging_qa_ids = BaggingQa.search(domain)
 
     def _compute_bag_label_scan_input(self):
         for box in self:
@@ -990,24 +1012,35 @@ class CduBoxLine(models.Model):
             parcels_by_box.setdefault(box_id, []).append(parcel_id)
 
         for box_id, parcel_ids in parcels_by_box.items():
-            if len(parcel_ids) != len(set(parcel_ids)):
-                self._raise_duplicate_parcel_error(parcel_ids[0])
+            seen_ids = set()
+            for parcel_id in parcel_ids:
+                if parcel_id in seen_ids:
+                    self._raise_duplicate_parcel_error(parcel_id)
+                seen_ids.add(parcel_id)
 
         if not parcels_by_box:
             return
 
-        domains = []
-        for box_id, parcel_ids in parcels_by_box.items():
-            domains.append(
-                [
-                    ("box_id", "=", box_id),
-                    ("bagging_qa_id", "in", list(set(parcel_ids))),
-                ]
-            )
-        domain = expression.OR(domains)
-        duplicate = self.search(domain, limit=1)
+        parcel_ids = [
+            parcel_id
+            for parcel_ids_for_box in parcels_by_box.values()
+            for parcel_id in parcel_ids_for_box
+        ]
+        seen_ids = set()
+        for parcel_id in parcel_ids:
+            if parcel_id in seen_ids:
+                self._raise_duplicate_parcel_error(parcel_id)
+            seen_ids.add(parcel_id)
+
+        duplicate = self.search(
+            [("bagging_qa_id", "in", list(set(parcel_ids)))],
+            limit=1,
+        )
         if duplicate:
-            self._raise_duplicate_parcel_error(duplicate.bagging_qa_id.id)
+            self._raise_duplicate_parcel_error(
+                duplicate.bagging_qa_id.id,
+                box=duplicate.box_id,
+            )
 
     def _validate_write_values_unique_parcels(self, vals):
         for line in self:
@@ -1018,17 +1051,24 @@ class CduBoxLine(models.Model):
             duplicate = self.search(
                 [
                     ("id", "!=", line.id),
-                    ("box_id", "=", box_id),
                     ("bagging_qa_id", "=", parcel_id),
                 ],
                 limit=1,
             )
             if duplicate:
-                self._raise_duplicate_parcel_error(parcel_id)
+                self._raise_duplicate_parcel_error(parcel_id, box=duplicate.box_id)
 
-    def _raise_duplicate_parcel_error(self, parcel_id):
+    def _raise_duplicate_parcel_error(self, parcel_id, box=False):
         parcel = self.env["cdu.bagging.qa"].browse(parcel_id)
         parcel_label = parcel.parcel_reference or parcel.display_name
+        if box:
+            raise ValidationError(
+                _("%(parcel)s has already been added to box %(box)s.")
+                % {
+                    "parcel": parcel_label,
+                    "box": box.display_name,
+                }
+            )
         raise ValidationError(_("%s has already been added to this box.") % parcel_label)
 
     def unlink(self):

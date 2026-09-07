@@ -3,7 +3,7 @@ from datetime import timedelta
 from lxml import etree, html as lxml_html
 
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -68,6 +68,49 @@ class TestCduBoxingWorkflow(TransactionCase):
             }
         )
 
+    def _create_confirmed_parcel(self, suffix):
+        today = fields.Date.today()
+        patient = self.env["res.partner"].create(
+            {
+                "name": "Boxing Test Patient %s" % suffix,
+                "customer_rank": 1,
+                "cdu_eregister_id": "TEST-BOXING-EREGISTER-%s" % suffix,
+            }
+        )
+        prescription = self.env["cdu.prescription"].create(
+            {
+                "facility_id": self.facility.id,
+                "facility_name": self.facility.name,
+                "facility_code": self.facility.code,
+                "prescription_date": today,
+                "patient_id": patient.id,
+                "patient_identifier": patient.cdu_eregister_id,
+                "patient_first_name": patient.name,
+                "regimen_prescribed_raw": "TEST-BOXING-REGIMEN",
+                "dosage_instructions": "Take one tablet daily.",
+                "drug_pickup_point_raw": self.collection_point.name,
+                "collection_point_id": self.collection_point.id,
+                "next_drug_pickup_date": today + timedelta(days=30),
+                "state": "awaiting_boxing",
+            }
+        )
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create(
+            {
+                "prescription_id": prescription.id,
+                "state": "confirmed",
+            }
+        )
+        return self.env["cdu.bagging.qa"].create(
+            {
+                "prescription_id": prescription.id,
+                "dispense_id": dispense.id,
+                "state": "confirmed",
+                "parcel_reference": "TEST-PARCEL-%s" % suffix,
+            }
+        )
+
     def test_barcode_scan_adds_one_parcel_and_reports_capacity(self):
         box = self.env["cdu.box"].with_user(self.admin).create(
             {"max_parcels": 20}
@@ -91,6 +134,35 @@ class TestCduBoxingWorkflow(TransactionCase):
 
         with self.assertRaises(UserError):
             box.action_scan_bag_label(self.prescription.name)
+
+    def test_added_parcels_are_removed_from_manual_selection_domain(self):
+        second_parcel = self._create_confirmed_parcel("AVAILABLE")
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        box.action_scan_bag_label(self.prescription.name)
+        box.invalidate_recordset()
+
+        self.assertNotIn(self.parcel, box.available_bagging_qa_ids)
+        self.assertIn(second_parcel, box.available_bagging_qa_ids)
+
+        view = self.env.ref("cdu_elmis.view_cdu_box_form")
+        arch = etree.fromstring(view.arch_db.encode())
+        parcel_field = arch.xpath(
+            ".//field[@name='line_ids']/tree/field[@name='bagging_qa_id']"
+        )
+        self.assertIn("available_bagging_qa_ids", parcel_field[0].get("domain"))
+
+    def test_manual_box_line_rejects_parcel_already_in_any_box(self):
+        first_box = self.env["cdu.box"].with_user(self.admin).create({})
+        first_box.action_scan_bag_label(self.prescription.name)
+        second_box = self.env["cdu.box"].with_user(self.admin).create({})
+
+        with self.assertRaisesRegex(ValidationError, "already been added to box"):
+            self.env["cdu.box.line"].with_user(self.admin).create(
+                {
+                    "box_id": second_box.id,
+                    "bagging_qa_id": self.parcel.id,
+                }
+            )
 
     def test_unknown_barcode_is_rejected(self):
         box = self.env["cdu.box"].with_user(self.admin).create({})

@@ -98,6 +98,7 @@ class TestCduPrescriptionWorkflow(TransactionCase):
             verification_action["res_model"],
             "cdu.prescription",
         )
+        self.assertEqual(verification_action["target"], "main")
 
         validation_action = prescription.with_user(
             self.dispensing_officer
@@ -107,6 +108,7 @@ class TestCduPrescriptionWorkflow(TransactionCase):
         self.assertEqual(prescription.state, "awaiting_batching")
         self.assertEqual(prescription.validated_by, self.dispensing_officer)
         self.assertEqual(validation_action["res_model"], "cdu.prescription")
+        self.assertEqual(validation_action["target"], "main")
 
     def test_rejection_history_preserves_multiple_reasons_and_origin(self):
         prescription = self._create_prescription(state="awaiting_validation")

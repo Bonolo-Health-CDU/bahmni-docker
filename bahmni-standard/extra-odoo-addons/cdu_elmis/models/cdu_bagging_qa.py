@@ -286,7 +286,7 @@ class CduBaggingQa(models.Model):
                 ("state", "=", "awaiting_bagging_qa"),
                 ("batch_id", "=", self.batch_id.id),
             ]
-        return action
+        return self._action_as_main_target(action)
 
     def action_confirm_bagging_qa(self):
         self._ensure_bagging_qa_access()
@@ -411,5 +411,10 @@ class CduBaggingQa(models.Model):
             "res_id": self.id,
             "view_mode": "form",
             "views": [(False, "form")],
-            "target": "current",
+            "target": "main",
         }
+
+    def _action_as_main_target(self, action):
+        action = dict(action)
+        action["target"] = "main"
+        return action

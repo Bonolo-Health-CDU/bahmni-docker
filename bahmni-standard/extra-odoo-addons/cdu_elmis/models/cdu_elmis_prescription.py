@@ -455,7 +455,7 @@ class CduPrescription(models.Model):
             "res_id": dispense.id,
             "view_mode": "form",
             "views": [(False, "form")],
-            "target": "current",
+            "target": "main",
         }
 
     def action_open_bagging_qa(self):
