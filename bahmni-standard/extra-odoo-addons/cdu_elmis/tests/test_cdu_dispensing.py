@@ -84,6 +84,34 @@ class TestCduDispensingWorkflow(TransactionCase):
         )
         return dispense
 
+    def _confirm_dispense_for_bagging(self, dispense):
+        dispense.write(
+            {
+                "state": "confirmed",
+                "confirmed_by": self.admin.id,
+                "confirmed_at": fields.Datetime.now(),
+                "labels_printed_by": self.admin.id,
+                "labels_printed_at": fields.Datetime.now(),
+            }
+        )
+        dispense.prescription_id.state = "awaiting_bagging_qa"
+
+    def _create_ready_bagging_qa(self, prescription, dispense):
+        return self.env["cdu.bagging.qa"].create(
+            {
+                "prescription_id": prescription.id,
+                "dispense_id": dispense.id,
+                "patient_details_checked": True,
+                "medicine_product_checked": True,
+                "quantity_checked": True,
+                "dosing_instructions_checked": True,
+                "product_labels_attached": True,
+                "bag_label_attached": True,
+                "medicines_placed_in_bag": True,
+                "bag_sealed": True,
+            }
+        )
+
     def _create_patient_picking_context(
         self,
         prescription,
@@ -154,6 +182,7 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(result["params"]["report_action"]["type"], "ir.actions.report")
         self.assertEqual(result["params"]["next"]["res_id"], second_dispense.id)
         self.assertEqual(result["params"]["next"]["views"], [(False, "form")])
+        self.assertEqual(result["params"]["next"]["target"], "main")
         self.assertEqual(first_dispense.state, "confirmed")
         self.assertTrue(first_dispense.labels_printed)
         self.assertEqual(first_prescription.state, "awaiting_bagging_qa")
@@ -179,6 +208,7 @@ class TestCduDispensingWorkflow(TransactionCase):
             result["params"]["next"]["id"],
             self.env.ref("cdu_elmis.action_cdu_dispensing_work_queue").id,
         )
+        self.assertEqual(result["params"]["next"]["target"], "main")
 
         with self.assertRaises(UserError):
             dispense.with_user(self.admin).action_confirm_dispensing()
@@ -199,6 +229,7 @@ class TestCduDispensingWorkflow(TransactionCase):
         prescription.invalidate_recordset()
 
         self.assertEqual(action["res_id"], dispense.id)
+        self.assertEqual(action["target"], "main")
         self.assertEqual(dispense.state, "draft")
         self.assertFalse(dispense.cancelled_by)
         self.assertFalse(dispense.cancelled_at)
@@ -377,6 +408,37 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(action["id"], expected_action.id)
         self.assertEqual(action["res_model"], "cdu.prescription")
         self.assertEqual(action["views"], [(False, "tree"), (False, "form")])
+        self.assertEqual(action["target"], "main")
+
+    def test_bagging_confirmation_opens_next_task_with_clean_target(self):
+        first_prescription = self._create_prescription("BAG-001", 10)
+        second_prescription = self._create_prescription("BAG-002", 20)
+        first_dispense = self._create_ready_dispense(first_prescription)
+        second_dispense = self._create_ready_dispense(second_prescription)
+        self._confirm_dispense_for_bagging(first_dispense)
+        self._confirm_dispense_for_bagging(second_dispense)
+        first_qa = self._create_ready_bagging_qa(first_prescription, first_dispense)
+        second_qa = self._create_ready_bagging_qa(second_prescription, second_dispense)
+
+        result = first_qa.with_user(self.admin).action_confirm_bagging_qa()
+
+        self.assertEqual(result["params"]["next"]["res_id"], second_qa.id)
+        self.assertEqual(result["params"]["next"]["res_model"], "cdu.bagging.qa")
+        self.assertEqual(result["params"]["next"]["target"], "main")
+
+    def test_exhausted_bagging_returns_to_work_queue_with_clean_target(self):
+        prescription = self._create_prescription("BAG-QUEUE", 30)
+        dispense = self._create_ready_dispense(prescription)
+        self._confirm_dispense_for_bagging(dispense)
+        qa = self._create_ready_bagging_qa(prescription, dispense)
+
+        result = qa.with_user(self.admin).action_confirm_bagging_qa()
+
+        expected_action = self.env.ref("cdu_elmis.action_cdu_bagging_qa_work_queue")
+        self.assertEqual(result["params"]["next"]["id"], expected_action.id)
+        self.assertEqual(result["params"]["next"]["res_model"], "cdu.prescription")
+        self.assertEqual(result["params"]["next"]["views"], [(False, "tree"), (False, "form")])
+        self.assertEqual(result["params"]["next"]["target"], "main")
 
     def test_next_button_is_removed_and_later_prescriptions_can_reprint(self):
         prescription = self._create_prescription("004", 40)

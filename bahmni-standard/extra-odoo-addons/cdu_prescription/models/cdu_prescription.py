@@ -400,8 +400,14 @@ class CduPrescription(models.Model):
         if invalid:
             raise ValidationError(_("This action is not allowed for the current prescription status."))
 
+    def _action_as_main_target(self, action):
+        action = dict(action)
+        action["target"] = "main"
+        return action
+
     def _action_open_prescription_queue(self, action_xml_id):
-        return self.env["ir.actions.actions"]._for_xml_id(action_xml_id)
+        action = self.env["ir.actions.actions"]._for_xml_id(action_xml_id)
+        return self._action_as_main_target(action)
 
     def action_mark_patient_verified(self):
         self._ensure_cdu_groups("cdu_prescription.group_cdu_data_clerk")
