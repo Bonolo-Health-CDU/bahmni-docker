@@ -1,4 +1,5 @@
 from datetime import timedelta
+from io import BytesIO
 from unittest.mock import patch
 
 from lxml import etree, html as lxml_html
@@ -6,6 +7,7 @@ from lxml import etree, html as lxml_html
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools.pdf import PdfFileReader
 
 
 @tagged("post_install", "-at_install", "cdu_dispensing")
@@ -283,6 +285,68 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(len(labels), 5)
         self.assertEqual(drug_names.count("Test Medicine"), 2)
         self.assertEqual(drug_names.count("Second Test Medicine"), 3)
+        self.assertTrue(
+            all(
+                label.xpath(
+                    ".//div[contains(concat(' ', normalize-space(@class), ' '), "
+                    "' cdu-medicine-card ')]"
+                )
+                for label in labels
+            )
+        )
+        self.assertTrue(
+            all(
+                "Bonolo Health" in " ".join(label.text_content().split())
+                and "Keep out of reach of children"
+                in " ".join(label.text_content().split())
+                and "Take one tablet daily."
+                in " ".join(label.text_content().split())
+                for label in labels[:2]
+            )
+        )
+        self.assertTrue(
+            all(
+                label.xpath(
+                    ".//img[contains(concat(' ', normalize-space(@class), ' '), "
+                    "' cdu-medicine-logo ')][contains(@src, "
+                    "'/cdu_elmis/static/src/img/moh_lesotho_logo.png')]"
+                )
+                for label in labels
+            )
+        )
+        self.assertTrue(
+            all(
+                label.xpath(
+                    ".//img[contains(concat(' ', normalize-space(@class), ' '), "
+                    "' cdu-medicine-qr ')][starts-with(@src, 'data:image/png;base64,')]"
+                )
+                for label in labels
+            )
+        )
+        first_product_supply = [
+            " ".join(
+                label.xpath(
+                    ".//div[contains(concat(' ', normalize-space(@class), ' '), "
+                    "' cdu-script-repeat ')]"
+                )[0]
+                .text_content()
+                .split()
+            )
+            for label in labels[:2]
+        ]
+        self.assertIn("Bottle 1 of 2", first_product_supply[0])
+        self.assertIn("Bottle 2 of 2", first_product_supply[1])
+
+        pdf, report_type = self.env["ir.actions.report"].with_context(
+            cdu_label_layout="medicine",
+            force_report_rendering=True,
+        )._render_qweb_pdf(
+            "cdu_elmis.report_cdu_dispense_labels",
+            dispense.ids,
+        )
+        self.assertEqual(report_type, "pdf")
+        self.assertTrue(pdf.startswith(b"%PDF"))
+        self.assertEqual(PdfFileReader(BytesIO(pdf)).getNumPages(), 5)
 
         bag_html, _report_type = self.env["ir.actions.report"].with_context(
             cdu_label_layout="bag"

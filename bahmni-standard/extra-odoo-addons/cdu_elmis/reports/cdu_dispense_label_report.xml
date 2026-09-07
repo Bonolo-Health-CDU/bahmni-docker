@@ -30,9 +30,9 @@
     </record>
 
     <template id="report_cdu_dispense_labels">
-        <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="dispense">
-                <t t-call="web.basic_layout">
+        <t t-foreach="docs" t-as="dispense">
+            <t t-set="full_width" t-value="True"/>
+            <t t-call="web.basic_layout">
                     <t t-set="label_layout" t-value="dispense.env.context.get('cdu_label_layout', 'all')"/>
                     <t t-set="prescription" t-value="dispense.prescription_id"/>
                     <t t-set="script_number" t-value="prescription.name or dispense.name"/>
@@ -111,35 +111,187 @@
                             font-weight: 700;
                         }
                         .cdu-medicine-label {
-                            font-size: 15px;
-                            font-weight: 700;
+                            color: #102f45;
+                            font-size: 20px;
+                            font-weight: 400;
+                            line-height: 1.2;
+                            padding: 4mm;
+                            -webkit-print-color-adjust: exact;
                         }
-                        .cdu-medicine-label .cdu-org {
-                            font-size: 19px;
-                            margin-bottom: 5mm;
+                        .cdu-medicine-card {
+                            border: 1mm solid #086da3;
+                            border-radius: 8mm;
+                            box-sizing: border-box;
+                            height: 348mm;
+                            overflow: hidden;
+                            page-break-inside: avoid;
+                            position: relative;
+                        }
+                        .cdu-medicine-brand {
+                            border-bottom: 0.8mm solid #087f7b;
+                            box-sizing: border-box;
+                            display: table;
+                            padding: 6mm 7mm 5mm;
+                            width: 100%;
+                        }
+                        .cdu-medicine-brand > div {
+                            display: table-cell;
+                            vertical-align: middle;
+                        }
+                        .cdu-medicine-logo-cell {
+                            width: 30mm;
+                        }
+                        .cdu-medicine-logo {
+                            display: block;
+                            height: 26mm;
+                            width: auto;
+                        }
+                        .cdu-medicine-brand-copy {
+                            padding-left: 5mm;
+                        }
+                        .cdu-medicine-brand-name {
+                            color: #086da3;
+                            font-size: 30px;
+                            font-weight: 700;
+                            line-height: 1.05;
+                            text-transform: uppercase;
+                        }
+                        .cdu-medicine-brand-unit {
+                            color: #087f7b;
+                            font-size: 16px;
+                            font-weight: 700;
+                            letter-spacing: 1.2px;
+                            margin-top: 2mm;
+                            text-transform: uppercase;
+                        }
+                        .cdu-medicine-qr-cell {
+                            text-align: right;
+                            width: 32mm;
+                        }
+                        .cdu-medicine-qr {
+                            display: inline-block;
+                            height: 30mm;
+                            width: 30mm;
+                        }
+                        .cdu-safety {
+                            background: #eaf5f7;
+                            border-bottom: 0.6mm solid #087f7b;
+                            color: #102f45;
+                            font-size: 18px;
+                            font-weight: 700;
+                            letter-spacing: 0.6px;
+                            padding: 3.4mm 7mm;
+                            text-align: center;
+                            text-transform: uppercase;
+                        }
+                        .cdu-medicine-body {
+                            padding: 6mm 8mm 32mm;
+                        }
+                        .cdu-field-caption {
+                            color: #087f7b;
+                            font-size: 14px;
+                            font-weight: 700;
+                            letter-spacing: 1.2px;
+                            margin-bottom: 1.6mm;
+                            text-transform: uppercase;
                         }
                         .cdu-drug {
-                            font-size: 16px;
-                            line-height: 1.15;
+                            color: #071d2d;
+                            font-size: 34px;
+                            font-weight: 700;
+                            line-height: 1.12;
+                            margin: 0 0 6mm;
                             text-transform: uppercase;
-                            margin: 8mm 0 5mm;
                         }
                         .cdu-directions {
-                            font-size: 15px;
-                            margin: 4mm 0 9mm;
+                            background: #eef6fb;
+                            border-left: 2.4mm solid #086da3;
+                            border-radius: 3mm;
+                            color: #071d2d;
+                            font-size: 30px;
+                            font-weight: 700;
+                            line-height: 1.18;
+                            margin: 0 0 6mm;
+                            min-height: 26mm;
+                            padding: 5mm 6mm;
+                        }
+                        .cdu-medicine-patient-row {
+                            display: table;
+                            width: 100%;
+                        }
+                        .cdu-medicine-patient-row > div {
+                            display: table-cell;
+                            vertical-align: bottom;
+                        }
+                        .cdu-medicine-patient {
+                            color: #071d2d;
+                            font-size: 28px;
+                            font-weight: 700;
+                            line-height: 1.15;
+                        }
+                        .cdu-medicine-date {
+                            font-size: 18px;
+                            text-align: right;
+                            white-space: nowrap;
+                            width: 60mm;
+                        }
+                        .cdu-medicine-rule {
+                            border-top: 0.6mm solid #7b8d98;
+                            margin: 4mm 0;
                         }
                         .cdu-script-repeat {
                             display: table;
                             width: 100%;
-                            margin: 7mm 0;
                         }
                         .cdu-script-repeat > div {
                             display: table-cell;
-                            font-size: 15px;
+                            font-size: 20px;
                             font-weight: 700;
+                            vertical-align: top;
                         }
                         .cdu-script-repeat > div:last-child {
                             text-align: right;
+                        }
+                        .cdu-medicine-meta {
+                            display: table;
+                            font-size: 16px;
+                            margin-top: 4mm;
+                            width: 100%;
+                        }
+                        .cdu-medicine-meta > div {
+                            display: table-cell;
+                            vertical-align: top;
+                            width: 50%;
+                        }
+                        .cdu-medicine-meta > div:last-child {
+                            padding-left: 6mm;
+                        }
+                        .cdu-medicine-meta-row {
+                            margin-bottom: 2mm;
+                        }
+                        .cdu-medicine-meta-key {
+                            font-weight: 700;
+                        }
+                        .cdu-medicine-footer {
+                            background: #086da3;
+                            bottom: 0;
+                            box-sizing: border-box;
+                            color: #fff;
+                            display: table;
+                            font-size: 16px;
+                            left: 0;
+                            padding: 4mm 7mm;
+                            position: absolute;
+                            width: 100%;
+                        }
+                        .cdu-medicine-footer > div {
+                            display: table-cell;
+                            vertical-align: middle;
+                        }
+                        .cdu-medicine-footer > div:last-child {
+                            font-weight: 700;
+                            text-align: right;
+                            text-transform: uppercase;
                         }
                         .cdu-bag-label {
                             font-size: 17px;
@@ -291,30 +443,98 @@
                             <t t-foreach="range(int(line.quantity_dispensed or 0))" t-as="label_copy">
                                 <div class="page cdu-print-page">
                                     <div class="cdu-print-sheet cdu-medicine-label">
-                                        <div class="cdu-org"><span t-esc="facility_name"/></div>
-                                        <div t-if="prescription.facility_code" class="cdu-muted">
-                                            <span t-field="prescription.facility_code"/>
-                                        </div>
-                                        <div class="cdu-drug">
-                                            <span t-esc="line.selected_orderable_name or line.openmrs_drug_name"/>
-                                        </div>
-                                        <div class="cdu-directions">
-                                            <span t-field="line.dosage_instructions"/>
-                                        </div>
-                                        <div class="cdu-script-repeat">
-                                            <div><span t-esc="script_number"/></div>
-                                            <div>Repeat 1</div>
-                                        </div>
-                                        <div>
-                                            <span t-if="dispense.labels_printed_at" t-field="dispense.labels_printed_at"/>
-                                            <span t-if="not dispense.labels_printed_at and dispense.confirmed_at" t-field="dispense.confirmed_at"/>
-                                        </div>
-                                        <div style="font-size: 16px; margin-top: 5mm;">
-                                            <span t-field="dispense.patient_name"/>
-                                        </div>
-                                        <div style="font-size: 15px; margin-top: 12mm;">
-                                            Dispenser:
-                                            <span t-field="dispense.labels_printed_by"/>
+                                        <div class="cdu-medicine-card">
+                                            <div class="cdu-medicine-brand">
+                                                <div class="cdu-medicine-logo-cell">
+                                                    <img class="cdu-medicine-logo"
+                                                         src="/cdu_elmis/static/src/img/moh_lesotho_logo.png"
+                                                         alt="Ministry of Health Lesotho"/>
+                                                </div>
+                                                <div class="cdu-medicine-brand-copy">
+                                                    <div class="cdu-medicine-brand-name">Bonolo Health</div>
+                                                    <div class="cdu-medicine-brand-unit">Central Dispensing Unit</div>
+                                                </div>
+                                                <div class="cdu-medicine-qr-cell">
+                                                    <img class="cdu-medicine-qr"
+                                                         t-att-src="dispense.get_barcode_data_uri(dispense.get_label_qr_value(), 'QR', 180, 180)"
+                                                         t-att-alt="'QR code for %s' % script_number"/>
+                                                </div>
+                                            </div>
+                                            <div class="cdu-safety">Keep out of reach of children</div>
+                                            <div class="cdu-medicine-body">
+                                                <div class="cdu-field-caption">Medicine</div>
+                                                <div class="cdu-drug">
+                                                    <span t-esc="line.selected_orderable_name or line.openmrs_drug_name"/>
+                                                </div>
+                                                <div class="cdu-field-caption">Directions</div>
+                                                <div class="cdu-directions">
+                                                    <span t-field="line.dosage_instructions"/>
+                                                </div>
+                                                <div class="cdu-medicine-patient-row">
+                                                    <div>
+                                                        <div class="cdu-field-caption">Patient</div>
+                                                        <div class="cdu-medicine-patient">
+                                                            <span t-field="dispense.patient_name"/>
+                                                            <span t-if="dispense.patient_identifier">
+                                                                (<span t-field="dispense.patient_identifier"/>)
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="cdu-medicine-date">
+                                                        <div class="cdu-field-caption">Dispensed</div>
+                                                        <span t-if="dispense.labels_printed_at"
+                                                              t-field="dispense.labels_printed_at"
+                                                              t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
+                                                        <span t-if="not dispense.labels_printed_at and dispense.confirmed_at"
+                                                              t-field="dispense.confirmed_at"
+                                                              t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
+                                                    </div>
+                                                </div>
+                                                <div class="cdu-medicine-rule"/>
+                                                <div class="cdu-script-repeat">
+                                                    <div>
+                                                        <div class="cdu-field-caption">Prescription</div>
+                                                        <span t-esc="script_number"/>
+                                                    </div>
+                                                    <div>
+                                                        <div class="cdu-field-caption">Supply</div>
+                                                        Bottle <span t-esc="label_copy + 1"/> of <span t-esc="int(line.quantity_dispensed or 0)"/>
+                                                        &#183; Repeat 1
+                                                    </div>
+                                                </div>
+                                                <div class="cdu-medicine-meta">
+                                                    <div>
+                                                        <div class="cdu-medicine-meta-row" t-if="line.selected_lot">
+                                                            <span class="cdu-medicine-meta-key">Batch:</span>
+                                                            <span t-field="line.selected_lot"/>
+                                                        </div>
+                                                        <div class="cdu-medicine-meta-row" t-if="line.selected_lot_expiry">
+                                                            <span class="cdu-medicine-meta-key">Expiry:</span>
+                                                            <span t-field="line.selected_lot_expiry"
+                                                                  t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div class="cdu-medicine-meta-row" t-if="line.selected_pack_size">
+                                                            <span class="cdu-medicine-meta-key">Pack size:</span>
+                                                            <span t-field="line.selected_pack_size"/>
+                                                        </div>
+                                                        <div class="cdu-medicine-meta-row">
+                                                            <span class="cdu-medicine-meta-key">Dispenser:</span>
+                                                            <span t-field="dispense.labels_printed_by"/>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="cdu-medicine-footer">
+                                                <div>
+                                                    <span t-esc="facility_name"/>
+                                                    <span t-if="prescription.facility_code">
+                                                        &#183; <span t-field="prescription.facility_code"/>
+                                                    </span>
+                                                </div>
+                                                <div>Bonolo Health CDU</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -376,7 +596,6 @@
                             </div>
                         </div>
                     </div>
-                </t>
             </t>
         </t>
     </template>
