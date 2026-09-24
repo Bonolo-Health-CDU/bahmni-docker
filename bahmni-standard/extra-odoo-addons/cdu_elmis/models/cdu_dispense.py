@@ -107,6 +107,12 @@ class CduDispense(models.Model):
         compute="_compute_labels_printed",
         store=True,
     )
+    print_job_ids = fields.One2many(
+        "bahmni.print.job",
+        "dispense_id",
+        string="Print Jobs",
+        readonly=True,
+    )
     _AUTO_REFRESH_FORM_FIELDS = frozenset(
         (
             "stock_option_ids",
@@ -479,19 +485,17 @@ class CduDispense(models.Model):
             )
             if dispense.prescription_id.state == "awaiting_dispensing":
                 dispense.prescription_id.write({"state": "awaiting_bagging_qa"})
-        report_action = self.with_context(
-            cdu_label_layout="all"
-        )._action_generate_labels()
+        print_jobs = self._enqueue_dispensing_print_jobs(label_layout="all")
         return {
             "type": "ir.actions.client",
-            "tag": "cdu_print_dispensing_labels_and_continue",
+            "tag": "display_notification",
             "params": {
-                "report_action": report_action,
                 "title": _("Dispensing confirmed"),
                 "message": _(
-                    "Labels were generated. Continuing the dispensing workflow."
-                ),
-                "notification_type": "success",
+                    "%s print jobs were queued. Continuing the dispensing workflow."
+                )
+                % len(print_jobs),
+                "type": "success",
                 "sticky": False,
                 "next": self._get_next_dispensing_action(),
             },
@@ -576,9 +580,42 @@ class CduDispense(models.Model):
             if dispense.state != "confirmed":
                 raise UserError(_("Confirm dispensing before printing labels."))
 
-        return self._action_generate_labels()
+        label_layout = self.env.context.get("cdu_label_layout", "all")
+        print_jobs = self._enqueue_dispensing_print_jobs(label_layout=label_layout)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Dispensing labels queued"),
+                "message": _("%s print jobs were queued.") % len(print_jobs),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
-    def _action_generate_labels(self):
+    def _enqueue_dispensing_print_jobs(self, label_layout="all"):
+        label_types = self._get_label_types_for_layout(label_layout)
+        print_jobs = self.env["bahmni.print.job"]
+        for dispense in self:
+            dispense._mark_labels_print_queued()
+            for label_type in label_types:
+                print_jobs |= dispense._enqueue_dispensing_print_job(label_type)
+        return print_jobs
+
+    def _get_label_types_for_layout(self, label_layout):
+        layouts = {
+            "all": ("dispensing_slip", "medicine_label", "bag_label"),
+            "slip": ("dispensing_slip",),
+            "medicine": ("medicine_label",),
+            "bag": ("bag_label",),
+        }
+        try:
+            return layouts[label_layout]
+        except KeyError:
+            raise UserError(_("Unknown dispensing print layout: %s") % label_layout)
+
+    def _mark_labels_print_queued(self):
         for dispense in self:
             if not dispense.labels_printed_at:
                 dispense.write(
@@ -587,13 +624,126 @@ class CduDispense(models.Model):
                         "labels_printed_at": fields.Datetime.now(),
                     }
                 )
-        label_layout = self.env.context.get("cdu_label_layout", "all")
-        return self.env.ref("cdu_elmis.action_report_cdu_dispense_labels").with_context(
-            cdu_label_layout=label_layout,
-        ).report_action(
-            self,
-            config=False,
+
+    def _enqueue_dispensing_print_job(self, label_type):
+        self.ensure_one()
+        template = self.env["bahmni.label.template"]._get_active_template(label_type)
+        if label_type == "medicine_label" and template.command_language != "pdf":
+            jobs = self.env["bahmni.print.job"]
+            for line in self.stock_selection_ids:
+                copies = int(line.quantity_dispensed or 0)
+                if copies <= 0:
+                    continue
+                payload = template.render_command_payload(
+                    self._get_print_template_values(line=line, copies=copies)
+                )
+                jobs |= self._create_print_job(
+                    template,
+                    label_type=label_type,
+                    payload=payload,
+                    payload_encoding="text",
+                )
+            return jobs
+
+        payload_encoding = "text"
+        if template.command_language == "pdf":
+            payload = self._render_pdf_print_payload(
+                template,
+                label_layout=self._get_pdf_layout_for_label_type(label_type),
+            )
+            payload_encoding = "base64"
+        else:
+            payload = template.render_command_payload(
+                self._get_print_template_values(copies=1)
+            )
+        return self._create_print_job(
+            template,
+            label_type=label_type,
+            payload=payload,
+            payload_encoding=payload_encoding,
         )
+
+    def _create_print_job(self, template, label_type, payload, payload_encoding):
+        self.ensure_one()
+        return self.env["bahmni.print.job"].create(
+            {
+                "label_type": label_type,
+                "printer_key": template.printer_key,
+                "command_language": template.command_language,
+                "payload": payload,
+                "payload_encoding": payload_encoding,
+                "res_model": self._name,
+                "res_id": self.id,
+                "dispense_id": self.id,
+            }
+        )
+
+    def _render_pdf_print_payload(self, template, label_layout):
+        self.ensure_one()
+        pdf_content, output_type = self.env["ir.actions.report"].with_context(
+            force_report_rendering=True,
+            cdu_label_layout=label_layout,
+        )._render_qweb_pdf(template.report_name, res_ids=self.ids)
+        if output_type != "pdf":
+            raise UserError(
+                _("Report %s did not render a PDF payload.") % template.report_name
+            )
+        return base64.b64encode(pdf_content).decode("ascii")
+
+    def _get_pdf_layout_for_label_type(self, label_type):
+        return {
+            "dispensing_slip": "slip",
+            "medicine_label": "medicine",
+            "bag_label": "bag",
+        }.get(label_type, "all")
+
+    def _get_print_template_values(self, line=False, copies=1):
+        self.ensure_one()
+        prescription = self.prescription_id
+        script_number = prescription.name or self.name or ""
+        pickup_point = (
+            self.collection_point_id.name
+            or prescription.drug_pickup_point_raw
+            or ""
+        )
+        printed_at = self.labels_printed_at or fields.Datetime.now()
+        medicine_name = ""
+        dosage_instructions = ""
+        if line:
+            medicine_name = line.selected_orderable_name or line.openmrs_drug_name or ""
+            dosage_instructions = line.dosage_instructions or ""
+        return {
+            "facility_name": prescription.facility_name or self.env.company.name,
+            "facility_code": prescription.facility_code or "",
+            "patient_name": self.patient_name or "",
+            "patient_identifier": self.patient_identifier or "",
+            "patient_phone": self.patient_phone or "",
+            "script_number": script_number,
+            "pickup_point": pickup_point,
+            "next_collection_date": self._format_print_date(
+                self.next_drug_pickup_date
+            ),
+            "collection_date": self._format_print_date(
+                prescription.prescription_date
+            ),
+            "medicine_name": medicine_name,
+            "dosage_instructions": dosage_instructions,
+            "quantity_dispensed": line.quantity_dispensed if line else "",
+            "copies": max(int(copies or 1), 1),
+            "repeat_number": 1,
+            "dispenser_name": self.labels_printed_by.name or self.env.user.name,
+            "printed_at": self._format_print_datetime(printed_at),
+            "qr_value": self.get_label_qr_value(),
+        }
+
+    def _format_print_date(self, value):
+        return fields.Date.to_string(value) if value else ""
+
+    def _format_print_datetime(self, value):
+        if not value:
+            return ""
+        localized = fields.Datetime.context_timestamp(self, value)
+        return localized.strftime("%Y-%m-%d %H:%M")
 
     def _get_next_dispensing_action(self):
         self.ensure_one()

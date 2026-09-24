@@ -9,7 +9,10 @@
         "cdu_prescription",
     ],
     "data": [
+        "security/cdu_print_security.xml",
         "security/ir.model.access.csv",
+        "data/bahmni_print_sequence.xml",
+        "data/bahmni_label_templates.xml",
         "data/cdu_elmis_defaults.xml",
         "data/cdu_elmis_catalog_cron.xml",
         "data/cdu_collect_go_cron.xml",
@@ -29,6 +32,7 @@
         "views/cdu_elmis_stock_cache_views.xml",
         "views/cdu_elmis_orderable_catalog_views.xml",
         "views/cdu_elmis_user_views.xml",
+        "views/bahmni_print_views.xml",
         "reports/cdu_picking_list_report.xml",
         "reports/cdu_dispense_label_report.xml",
         "reports/cdu_box_documents_report.xml",

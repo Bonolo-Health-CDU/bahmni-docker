@@ -1,4 +1,10 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_bahmni_label_template_dispensing_officer,bahmni.label.template dispensing officer,model_bahmni_label_template,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_bahmni_label_template_print_agent,bahmni.label.template print agent,model_bahmni_label_template,cdu_elmis.group_cdu_print_agent,1,0,0,0
+access_bahmni_label_template_admin,bahmni.label.template admin,model_bahmni_label_template,cdu_prescription.group_cdu_admin,1,1,1,1
+access_bahmni_print_job_dispensing_officer,bahmni.print.job dispensing officer,model_bahmni_print_job,cdu_prescription.group_cdu_dispensing_officer,1,0,1,0
+access_bahmni_print_job_print_agent,bahmni.print.job print agent,model_bahmni_print_job,cdu_elmis.group_cdu_print_agent,1,1,0,0
+access_bahmni_print_job_admin,bahmni.print.job admin,model_bahmni_print_job,cdu_prescription.group_cdu_admin,1,1,1,1
 access_cdu_elmis_orderable_catalog_data_clerk,cdu.elmis.orderable.catalog data clerk,model_cdu_elmis_orderable_catalog,cdu_prescription.group_cdu_data_clerk,1,0,0,0
 access_cdu_elmis_orderable_catalog_dispensing_officer,cdu.elmis.orderable.catalog dispensing officer,model_cdu_elmis_orderable_catalog,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
 access_cdu_elmis_orderable_catalog_admin,cdu.elmis.orderable.catalog admin,model_cdu_elmis_orderable_catalog,cdu_prescription.group_cdu_admin,1,1,1,1

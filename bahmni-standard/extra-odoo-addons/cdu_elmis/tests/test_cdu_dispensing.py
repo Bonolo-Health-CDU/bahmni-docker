@@ -1,3 +1,4 @@
+import base64
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -175,9 +176,8 @@ class TestCduDispensingWorkflow(TransactionCase):
 
         self.assertEqual(
             result["tag"],
-            "cdu_print_dispensing_labels_and_continue",
+            "display_notification",
         )
-        self.assertEqual(result["params"]["report_action"]["type"], "ir.actions.report")
         self.assertEqual(result["params"]["next"]["res_id"], second_dispense.id)
         self.assertEqual(result["params"]["next"]["views"], [(False, "form")])
         self.assertEqual(result["params"]["next"]["target"], "main")
@@ -187,6 +187,72 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(first_prescription.dispensing_status, "fully_dispensed")
         self.assertFalse(first_prescription.dispensing_back_order_short)
         self.assertEqual(second_prescription.state, "awaiting_dispensing")
+        print_jobs = self.env["bahmni.print.job"].search(
+            [
+                ("res_model", "=", "cdu.dispense"),
+                ("res_id", "=", first_dispense.id),
+            ],
+            order="label_type",
+        )
+        self.assertEqual(
+            sorted(print_jobs.mapped("label_type")),
+            ["bag_label", "dispensing_slip", "medicine_label"],
+        )
+        self.assertEqual(set(print_jobs.mapped("state")), {"pending"})
+        self.assertEqual(
+            print_jobs.filtered(lambda job: job.label_type == "dispensing_slip").printer_key,
+            "document_printer",
+        )
+        self.assertEqual(
+            print_jobs.filtered(lambda job: job.label_type == "medicine_label").printer_key,
+            "product_printer",
+        )
+        self.assertEqual(
+            print_jobs.filtered(lambda job: job.label_type == "bag_label").printer_key,
+            "bagging_printer",
+        )
+        slip_job = print_jobs.filtered(lambda job: job.label_type == "dispensing_slip")
+        self.assertEqual(slip_job.command_language, "pdf")
+        self.assertEqual(slip_job.payload_encoding, "base64")
+        self.assertTrue(base64.b64decode(slip_job.payload).startswith(b"%PDF"))
+        medicine_job = print_jobs.filtered(lambda job: job.label_type == "medicine_label")
+        self.assertEqual(medicine_job.command_language, "tspl")
+        self.assertIn("Test Medicine", medicine_job.payload)
+        bag_job = print_jobs.filtered(lambda job: job.label_type == "bag_label")
+        self.assertEqual(bag_job.command_language, "zpl")
+        self.assertIn(first_prescription.name, bag_job.payload)
+
+    def test_print_agent_api_can_process_jobs_without_printers(self):
+        prescription = self._create_prescription("AGENT", 10)
+        dispense = self._create_ready_dispense(prescription)
+        dispense.with_user(self.admin).action_confirm_dispensing()
+
+        PrintJob = self.env["bahmni.print.job"]
+        pending_jobs = PrintJob.api_get_pending_jobs(limit=2)
+
+        self.assertEqual(len(pending_jobs), 2)
+        self.assertEqual(pending_jobs[0]["state"], "pending")
+        self.assertTrue(pending_jobs[0]["payload"])
+
+        self.assertTrue(
+            PrintJob.api_mark_done(pending_jobs[0]["id"], agent_name="test-agent")
+        )
+        self.assertTrue(
+            PrintJob.api_mark_failed(
+                pending_jobs[1]["id"],
+                "Simulated printer offline",
+                agent_name="test-agent",
+            )
+        )
+
+        done_job = PrintJob.browse(pending_jobs[0]["id"])
+        failed_job = PrintJob.browse(pending_jobs[1]["id"])
+        self.assertEqual(done_job.state, "done")
+        self.assertEqual(done_job.agent_name, "test-agent")
+        self.assertTrue(done_job.completed_at)
+        self.assertEqual(failed_job.state, "failed")
+        self.assertEqual(failed_job.error_message, "Simulated printer offline")
+        self.assertTrue(failed_job.failed_at)
 
     def test_cancel_draft_dispensing_job_returns_to_work_queue(self):
         prescription = self._create_prescription("CANCEL", 10)
@@ -414,7 +480,8 @@ class TestCduDispensingWorkflow(TransactionCase):
         action = prescription.with_user(
             self.admin
         ).action_reprint_dispensing_labels()
-        self.assertEqual(action["type"], "ir.actions.report")
+        self.assertEqual(action["tag"], "display_notification")
+        self.assertEqual(action["params"]["type"], "success")
 
     def test_regimen_products_have_independent_dosage_and_stable_order(self):
         prescription = self._create_prescription("005", 30)

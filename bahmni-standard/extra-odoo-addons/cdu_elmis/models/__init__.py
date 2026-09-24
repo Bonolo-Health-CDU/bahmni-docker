@@ -1,3 +1,5 @@
+from . import bahmni_label_template
+from . import bahmni_print_job
 from . import cdu_bagging_qa
 from . import cdu_box
 from . import cdu_collect_go_api_log

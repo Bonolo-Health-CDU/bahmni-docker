@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_bahmni_print_job_tree" model="ir.ui.view">
+        <field name="name">bahmni.print.job.tree</field>
+        <field name="model">bahmni.print.job</field>
+        <field name="arch" type="xml">
+            <tree decoration-info="state == 'pending'"
+                  decoration-success="state == 'done'"
+                  decoration-danger="state == 'failed'">
+                <field name="create_date"/>
+                <field name="name"/>
+                <field name="label_type"/>
+                <field name="printer_key"/>
+                <field name="command_language"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state == 'pending'"
+                       decoration-success="state == 'done'"
+                       decoration-danger="state == 'failed'"/>
+                <field name="agent_name"/>
+                <field name="last_attempt_at"/>
+                <field name="res_model"/>
+                <field name="res_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_bahmni_print_job_form" model="ir.ui.view">
+        <field name="name">bahmni.print.job.form</field>
+        <field name="model">bahmni.print.job</field>
+        <field name="arch" type="xml">
+            <form string="Print Job">
+                <header>
+                    <button name="action_retry"
+                            string="Retry"
+                            type="object"
+                            class="btn-primary"
+                            groups="cdu_prescription.group_cdu_admin,cdu_elmis.group_cdu_print_agent"
+                            attrs="{'invisible': [('state', '!=', 'failed')]}"/>
+                    <button name="action_mark_done"
+                            string="Mark Done"
+                            type="object"
+                            class="btn-secondary"
+                            groups="cdu_prescription.group_cdu_admin,cdu_elmis.group_cdu_print_agent"
+                            attrs="{'invisible': [('state', '=', 'done')]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,done,failed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Routing">
+                            <field name="label_type" readonly="1"/>
+                            <field name="printer_key" readonly="1"/>
+                            <field name="command_language" readonly="1"/>
+                            <field name="payload_encoding" readonly="1"/>
+                        </group>
+                        <group string="Result">
+                            <field name="agent_name" readonly="1"/>
+                            <field name="last_attempt_at" readonly="1"/>
+                            <field name="completed_at" readonly="1"/>
+                            <field name="failed_at" readonly="1"/>
+                            <field name="error_message" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Source">
+                        <field name="dispense_id" readonly="1"/>
+                        <field name="res_model" readonly="1"/>
+                        <field name="res_id" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Payload">
+                            <field name="payload" readonly="1" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_bahmni_print_job_search" model="ir.ui.view">
+        <field name="name">bahmni.print.job.search</field>
+        <field name="model">bahmni.print.job</field>
+        <field name="arch" type="xml">
+            <search string="Print Jobs">
+                <field name="name"/>
+                <field name="label_type"/>
+                <field name="printer_key"/>
+                <field name="agent_name"/>
+                <filter string="Pending" name="pending" domain="[('state', '=', 'pending')]"/>
+                <filter string="Failed" name="failed" domain="[('state', '=', 'failed')]"/>
+                <filter string="Done" name="done" domain="[('state', '=', 'done')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Printer" name="group_printer" context="{'group_by': 'printer_key'}"/>
+                    <filter string="Label Type" name="group_label_type" context="{'group_by': 'label_type'}"/>
+                    <filter string="Date" name="group_date" context="{'group_by': 'create_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_bahmni_print_job" model="ir.actions.act_window">
+        <field name="name">Print Jobs</field>
+        <field name="res_model">bahmni.print.job</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_bahmni_print_job_search"/>
+        <field name="context">{'search_default_pending': 1}</field>
+    </record>
+
+    <record id="view_bahmni_label_template_tree" model="ir.ui.view">
+        <field name="name">bahmni.label.template.tree</field>
+        <field name="model">bahmni.label.template</field>
+        <field name="arch" type="xml">
+            <tree decoration-muted="not active">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="label_type"/>
+                <field name="printer_key"/>
+                <field name="command_language"/>
+                <field name="width_mm"/>
+                <field name="height_mm"/>
+                <field name="gap_mm"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_bahmni_label_template_form" model="ir.ui.view">
+        <field name="name">bahmni.label.template.form</field>
+        <field name="model">bahmni.label.template</field>
+        <field name="arch" type="xml">
+            <form string="Print Template">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Routing">
+                            <field name="sequence"/>
+                            <field name="label_type"/>
+                            <field name="printer_key"/>
+                            <field name="command_language"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Stock">
+                            <field name="width_mm"/>
+                            <field name="height_mm"/>
+                            <field name="gap_mm"/>
+                            <field name="report_name"
+                                   attrs="{'invisible': [('command_language', '!=', 'pdf')]}"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Command Template"
+                              attrs="{'invisible': [('command_language', '=', 'pdf')]}">
+                            <field name="template_body" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_bahmni_label_template_search" model="ir.ui.view">
+        <field name="name">bahmni.label.template.search</field>
+        <field name="model">bahmni.label.template</field>
+        <field name="arch" type="xml">
+            <search string="Print Templates">
+                <field name="name"/>
+                <field name="label_type"/>
+                <field name="printer_key"/>
+                <filter string="Active" name="active" domain="[('active', '=', True)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Label Type" name="group_label_type" context="{'group_by': 'label_type'}"/>
+                    <filter string="Printer" name="group_printer" context="{'group_by': 'printer_key'}"/>
+                    <filter string="Language" name="group_language" context="{'group_by': 'command_language'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_bahmni_label_template" model="ir.actions.act_window">
+        <field name="name">Print Templates</field>
+        <field name="res_model">bahmni.label.template</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_bahmni_label_template_search"/>
+        <field name="context">{'search_default_active': 1}</field>
+    </record>
+
+    <menuitem
+        id="menu_bahmni_print_jobs"
+        name="Print Jobs"
+        parent="cdu_prescription.menu_cdu_configuration"
+        action="action_bahmni_print_job"
+        sequence="92"
+        groups="cdu_prescription.group_cdu_admin,cdu_elmis.group_cdu_print_agent"/>
+
+    <menuitem
+        id="menu_bahmni_label_templates"
+        name="Print Templates"
+        parent="cdu_prescription.menu_cdu_configuration"
+        action="action_bahmni_label_template"
+        sequence="93"
+        groups="cdu_prescription.group_cdu_admin"/>
+</odoo>

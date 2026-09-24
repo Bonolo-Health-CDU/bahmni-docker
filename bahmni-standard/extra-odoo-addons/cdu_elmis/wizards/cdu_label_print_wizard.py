@@ -52,7 +52,10 @@ class CduLabelPrintWizard(models.TransientModel):
     @api.depends("dispense_id.stock_selection_ids", "label_layout")
     def _compute_label_counts(self):
         for wizard in self:
-            medicine_count = len(wizard.dispense_id.stock_selection_ids)
+            medicine_count = sum(
+                int(line.quantity_dispensed or 0)
+                for line in wizard.dispense_id.stock_selection_ids
+            )
             wizard.dispensing_slip_count = 1 if wizard.label_layout in ("all", "slip") else 0
             wizard.medicine_label_count = (
                 medicine_count if wizard.label_layout in ("all", "medicine") else 0

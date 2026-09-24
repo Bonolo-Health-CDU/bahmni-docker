@@ -57,7 +57,7 @@
                             type="object"
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            confirm="Confirm dispensing for this prescription?&#10;&#10;Before continuing, make sure the eLMIS product, batch number, dispensed packs, and dosing instructions are correct.&#10;&#10;This moves the prescription to Awaiting Bagging / QA and generates the dispensing slip, medicine label, and bag label. eLMIS stock is not consumed at this step; consumption happens when the box is confirmed."
+                            confirm="Confirm dispensing for this prescription?&#10;&#10;Before continuing, make sure the eLMIS product, batch number, dispensed packs, and dosing instructions are correct.&#10;&#10;This moves the prescription to Awaiting Bagging / QA and queues the dispensing slip, medicine label, and bag label for the Print Agent. eLMIS stock is not consumed at this step; consumption happens when the box is confirmed."
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_reject_to_call_center"
                             string="Reject to Call Center"
@@ -302,6 +302,26 @@
                                     <field name="lot_id" optional="hide"/>
                                     <field name="facility_code" optional="hide"/>
                                     <field name="program_code" optional="hide"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Print Jobs">
+                            <field name="print_job_ids" readonly="1">
+                                <tree decoration-info="state == 'pending'"
+                                      decoration-success="state == 'done'"
+                                      decoration-danger="state == 'failed'">
+                                    <field name="create_date"/>
+                                    <field name="name"/>
+                                    <field name="label_type"/>
+                                    <field name="printer_key"/>
+                                    <field name="command_language"/>
+                                    <field name="state"
+                                           widget="badge"
+                                           decoration-info="state == 'pending'"
+                                           decoration-success="state == 'done'"
+                                           decoration-danger="state == 'failed'"/>
+                                    <field name="agent_name"/>
+                                    <field name="error_message"/>
                                 </tree>
                             </field>
                         </page>
