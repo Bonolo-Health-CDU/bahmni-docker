@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cdu_eregister_api_log_data_clerk,cdu.eregister.api.log data clerk,model_cdu_eregister_api_log,cdu_prescription.group_cdu_data_clerk,1,0,0,0
+access_cdu_eregister_api_log_call_agent,cdu.eregister.api.log call agent,model_cdu_eregister_api_log,cdu_prescription.group_cdu_call_agent,1,0,0,0
+access_cdu_eregister_api_log_dispensing_officer,cdu.eregister.api.log dispensing officer,model_cdu_eregister_api_log,cdu_prescription.group_cdu_dispensing_officer,1,0,0,0
+access_cdu_eregister_api_log_admin,cdu.eregister.api.log admin,model_cdu_eregister_api_log,cdu_prescription.group_cdu_admin,1,1,1,1

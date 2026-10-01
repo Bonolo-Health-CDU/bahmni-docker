@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <menuitem
+        id="menu_cdu_eregister_settings"
+        name="eRegister Integration"
+        parent="cdu_prescription.menu_cdu_configuration"
+        action="action_cdu_eregister_settings"
+        sequence="86"
+        groups="cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
+        id="menu_cdu_eregister_api_logs"
+        name="eRegister API Logs"
+        parent="cdu_prescription.menu_cdu_configuration"
+        action="action_cdu_eregister_api_log"
+        sequence="87"
+        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"/>
+</odoo>
