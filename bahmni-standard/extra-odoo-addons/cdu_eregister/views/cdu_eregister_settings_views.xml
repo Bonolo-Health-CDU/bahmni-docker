@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_eregister_settings_form" model="ir.ui.view">
+        <field name="name">cdu.eregister.settings.form</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <form string="eRegister Integration" class="o_cdu_admin_form">
+                <header>
+                    <button name="execute" string="Save" type="object" class="btn-primary"/>
+                    <button name="action_test_eregister_connection" string="Test Connection" type="object" class="btn-secondary"/>
+                    <button name="action_pull_eregister_now" string="Pull Prescriptions Now" type="object" class="btn-secondary"/>
+                    <button name="action_check_eregister_cancellations_now" string="Check Cancellations Now" type="object" class="btn-secondary"/>
+                    <button string="Discard" special="cancel"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>eRegister Integration</h1>
+                        <p>Pulls prescriptions published by eRegister from the FHIR repository through OpenHIM, and publishes CDU fulfilment status back on each prescription's Task.</p>
+                    </div>
+                    <group string="Connection">
+                        <field name="cdu_eregister_base_url" placeholder="http://host.docker.internal:5001/fhir"/>
+                        <field name="cdu_eregister_username"/>
+                        <field name="cdu_eregister_password" password="True"/>
+                        <field name="cdu_eregister_cdu_organization_id" placeholder="1-LESOTHO-CDU"/>
+                    </group>
+                    <group string="Synchronisation">
+                        <field name="cdu_eregister_sync_enabled"/>
+                        <field name="cdu_eregister_page_size"/>
+                        <field name="cdu_eregister_timeout_seconds"/>
+                        <field name="cdu_eregister_max_publish_attempts"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cdu_eregister_settings" model="ir.actions.act_window">
+        <field name="name">eRegister Integration</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_cdu_eregister_settings_form"/>
+        <field name="target">current</field>
+        <field name="context">{'module': 'cdu_eregister'}</field>
+    </record>
+</odoo>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_eregister_api_log_tree" model="ir.ui.view">
+        <field name="name">cdu.eregister.api.log.tree</field>
+        <field name="model">cdu.eregister.api.log</field>
+        <field name="arch" type="xml">
+            <tree create="0" edit="0" decoration-danger="not success">
+                <field name="timestamp"/>
+                <field name="call_type"/>
+                <field name="http_method"/>
+                <field name="endpoint"/>
+                <field name="http_status_code"/>
+                <field name="prescription_id"/>
+                <field name="success" widget="boolean_toggle" readonly="1"/>
+                <field name="error_message" optional="show"/>
+                <field name="user_id" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_cdu_eregister_api_log_form" model="ir.ui.view">
+        <field name="name">cdu.eregister.api.log.form</field>
+        <field name="model">cdu.eregister.api.log</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="call_type"/>
+                            <field name="http_method"/>
+                            <field name="endpoint"/>
+                            <field name="http_status_code"/>
+                            <field name="success"/>
+                        </group>
+                        <group>
+                            <field name="timestamp"/>
+                            <field name="user_id"/>
+                            <field name="prescription_id"/>
+                            <field name="fhir_reference"/>
+                        </group>
+                    </group>
+                    <group string="Error" attrs="{'invisible': [('error_message', '=', False)]}">
+                        <field name="error_message" nolabel="1" colspan="2"/>
+                    </group>
+                    <notebook>
+                        <page string="Request">
+                            <field name="request_payload" widget="ace" options="{'mode': 'json'}"/>
+                        </page>
+                        <page string="Response">
+                            <field name="response_body" widget="ace" options="{'mode': 'json'}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cdu_eregister_api_log_search" model="ir.ui.view">
+        <field name="name">cdu.eregister.api.log.search</field>
+        <field name="model">cdu.eregister.api.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="endpoint"/>
+                <field name="prescription_id"/>
+                <field name="fhir_reference"/>
+                <filter string="Failed" name="failed" domain="[('success', '=', False)]"/>
+                <filter string="Succeeded" name="succeeded" domain="[('success', '=', True)]"/>
+                <separator/>
+                <filter string="Status Publications" name="push_status" domain="[('call_type', '=', 'PUSH_STATUS')]"/>
+                <filter string="Intake" name="ingest" domain="[('call_type', '=', 'INGEST')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Call Type" name="group_call_type" context="{'group_by': 'call_type'}"/>
+                    <filter string="Day" name="group_day" context="{'group_by': 'timestamp:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cdu_eregister_api_log" model="ir.actions.act_window">
+        <field name="name">eRegister API Logs</field>
+        <field name="res_model">cdu.eregister.api.log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_cdu_eregister_api_log_search"/>
+    </record>
+</odoo>
