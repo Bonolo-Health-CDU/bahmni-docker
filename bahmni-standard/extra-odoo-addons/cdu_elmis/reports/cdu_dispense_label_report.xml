@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <record id="paperformat_cdu_dispense_labels" model="report.paperformat">
-        <field name="name">CDU Dispensing Labels 4x6</field>
+        <field name="name">CDU Dispensing Receipt 80mm</field>
         <field name="default" eval="False"/>
         <field name="format">custom</field>
-        <field name="page_width">102</field>
-        <field name="page_height">152</field>
+        <field name="page_width">80</field>
+        <field name="page_height">220</field>
         <field name="orientation">Portrait</field>
         <field name="margin_top">3</field>
         <field name="margin_bottom">3</field>
@@ -41,24 +41,25 @@
                     <style>
                         .cdu-print-page {
                             font-family: Arial, sans-serif;
-                            font-size: 12px;
-                            line-height: 1.22;
+                            font-size: 13px;
+                            line-height: 1.32;
                             page-break-after: always;
                         }
                         .cdu-print-sheet {
                             box-sizing: border-box;
-                            min-height: 136mm;
-                            padding: 5mm;
+                            min-height: 0;
+                            padding: 0;
                         }
                         .cdu-slip {
-                            font-size: 11px;
+                            font-size: 13px;
+                            width: 100%;
                         }
                         .cdu-slip-header {
                             text-align: center;
-                            margin-bottom: 6mm;
+                            margin-bottom: 3mm;
                         }
                         .cdu-org {
-                            font-size: 18px;
+                            font-size: 16px;
                             font-weight: 700;
                             letter-spacing: 0;
                             text-transform: uppercase;
@@ -71,44 +72,52 @@
                         }
                         .cdu-rule {
                             border-top: 1px solid #111;
-                            margin: 4mm 0;
+                            margin: 2.5mm 0;
                         }
                         .cdu-title {
-                            font-size: 13px;
+                            font-size: 14px;
                             font-weight: 700;
                             text-align: center;
                             text-decoration: underline;
                             text-transform: uppercase;
-                            margin: 2mm 0 3mm;
+                            margin: 2mm 0 2.5mm;
                         }
                         .cdu-row {
                             display: table;
                             width: 100%;
-                            margin-bottom: 2mm;
+                            margin-bottom: 1.5mm;
                         }
                         .cdu-row > div {
                             display: table-cell;
                             vertical-align: top;
                         }
                         .cdu-label-key {
-                            width: 30%;
+                            width: 34%;
                             font-weight: 700;
                         }
                         .cdu-table {
                             border-collapse: collapse;
                             width: 100%;
-                            margin: 3mm 0;
+                            margin: 2.5mm 0;
+                            table-layout: auto;
                         }
                         .cdu-table th,
                         .cdu-table td {
                             border: 1px solid #555;
-                            padding: 2mm;
+                            padding: 1mm;
                             text-align: left;
                             vertical-align: top;
+                            overflow-wrap: anywhere;
+                            white-space: normal;
+                            word-break: normal;
                         }
                         .cdu-table th {
                             background: #e6e6e6;
                             font-weight: 700;
+                        }
+                        .cdu-table th:nth-child(2),
+                        .cdu-table td:nth-child(2) {
+                            text-align: center;
                         }
                         .cdu-medicine-label {
                             font-size: 15px;
@@ -229,7 +238,7 @@
                                     (<span t-field="dispense.patient_identifier"/>)
                                 </span>
                             </div>
-                            <div t-if="dispense.patient_phone" style="margin-top: 16mm;">
+                            <div t-if="dispense.patient_phone" style="margin-top: 1.5mm;">
                                 <span t-field="dispense.patient_phone"/>
                             </div>
                             <div class="cdu-rule"/>
@@ -276,11 +285,11 @@
                                 <strong>Pharmacist:</strong>
                                 <span t-field="dispense.confirmed_by"/>
                             </div>
-                            <div style="margin-top: 4mm;">
+                            <div style="margin-top: 2mm;">
                                 <strong>This is Repeat</strong>
                                 <span>1</span>
                             </div>
-                            <div class="cdu-small" style="text-align: center; margin-top: 8mm;">
+                            <div class="cdu-small" style="text-align: center; margin-top: 3mm;">
                                 If medication was not dispensed it is not available from the automatic dispensing unit and must be collected at the pharmacist's counter.
                             </div>
                         </div>

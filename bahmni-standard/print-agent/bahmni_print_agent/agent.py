@@ -24,7 +24,10 @@ class PrintAgent:
     def run_forever(self):
         _logger.info("Starting print agent %s", self.config.name)
         while True:
-            self.process_once()
+            try:
+                self.process_once()
+            except Exception:
+                _logger.exception("Print agent polling failed")
             time.sleep(self.config.poll_interval_seconds)
 
     def process_once(self) -> int:

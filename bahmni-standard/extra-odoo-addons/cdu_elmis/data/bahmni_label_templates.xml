@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo noupdate="1">
     <record id="template_dispensing_slip_pdf" model="bahmni.label.template">
-        <field name="name">Dispensing Slip PDF</field>
+        <field name="name">Dispensing Receipt PDF</field>
         <field name="sequence">10</field>
         <field name="label_type">dispensing_slip</field>
-        <field name="printer_key">document_printer</field>
+        <field name="printer_key">dispensing_receipt_printer</field>
         <field name="command_language">pdf</field>
         <field name="report_name">cdu_elmis.report_cdu_dispense_labels</field>
-        <field name="width_mm">102</field>
-        <field name="height_mm">152</field>
+        <field name="width_mm">80</field>
+        <field name="height_mm">220</field>
         <field name="gap_mm">0</field>
         <field name="active" eval="True"/>
     </record>
@@ -19,23 +19,21 @@
         <field name="label_type">medicine_label</field>
         <field name="printer_key">product_printer</field>
         <field name="command_language">tspl</field>
-        <field name="width_mm">102</field>
-        <field name="height_mm">152</field>
-        <field name="gap_mm">3</field>
+        <field name="width_mm">50</field>
+        <field name="height_mm">53</field>
+        <field name="gap_mm">3.6</field>
         <field name="template_body"><![CDATA[SIZE {width_mm} mm, {height_mm} mm
 GAP {gap_mm} mm, 0 mm
 DENSITY 8
 DIRECTION 1
 CLS
-TEXT 24,24,"3",0,1,1,"{facility_name}"
-TEXT 24,68,"2",0,1,1,"{facility_code}"
-TEXT 24,118,"3",0,1,1,"{medicine_name}"
-TEXT 24,182,"2",0,1,1,"{dosage_instructions}"
-TEXT 24,252,"2",0,1,1,"Rx: {script_number}"
-TEXT 24,294,"2",0,1,1,"Repeat {repeat_number}"
-TEXT 24,338,"2",0,1,1,"Patient: {patient_name}"
-TEXT 24,382,"2",0,1,1,"Dispenser: {dispenser_name}"
-TEXT 24,426,"2",0,1,1,"Printed: {printed_at}"
+TEXT 384,16,"2",90,1,1,"{facility_name}"
+TEXT 356,16,"1",90,1,1,"Rx: {script_number}"
+BLOCK 312,16,392,64,"1",90,1,1,2,0,"{medicine_name}"
+BLOCK 240,16,392,52,"1",90,1,1,2,0,"{dosage_instructions}"
+TEXT 176,16,"1",90,1,1,"Patient: {patient_name}"
+TEXT 148,16,"1",90,1,1,"Repeat {repeat_number}"
+TEXT 120,16,"1",90,1,1,"Printed: {printed_at}"
 PRINT {copies}
 ]]></field>
         <field name="active" eval="True"/>
@@ -47,30 +45,87 @@ PRINT {copies}
         <field name="label_type">bag_label</field>
         <field name="printer_key">bagging_printer</field>
         <field name="command_language">zpl</field>
-        <field name="width_mm">102</field>
-        <field name="height_mm">152</field>
-        <field name="gap_mm">3</field>
+        <field name="width_mm">103</field>
+        <field name="height_mm">50</field>
+        <field name="gap_mm">3.3</field>
         <field name="template_body"><![CDATA[^XA
-^PW812
-^LL1218
-^CF0,36
-^FO32,32^FDScript Number: {script_number}^FS
-^FO32,92^BY2
-^BCN,112,Y,N,N
+^PW823
+^LL402
+^CF0,30
+^FO24,20^FDScript: {script_number}^FS
+^FO24,62^BY2,2,70
+^BCN,70,Y,N,N
 ^FD{script_number}^FS
-^FO520,92
-^BQN,2,6
+^FO590,20
+^BQN,2,4
 ^FDLA,{qr_value}^FS
-^CF0,34
-^FO32,270^FDPatient: {patient_name}^FS
-^FO32,330^FDPickup Point:^FS
-^FO32,382^FD{pickup_point}^FS
-^FO32,476^FDNext Collection: {next_collection_date}^FS
-^FO32,536^FDCollection Date: {collection_date}^FS
-^FO32,630^FDProduced By: Bonolo Health^FS
+^CF0,27
+^FO24,175^FDPatient: {patient_name}^FS
+^FO24,215^FDPickup:^FS
+^FO24,250^FB520,2,0,L,0^FD{pickup_point}^FS
+^FO24,325^FDNext: {next_collection_date}^FS
+^FO360,325^FDCollected: {collection_date}^FS
+^CF0,24
+^FO590,250^FDProduced By:^FS
+^FO590,282^FDBonolo Health^FS
 ^PQ1
 ^XZ
 ]]></field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="template_box_label_pdf" model="bahmni.label.template">
+        <field name="name">Box Label ZPL</field>
+        <field name="sequence">40</field>
+        <field name="label_type">box_label</field>
+        <field name="printer_key">box_label_printer</field>
+        <field name="command_language">zpl</field>
+        <field name="report_name" eval="False"/>
+        <field name="width_mm">102</field>
+        <field name="height_mm">152</field>
+        <field name="gap_mm">0</field>
+        <field name="template_body"><![CDATA[^XA
+^PW812
+^LL1218
+^CI28
+^CF0,40
+^FO40,30^FDBox: {box_reference}^FS
+^FO40,90^BY3,2,120
+^BCN,120,Y,N,N
+^FD{box_reference}^FS
+^CF0,32
+^FO40,260^FDProduction Date: {production_date}^FS
+^FO40,320^FDBox Nr: {box_number}^FS
+^FO420,320^FDRoute: {route_label}^FS
+^CF0,34
+^FO40,400^FDDeliver To:^FS
+^CF0,42
+^FO40,450^FB720,4,0,L,0^FD{collection_point}^FS
+^CF0,34
+^FO40,710^FDCollection Date:^FS
+^CF0,42
+^FO40,760^FD{collection_date} to {collection_date}^FS
+^CF0,34
+^FO40,850^FDParcels: {parcel_count}^FS
+^FO40,930^FDProduced By:^FS
+^CF0,42
+^FO40,980^FD{produced_by}^FS
+^PQ1
+^XZ
+]]></field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="template_box_manifest_pdf" model="bahmni.label.template">
+        <field name="name">Box Manifest PDF</field>
+        <field name="sequence">50</field>
+        <field name="label_type">box_manifest</field>
+        <field name="printer_key">document_printer</field>
+        <field name="command_language">pdf</field>
+        <field name="report_name">cdu_elmis.report_cdu_box_manifest</field>
+        <field name="width_mm">210</field>
+        <field name="height_mm">297</field>
+        <field name="gap_mm">0</field>
         <field name="active" eval="True"/>
     </record>
 </odoo>

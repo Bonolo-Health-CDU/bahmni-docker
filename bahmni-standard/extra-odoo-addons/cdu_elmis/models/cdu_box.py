@@ -1,3 +1,5 @@
+import base64
+
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from werkzeug import urls
@@ -573,24 +575,83 @@ class CduBox(models.Model):
         sticky=False,
         next_action=False,
     ):
+        print_jobs = self._enqueue_box_print_jobs()
         return {
             "type": "ir.actions.client",
-            "tag": "cdu_print_box_documents",
+            "tag": "display_notification",
             "params": {
-                "report_actions": [
-                    self.env.ref("cdu_elmis.action_report_cdu_box_label").report_action(
-                        self, config=False
-                    ),
-                    self.env.ref("cdu_elmis.action_report_cdu_box_manifest").report_action(
-                        self, config=False
-                    ),
-                ],
                 "title": title,
-                "message": message,
-                "notification_type": notification_type,
+                "message": _("%(message)s %(count)s print jobs were queued.")
+                % {"message": message, "count": len(print_jobs)},
+                "type": notification_type,
                 "sticky": sticky,
                 "next": next_action,
             },
+        }
+
+    def _enqueue_box_print_jobs(self):
+        print_jobs = self.env["bahmni.print.job"]
+        for box in self:
+            for label_type in ("box_label", "box_manifest"):
+                print_jobs |= box._enqueue_box_print_job(label_type)
+        return print_jobs
+
+    def _enqueue_box_print_job(self, label_type):
+        self.ensure_one()
+        template = self.env["bahmni.label.template"]._get_active_template(label_type)
+        payload_encoding = "text"
+        if template.command_language == "pdf":
+            payload = self._render_box_pdf_print_payload(template)
+            payload_encoding = "base64"
+        else:
+            payload = template.render_command_payload(
+                self._get_box_print_template_values()
+            )
+        return self.env["bahmni.print.job"].create(
+            {
+                "label_type": label_type,
+                "printer_key": template.printer_key,
+                "command_language": template.command_language,
+                "payload": payload,
+                "payload_encoding": payload_encoding,
+                "res_model": self._name,
+                "res_id": self.id,
+            }
+        )
+
+    def _render_box_pdf_print_payload(self, template):
+        self.ensure_one()
+        pdf_content, output_type = self.env["ir.actions.report"].with_context(
+            force_report_rendering=True,
+        )._render_qweb_pdf(template.report_name, res_ids=self.ids)
+        if output_type != "pdf":
+            raise UserError(
+                _("Report %s did not render a PDF payload.") % template.report_name
+            )
+        return base64.b64encode(pdf_content).decode("ascii")
+
+    def _get_box_print_template_values(self):
+        self.ensure_one()
+        production_at = fields.Datetime.to_datetime(
+            self.confirmed_at or fields.Datetime.now()
+        )
+        production_date = fields.Date.to_string(
+            fields.Datetime.context_timestamp(self, production_at).date()
+        )
+        collection_date = (
+            fields.Date.to_string(self.next_drug_pickup_date)
+            if self.next_drug_pickup_date
+            else ""
+        )
+        return {
+            "box_reference": self.name or "",
+            "box_number": self.get_box_number(),
+            "route_label": self.get_route_label(),
+            "collection_point": self.collection_point_id.display_name or "",
+            "collection_date": collection_date,
+            "production_date": production_date,
+            "parcel_count": self.parcel_count,
+            "produced_by": "Bonolo Health",
         }
 
     def get_barcode_url(self, value, width=760, height=120):

@@ -201,7 +201,7 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(set(print_jobs.mapped("state")), {"pending"})
         self.assertEqual(
             print_jobs.filtered(lambda job: job.label_type == "dispensing_slip").printer_key,
-            "document_printer",
+            "dispensing_receipt_printer",
         )
         self.assertEqual(
             print_jobs.filtered(lambda job: job.label_type == "medicine_label").printer_key,

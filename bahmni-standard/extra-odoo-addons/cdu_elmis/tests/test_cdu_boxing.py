@@ -1,3 +1,4 @@
+import base64
 from datetime import timedelta
 
 from lxml import etree, html as lxml_html
@@ -206,6 +207,41 @@ class TestCduBoxingWorkflow(TransactionCase):
             " ".join(manifest_produced_by[0].text_content().split()),
             "Produced By: Bonolo Health",
         )
+
+    def test_box_document_printing_queues_label_and_manifest_jobs(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        box.action_scan_bag_label(self.prescription.name)
+        box.write(
+            {
+                "state": "confirmed",
+                "confirmed_by": self.admin.id,
+                "confirmed_at": fields.Datetime.now(),
+            }
+        )
+
+        result = box.with_user(self.admin).action_print_box_documents()
+
+        self.assertEqual(result["tag"], "display_notification")
+        print_jobs = self.env["bahmni.print.job"].search(
+            [
+                ("res_model", "=", "cdu.box"),
+                ("res_id", "=", box.id),
+            ],
+            order="label_type",
+        )
+        self.assertEqual(sorted(print_jobs.mapped("label_type")), ["box_label", "box_manifest"])
+        self.assertEqual(set(print_jobs.mapped("state")), {"pending"})
+        box_label = print_jobs.filtered(lambda job: job.label_type == "box_label")
+        manifest = print_jobs.filtered(lambda job: job.label_type == "box_manifest")
+        self.assertEqual(box_label.printer_key, "box_label_printer")
+        self.assertEqual(manifest.printer_key, "document_printer")
+        self.assertEqual(box_label.command_language, "zpl")
+        self.assertEqual(box_label.payload_encoding, "text")
+        self.assertTrue(box_label.payload.startswith("^XA"))
+        self.assertIn(box.name, box_label.payload)
+        self.assertEqual(manifest.command_language, "pdf")
+        self.assertEqual(manifest.payload_encoding, "base64")
+        self.assertTrue(base64.b64decode(manifest.payload).startswith(b"%PDF"))
 
     def test_boxing_filters_are_registered(self):
         for view_xmlid in (

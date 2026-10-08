@@ -1,0 +1,15 @@
+SIZE 102 mm, 152 mm
+GAP 3 mm, 0 mm
+DENSITY 8
+DIRECTION 1
+CLS
+TEXT 24,24,"3",0,1,1,"Leribe District Hospital"
+TEXT 24,68,"2",0,1,1,"LERIBE-DISTRICT-HOSPITAL"
+TEXT 24,118,"3",0,1,1,"Tenofovir/Lamivudine 300/300Mg Tablets 30"
+TEXT 24,182,"2",0,1,1,"ha ngoe ka letsatsi"
+TEXT 24,252,"2",0,1,1,"Rx: CDU/RX/2026/00291"
+TEXT 24,294,"2",0,1,1,"Repeat 1"
+TEXT 24,338,"2",0,1,1,"Patient: Mathope Maphathe LER"
+TEXT 24,382,"2",0,1,1,"Dispenser: Administrator"
+TEXT 24,426,"2",0,1,1,"Printed: 2026-10-07 00:33"
+PRINT 10
