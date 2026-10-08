@@ -237,12 +237,22 @@ class CduEregisterSync(models.AbstractModel):
         regimen_changed = (prescription.regimen_prescribed_raw or "") != (
             values.get("regimen_prescribed_raw") or ""
         )
+        old_dosage = prescription.dosage_instructions or False
+        new_dosage = values.get("dosage_instructions") or False
         prescription.write(
             {key: value for key, value in values.items() if key not in ("intake_source", "eregister_order_uuid")}
         )
+        lines = prescription.product_line_ids.with_context(cdu_allow_product_line_sync=True)
         if regimen_changed:
-            prescription.product_line_ids.with_context(cdu_allow_product_line_sync=True).unlink()
+            lines.unlink()
             prescription._seed_product_lines()
+        elif old_dosage != new_dosage:
+            # Product lines copy the prescription's dosage when seeded. Carry the
+            # facility's new dosage onto lines that still have the old one; lines
+            # a clerk has edited keep their dosage.
+            lines.filtered(lambda line: (line.dosage_instructions or False) == old_dosage).write(
+                {"dosage_instructions": new_dosage}
+            )
 
         destination = prescription.rejected_from_state or (
             "awaiting_validation" if prescription.verified_at else "awaiting_verification"

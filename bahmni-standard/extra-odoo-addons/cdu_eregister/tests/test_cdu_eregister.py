@@ -357,12 +357,27 @@ class TestCduEregisterIntegration(TransactionCase):
 
         self.assertEqual(prescription.state, "awaiting_verification")
         self.assertEqual(prescription.dosage_instructions, "Take one tablet at night")
+        self.assertEqual(prescription.product_line_ids.mapped("dosage_instructions"), ["Take one tablet at night"])
         self.assertFalse(prescription.active_rejection_id)
         self.assertFalse(prescription.rejection_history_ids.is_active)
         task = self._task()
         self.assertEqual(task["status"], "accepted")
         self.assertEqual(task["businessStatus"]["coding"][0]["code"], "received")
         self.assertNotIn("statusReason", task)
+
+    def test_resubmitted_dosage_leaves_a_clerk_edited_product_line_alone(self):
+        prescription = self._pull()
+        line = prescription.product_line_ids
+        line.with_context(cdu_allow_product_line_sync=True).write({"dosage_instructions": "1 tablet at 20:00 with food"})
+        prescription.with_user(self.data_clerk)._perform_rejection("facility", ["missing_collection_information"])
+        self.sync.cron_push_pending_statuses()
+
+        self.server.update("MedicationRequest/12", dosageInstruction=[{"patientInstruction": "Take one tablet at night"}])
+        self.server.update("Task/13", status="requested")
+        self._pull()
+
+        self.assertEqual(prescription.dosage_instructions, "Take one tablet at night")
+        self.assertEqual(line.dosage_instructions, "1 tablet at 20:00 with food")
 
     def test_failed_publication_retries_then_gives_up(self):
         prescription = self._pull()
