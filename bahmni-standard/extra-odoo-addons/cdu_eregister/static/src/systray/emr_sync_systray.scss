@@ -1,0 +1,35 @@
+.o_cdu_emr_sync_dot {
+    position: absolute;
+    bottom: -3px;
+    right: -5px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9); // separates the dot from the icon on any navbar colour
+}
+
+.o_cdu_emr_sync_ok { background-color: #2fb380; color: #fff; }
+.o_cdu_emr_sync_warn { background-color: #f0ad4e; color: #212529; }
+.o_cdu_emr_sync_error { background-color: #dc3545; color: #fff; }
+.o_cdu_emr_sync_off { background-color: #adb5bd; color: #212529; }
+
+.o_cdu_emr_sync_menu {
+    width: 340px;
+    max-width: calc(100vw - 16px);
+}
+
+.o_cdu_emr_sync_facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    column-gap: 12px;
+    row-gap: 6px;
+    font-size: 0.875rem;
+
+    dt { font-weight: 500; color: $text-muted; }
+    dd { margin: 0; }
+}
+
+.o_cdu_emr_sync_footer {
+    border-top: 1px solid $border-color;
+    background-color: $gray-100;
+}

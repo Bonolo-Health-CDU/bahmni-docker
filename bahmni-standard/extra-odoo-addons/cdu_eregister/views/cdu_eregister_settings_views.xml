@@ -26,6 +26,9 @@
                     </group>
                     <group string="Synchronisation">
                         <field name="cdu_eregister_sync_enabled"/>
+                        <field name="cdu_eregister_pull_interval"/>
+                        <field name="cdu_eregister_push_interval"/>
+                        <field name="cdu_eregister_cancellation_interval"/>
                         <field name="cdu_eregister_page_size"/>
                         <field name="cdu_eregister_timeout_seconds"/>
                         <field name="cdu_eregister_max_publish_attempts"/>

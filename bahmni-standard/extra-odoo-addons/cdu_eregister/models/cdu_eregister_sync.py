@@ -1,9 +1,10 @@
 import copy
+import json
 import logging
 import threading
 from datetime import timedelta, timezone
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 from .fhir_contract import (
@@ -32,6 +33,18 @@ _logger = logging.getLogger(__name__)
 # the previous run was in flight is not missed. Processing is idempotent.
 CANCELLATION_OVERLAP = timedelta(minutes=10)
 
+# One pull at a time across workers (scheduled, systray button, settings):
+# a Postgres session lock, which survives the per-prescription commits.
+PULL_LOCK_KEY = 7150001
+LAST_PULL_PARAM = "cdu.eregister.last_pull"
+LAST_SUCCESSFUL_PULL_PARAM = "cdu.eregister.last_successful_pull"
+CDU_STAFF_GROUPS = (
+    "cdu_prescription.group_cdu_admin",
+    "cdu_prescription.group_cdu_data_clerk",
+    "cdu_prescription.group_cdu_call_agent",
+    "cdu_prescription.group_cdu_dispensing_officer",
+)
+
 
 class CduEregisterSync(models.AbstractModel):
     """INT-02 (pull prescriptions) and INT-03 (publish status) for the CDU."""
@@ -48,7 +61,120 @@ class CduEregisterSync(models.AbstractModel):
 
     def cron_pull_new_prescriptions(self):
         if self._sync_enabled():
-            self.pull_new_prescriptions(commit=True)
+            self.run_pull("scheduled")
+
+    # ------------------------------------------------------------------
+    # Recorded pulls (every way of starting one goes through run_pull)
+    # ------------------------------------------------------------------
+    def _try_pull_lock(self):
+        self.env.cr.execute("SELECT pg_try_advisory_lock(%s)", (PULL_LOCK_KEY,))
+        return self.env.cr.fetchone()[0]
+
+    def _release_pull_lock(self):
+        self.env.cr.execute("SELECT pg_advisory_unlock(%s)", (PULL_LOCK_KEY,))
+
+    def run_pull(self, trigger):
+        """Pull new prescriptions and record the outcome for the systray.
+
+        Returns the recorded outcome. If another pull is running, returns
+        {"busy": True} without pulling.
+        """
+        if not self._try_pull_lock():
+            return {"busy": True}
+        outcome = {
+            "at": fields.Datetime.now().isoformat() + "Z",
+            "trigger": trigger,
+            "user": self.env.user.name if trigger == "manual" else False,
+        }
+        try:
+            summary = self.pull_new_prescriptions(commit=True)
+            outcome.update(ok=True, error=False, **summary)
+        except UserError as exc:
+            _logger.warning("eRegister pull failed: %s", exc)
+            outcome.update(ok=False, error=str(exc), created=0, updated=0, failed=0)
+        finally:
+            self._release_pull_lock()
+        params = self.env["ir.config_parameter"].sudo()
+        params.set_param(LAST_PULL_PARAM, json.dumps(outcome))
+        if outcome["ok"]:
+            params.set_param(LAST_SUCCESSFUL_PULL_PARAM, json.dumps(outcome))
+        self._commit(True)
+        return outcome
+
+    def _is_cdu_staff(self):
+        # The superuser (scheduled jobs, sudo) always may; people need a CDU role.
+        return self.env.is_superuser() or any(self.env.user.has_group(group) for group in CDU_STAFF_GROUPS)
+
+    def _stored_pull(self, key):
+        try:
+            return json.loads(self.env["ir.config_parameter"].sudo().get_param(key) or "null")
+        except ValueError:
+            return None
+
+    @api.model
+    def get_sync_status(self):
+        """What the EMR sync systray shows. Aggregates only; safe for all CDU staff."""
+        if not self._is_cdu_staff():
+            return {"can_sync": False}
+        client = self.env["cdu.eregister.client"]
+        Prescription = self.env["cdu.prescription"].sudo()
+        running = not self._try_pull_lock()
+        if not running:
+            self._release_pull_lock()
+        latest = Prescription.search([("intake_source", "=", "eregister_fhir")], order="create_date desc", limit=1)
+        return {
+            "can_sync": True,
+            "is_admin": self.env.user.has_group("cdu_prescription.group_cdu_admin"),
+            "configured": client.is_configured(),
+            "enabled": client._param("cdu.eregister.sync_enabled") == "True",
+            "pull_interval_minutes": self._pull_interval_minutes(),
+            "running": running,
+            "last_pull": self._stored_pull(LAST_PULL_PARAM),
+            "last_successful_pull": self._stored_pull(LAST_SUCCESSFUL_PULL_PARAM),
+            "last_received": {
+                "at": latest.create_date.isoformat() + "Z",
+                "name": latest.name,
+                "id": latest.id,
+            }
+            if latest
+            else None,
+            "publication_failures": Prescription.search_count([("fhir_sync_state", "=", "failed")]),
+            "publication_pending": Prescription.search_count([("fhir_sync_state", "=", "pending")]),
+        }
+
+    def _pull_interval_minutes(self):
+        from .res_config_settings import cron_interval_minutes
+
+        cron = self.env.ref("cdu_eregister.ir_cron_cdu_eregister_pull", raise_if_not_found=False)
+        return cron_interval_minutes(cron.sudo()) if cron else None
+
+    @api.model
+    def action_pull_now(self):
+        """The systray's "Pull prescriptions now" button."""
+        if not self._is_cdu_staff():
+            raise UserError(_("Only CDU staff can sync prescriptions from eRegister."))
+        if not self.env["cdu.eregister.client"].is_configured():
+            return {
+                "ok": False,
+                "message": _("The eRegister integration is not configured. Ask a CDU administrator to set it up."),
+                "status": self.get_sync_status(),
+            }
+        outcome = self.run_pull("manual")
+        if outcome.get("busy"):
+            message = _("A sync is already running. Try again in a moment.")
+        elif not outcome["ok"]:
+            message = _("Sync failed: %s") % outcome["error"]
+        elif outcome["created"]:
+            message = _("%s new prescription(s) received from eRegister.") % outcome["created"]
+        else:
+            message = _("Up to date: no new prescriptions in eRegister.")
+        return {
+            "ok": bool(outcome.get("ok")),
+            "busy": bool(outcome.get("busy")),
+            "message": message,
+            "outcome": outcome,
+            "status": self.get_sync_status(),
+        }
 
     def cron_push_pending_statuses(self):
         if not self._sync_enabled():

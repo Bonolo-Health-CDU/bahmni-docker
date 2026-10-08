@@ -4,6 +4,8 @@ from datetime import date, timedelta
 from unittest.mock import patch
 from urllib.parse import urlsplit
 
+from odoo import fields
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 from ..models import fhir_contract as fc
@@ -91,8 +93,9 @@ class FakeFhirServer:
         return 200, json.dumps(self.add(body))
 
 
-@tagged("post_install", "-at_install", "cdu_eregister")
-class TestCduEregisterIntegration(TransactionCase):
+class EregisterFixture(TransactionCase):
+    """A fake repository with one published prescription; no tests of its own."""
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -229,6 +232,10 @@ class TestCduEregisterIntegration(TransactionCase):
     def _puts(self):
         return [call for call in self.server.calls if call["method"] == "PUT"]
 
+
+
+@tagged("post_install", "-at_install", "cdu_eregister")
+class TestCduEregisterIntegration(EregisterFixture):
     # ------------------------------------------------------------------
     # INT-02: intake
     # ------------------------------------------------------------------
@@ -494,3 +501,128 @@ class TestCduEregisterIntegration(TransactionCase):
             BASE_URL + "?_getpages=abc&_getpagesoffset=50",
         )
         self.assertEqual(client._url("Task/13"), BASE_URL + "/Task/13")
+
+
+@tagged("post_install", "-at_install", "cdu_eregister")
+class TestCduEregisterSyncSystray(EregisterFixture):
+    """The EMR Sync button in the top bar and the recorded pulls behind it."""
+
+    def _status(self, user=None):
+        sync = self.sync.with_user(user) if user else self.sync
+        return sync.get_sync_status()
+
+    def test_pull_now_records_the_outcome_and_reports_new_prescriptions(self):
+        result = self.sync.with_user(self.data_clerk).action_pull_now()
+
+        self.assertTrue(result["ok"])
+        self.assertIn("1 new prescription", result["message"])
+        status = result["status"]
+        self.assertTrue(status["can_sync"])
+        self.assertFalse(status["is_admin"])
+        self.assertFalse(status["running"])
+        self.assertEqual(status["last_pull"]["created"], 1)
+        self.assertEqual(status["last_pull"]["trigger"], "manual")
+        self.assertEqual(status["last_pull"]["user"], self.data_clerk.name)
+        self.assertEqual(status["last_successful_pull"], status["last_pull"])
+        self.assertTrue(status["last_received"]["name"])
+
+        again = self.sync.with_user(self.data_clerk).action_pull_now()
+        self.assertIn("Up to date", again["message"])
+
+    def test_a_failed_pull_keeps_the_last_successful_one(self):
+        self.sync.run_pull("scheduled")
+        failing = lambda _self, method, url, params=None, body=None, headers=None: (
+            503,
+            json.dumps({"resourceType": "OperationOutcome", "issue": [{"severity": "error", "diagnostics": "HAPI is down"}]}),
+        )
+        with patch.object(type(self.env["cdu.eregister.client"]), "_send", failing):
+            outcome = self.sync.run_pull("scheduled")
+
+        self.assertFalse(outcome["ok"])
+        status = self._status()
+        self.assertFalse(status["last_pull"]["ok"])
+        self.assertIn("HAPI is down", status["last_pull"]["error"])
+        self.assertTrue(status["last_successful_pull"]["ok"])
+        self.assertEqual(status["last_successful_pull"]["trigger"], "scheduled")
+        self.assertFalse(status["last_successful_pull"]["user"])
+
+    def test_only_one_pull_runs_at_a_time(self):
+        from odoo.sql_db import db_connect
+
+        # Another worker holding the lock: a separate database connection.
+        with db_connect(self.env.cr.dbname).cursor() as other:
+            other.execute("SELECT pg_try_advisory_lock(%s)", (7150001,))
+            self.assertTrue(other.fetchone()[0])
+            try:
+                self.assertTrue(self._status()["running"])
+                result = self.sync.action_pull_now()
+                self.assertTrue(result["busy"])
+                self.assertFalse(self.env["cdu.prescription"].search([("eregister_order_uuid", "=", ORDER_UUID)]))
+            finally:
+                other.execute("SELECT pg_advisory_unlock(%s)", (7150001,))
+        self.assertFalse(self._status()["running"])
+
+    def test_people_outside_the_cdu_cannot_see_or_start_a_sync(self):
+        outsider = self.env["res.users"].create(
+            {"name": "Not CDU", "login": "not.cdu@example.org", "groups_id": [(6, 0, [self.env.ref("base.group_user").id])]}
+        )
+        self.assertEqual(self._status(outsider), {"can_sync": False})
+        with self.assertRaises(UserError):
+            self.sync.with_user(outsider).action_pull_now()
+
+    def test_pull_now_explains_a_missing_configuration(self):
+        self.env["ir.config_parameter"].sudo().set_param("cdu.eregister.password", False)
+        result = self.sync.action_pull_now()
+        self.assertFalse(result["ok"])
+        self.assertIn("not configured", result["message"])
+        self.assertFalse(result["status"]["configured"])
+
+
+@tagged("post_install", "-at_install", "cdu_eregister")
+class TestCduEregisterSyncIntervals(TransactionCase):
+    """The scheduled-job intervals set on the eRegister Integration page."""
+
+    def setUp(self):
+        super().setUp()
+        self.pull_cron = self.env.ref("cdu_eregister.ir_cron_cdu_eregister_pull")
+
+    def _settings(self, **values):
+        settings = self.env["res.config.settings"].create({})
+        if values:
+            settings.write(values)
+            settings.set_values()
+        return settings
+
+    def test_defaults_come_from_the_scheduled_jobs(self):
+        settings = self._settings()
+        self.assertEqual(settings.cdu_eregister_pull_interval, 2)
+        self.assertEqual(settings.cdu_eregister_push_interval, 1)
+        self.assertEqual(settings.cdu_eregister_cancellation_interval, 5)
+
+    def test_saving_changes_the_job_and_a_shorter_interval_applies_now(self):
+        self.pull_cron.write({"nextcall": fields.Datetime.now() + timedelta(hours=6)})
+
+        self._settings(cdu_eregister_pull_interval=15)
+
+        self.assertEqual((self.pull_cron.interval_number, self.pull_cron.interval_type), (15, "minutes"))
+        self.assertLessEqual(self.pull_cron.nextcall, fields.Datetime.now() + timedelta(minutes=15))
+        self.assertEqual(self._settings().cdu_eregister_pull_interval, 15)
+        self.assertEqual(self.env["cdu.eregister.sync"].get_sync_status()["pull_interval_minutes"], 15)
+
+    def test_a_longer_interval_does_not_bring_the_next_run_forward(self):
+        soon = fields.Datetime.now() + timedelta(minutes=1)
+        self.pull_cron.write({"nextcall": soon})
+        self._settings(cdu_eregister_pull_interval=60)
+        self.assertEqual(self.pull_cron.nextcall, soon)
+
+    def test_intervals_must_be_between_one_minute_and_a_day(self):
+        for minutes in (0, -5, 24 * 60 + 1):
+            with self.assertRaises(ValidationError):
+                self._settings(cdu_eregister_pull_interval=minutes)
+        self._settings(cdu_eregister_cancellation_interval=24 * 60)
+        cron = self.env.ref("cdu_eregister.ir_cron_cdu_eregister_cancellations")
+        self.assertEqual(cron.interval_number, 24 * 60)
+
+    def test_an_interval_stored_in_hours_is_shown_in_minutes(self):
+        self.pull_cron.write({"interval_number": 1, "interval_type": "hours"})
+        self.assertEqual(self._settings().cdu_eregister_pull_interval, 60)
