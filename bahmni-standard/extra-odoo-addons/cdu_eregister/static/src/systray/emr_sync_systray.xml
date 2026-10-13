@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="cdu_eregister.EmrSyncSystray" owl="1">
+        <Dropdown t-if="status.can_sync"
+                  class="'o_cdu_emr_sync'"
+                  position="'bottom-end'"
+                  beforeOpen.bind="refresh"
+                  menuClass="'o_cdu_emr_sync_menu p-0'"
+                  title="'eRegister (EMR) sync: ' + health.label">
+            <t t-set-slot="toggler">
+                <span class="o_cdu_emr_sync_toggler d-flex align-items-center gap-1">
+                    <span class="position-relative">
+                        <i t-attf-class="fa fa-refresh fa-lg {{ busy ? 'fa-spin' : '' }}" role="img" aria-label="EMR sync"/>
+                        <span t-attf-class="o_cdu_emr_sync_dot o_cdu_emr_sync_{{ health.level }}"/>
+                    </span>
+                    <span class="d-none d-lg-inline">EMR Sync</span>
+                </span>
+            </t>
+
+            <div class="o_cdu_emr_sync_panel">
+                <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2">
+                    <strong>eRegister (EMR) sync</strong>
+                    <span t-attf-class="badge rounded-pill o_cdu_emr_sync_badge o_cdu_emr_sync_{{ health.level }}" t-esc="health.label"/>
+                </div>
+
+                <dl class="o_cdu_emr_sync_facts px-3 mb-2">
+                    <dt>Last successful sync</dt>
+                    <dd t-if="status.last_successful_pull" t-att-title="absolute(status.last_successful_pull.at)">
+                        <t t-esc="relative(status.last_successful_pull.at)"/>
+                        <span class="text-muted"> · <t t-esc="triggerLabel(status.last_successful_pull)"/></span>
+                    </dd>
+                    <dd t-else="" class="text-muted">Never</dd>
+
+                    <t t-if="status.last_successful_pull">
+                        <dt>Pulled in that sync</dt>
+                        <dd>
+                            <b t-esc="status.last_successful_pull.created"/> new
+                            <span class="text-muted"> · </span><t t-esc="status.last_successful_pull.updated"/> re-sent
+                            <t t-if="status.last_successful_pull.failed">
+                                <span class="text-muted"> · </span>
+                                <span class="text-danger"><t t-esc="status.last_successful_pull.failed"/> failed</span>
+                            </t>
+                        </dd>
+                    </t>
+
+                    <dt>Last new prescription</dt>
+                    <dd t-if="status.last_received">
+                        <a href="#" t-on-click.prevent="() => this.openPrescription(status.last_received.id)" t-esc="status.last_received.name"/>
+                        <span class="text-muted" t-att-title="absolute(status.last_received.at)"> · <t t-esc="relative(status.last_received.at)"/></span>
+                    </dd>
+                    <dd t-else="" class="text-muted">None received yet</dd>
+
+                    <dt>Automatic sync</dt>
+                    <dd t-if="status.enabled" t-esc="scheduleLabel"/>
+                    <dd t-else="" class="text-muted">Off: pulls only happen on demand</dd>
+                </dl>
+
+                <div t-if="status.last_pull and !status.last_pull.ok" class="alert alert-danger mx-3 mb-2 py-2 small">
+                    <b>Last attempt failed</b> <span t-att-title="absolute(status.last_pull.at)"><t t-esc="relative(status.last_pull.at)"/></span>:
+                    <t t-esc="status.last_pull.error"/>
+                </div>
+                <div t-if="!status.configured" class="alert alert-warning mx-3 mb-2 py-2 small">
+                    The eRegister connection is not set up yet. A CDU administrator can configure it in Settings.
+                </div>
+                <div t-if="status.publication_failures" class="alert alert-warning mx-3 mb-2 py-2 small">
+                    <a href="#" t-on-click.prevent="openPublicationFailures">
+                        <t t-esc="status.publication_failures"/> status update(s) could not be sent to eRegister
+                    </a>
+                </div>
+
+                <div class="px-3 pb-3">
+                    <button class="btn btn-primary w-100" t-att-disabled="busy or !status.configured" t-on-click="pullNow">
+                        <i t-attf-class="fa {{ busy ? 'fa-circle-o-notch fa-spin' : 'fa-cloud-download' }} me-1"/>
+                        <t t-if="busy">Syncing…</t>
+                        <t t-else="">Pull prescriptions now</t>
+                    </button>
+                </div>
+
+                <div t-if="status.is_admin" class="o_cdu_emr_sync_footer d-flex justify-content-between px-3 py-2 small">
+                    <a href="#" t-on-click.prevent="openSettings"><i class="fa fa-cog me-1"/>Settings</a>
+                    <a href="#" t-on-click.prevent="openLog"><i class="fa fa-list me-1"/>API log</a>
+                </div>
+            </div>
+        </Dropdown>
+    </t>
+</templates>
