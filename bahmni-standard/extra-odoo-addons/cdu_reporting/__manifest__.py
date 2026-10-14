@@ -2,7 +2,7 @@
     "name": "CDU Reporting",
     "summary": "Operational and management reporting for the Central Dispensing Unit",
     "description": "Shared operational and management reports for CDU workflows.",
-    "version": "16.0.1.0.0",
+    "version": "16.0.1.1.0",
     "category": "Healthcare/Reporting",
     "author": "Ministry of Health",
     "license": "LGPL-3",

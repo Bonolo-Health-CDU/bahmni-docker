@@ -131,12 +131,15 @@ class TestCduReporting(TransactionCase):
         )
         cls.box_line.write(
             {
-                "collect_go_parcel_status": "Collected",
+                "collect_go_parcel_status_type": 12,
+                "collect_go_parcel_status": "Collected by Customer",
                 "collect_go_status_received_at": cls.now,
             }
         )
         cls.completed.write({"state": "awaiting_dispatch"})
         cls.completed.write({"state": "dispatched"})
+        # A confirmed collection moves the prescription on (see cdu_elmis).
+        cls.completed.write({"state": "collected", "collected_at": cls.now})
 
         cls.awaiting = cls._create_prescription("AWAITING", "revisit", cls.other_facility)
         cls.submitted = cls._create_prescription("SUBMITTED", "revisit", cls.facility)
