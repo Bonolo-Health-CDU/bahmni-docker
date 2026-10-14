@@ -2,6 +2,8 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_compare, float_is_zero
 
+from .collect_go_status import COLLECTED, NEEDS_ATTENTION, RETURNED_TO_CDU
+
 
 class CduPrescription(models.Model):
     _inherit = "cdu.prescription"
@@ -67,9 +69,69 @@ class CduPrescription(models.Model):
             "awaiting_boxing",
             "awaiting_dispatch",
             "dispatched",
+            "collected",
+            "returned_uncollected",
         )
     )
     _DISPENSING_FLOAT_PRECISION_DIGITS = 4
+    # Collect & Go may confirm a collection or return before the CDU has seen
+    # its own dispatch confirmation, so both states can move on.
+    _COLLECT_GO_OPEN_STATES = ("awaiting_dispatch", "dispatched")
+
+    collect_go_parcel_status = fields.Char(
+        string="Parcel Status",
+        readonly=True,
+        copy=False,
+        help="Latest status of this prescription's parcel, as reported by Collect & Go.",
+    )
+    collect_go_parcel_status_at = fields.Datetime(
+        string="Parcel Status Date",
+        readonly=True,
+        copy=False,
+    )
+
+    def _apply_collect_go_status(self, code, label, status_at):
+        """Act on a Collect & Go tracking status for these prescriptions.
+
+        Only confirmed outcomes change the prescription: Collected by Customer
+        (12), and back at the CDU: Returned to CDU (Confirmed) (11) or Returned
+        to Vendor (16; the vendor is the CDU). Wrong-location deliveries and
+        parcels ready for the CDU to fetch (15) raise an activity for an admin.
+        Everything else is recorded for information. Collected and Returned
+        are final.
+        """
+        for prescription in self.sudo():
+            values = {"collect_go_parcel_status": label, "collect_go_parcel_status_at": status_at}
+            message = False
+            if prescription.state in self._COLLECT_GO_OPEN_STATES:
+                if code in COLLECTED:
+                    values.update(state="collected", collected_at=status_at)
+                    message = _("Collected by the patient (Collect & Go).")
+                elif code in RETURNED_TO_CDU:
+                    values.update(state="returned_uncollected", returned_uncollected_at=status_at)
+                    message = _("Not collected: Collect & Go confirmed the parcel is back at the CDU.")
+            prescription.write(values)
+            if message:
+                prescription.message_post(body=message)
+            if code in NEEDS_ATTENTION:
+                prescription._flag_collect_go_problem(NEEDS_ATTENTION[code], label)
+
+    def _flag_collect_go_problem(self, summary, label):
+        """One open activity per problem, for a CDU admin to follow up."""
+        self.ensure_one()
+        if self.activity_ids.filtered(lambda activity: activity.summary == summary):
+            return
+        admins = self.env.ref("cdu_prescription.group_cdu_admin").users.filtered(
+            lambda user: user.active and not user._is_superuser()
+        )
+        note = _("Collect & Go reported: %s. Check the parcel with Collect & Go.") % label
+        self.activity_schedule(
+            "mail.mail_activity_data_todo",
+            summary=summary,
+            note=note,
+            user_id=(admins[:1] or self.env.ref("base.user_admin")).id,
+        )
+        self.message_post(body=note)
 
     @api.depends(
         "state",

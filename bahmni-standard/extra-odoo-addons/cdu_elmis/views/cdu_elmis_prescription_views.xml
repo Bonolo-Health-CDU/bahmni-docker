@@ -35,6 +35,12 @@
                 <field name="dispensing_back_order_summary"
                        readonly="1"
                        attrs="{'invisible': [('dispensing_status', '!=', 'partially_dispensed')]}"/>
+                <field name="collect_go_parcel_status"
+                       readonly="1"
+                       attrs="{'invisible': [('collect_go_parcel_status', '=', False)]}"/>
+                <field name="collect_go_parcel_status_at"
+                       readonly="1"
+                       attrs="{'invisible': [('collect_go_parcel_status_at', '=', False)]}"/>
             </xpath>
         </field>
     </record>
