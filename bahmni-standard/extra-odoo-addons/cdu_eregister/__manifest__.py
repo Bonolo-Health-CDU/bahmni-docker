@@ -1,7 +1,7 @@
 {
     "name": "CDU eRegister Integration Client",
     "summary": "Pull eRegister prescriptions from the FHIR repository (via OpenHIM) and publish CDU fulfilment status back",
-    "version": "16.0.1.1.0",
+    "version": "16.0.1.2.0",
     "category": "Healthcare",
     "author": "Ministry of Health",
     "license": "LGPL-3",

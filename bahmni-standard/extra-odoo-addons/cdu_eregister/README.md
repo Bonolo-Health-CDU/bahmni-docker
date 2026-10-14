@@ -22,11 +22,13 @@ Claiming a Task is just the first status publication (`accepted` / `received`). 
 | awaiting batching … boxing | in-progress | in-preparation |
 | awaiting dispatch | in-progress | ready-for-dispatch |
 | dispatched | in-progress | dispatched |
+| collected (Collect & Go code 12) | completed | collected (+ executionPeriod.end) |
+| returned uncollected (Collect & Go code 11 or 16) | failed | uncollected-returned (+ executionPeriod.end) |
 | cancelled by the CDU | cancelled | cancelled |
 
 This follows the "Status Map" tab of the Bonolo_CDU_eRegister_Data_Mapping sheet. eRegister also cancels with `cancelled` / `cancelled`; the module tells its own cancellation apart by what it last published, so a CDU cancellation is never read back as an eRegister one.
 
-`collected` and `uncollected-returned` need Collect & Go parcel events and are not published yet. R4 `Task.statusReason` holds one concept: it carries the first rejection reason as a code and all reasons in its text.
+Collected and returned uncollected come from **confirmed** Collect & Go parcel statuses (`cdu_elmis`): code 12 *Collected by Customer*, and code 11 *Returned to CDU (Confirmed)* or 16 *Returned to Vendor* (Collect & Go's "vendor" is the CDU). Unconfirmed statuses are recorded for information only. The collection or return time goes in `Task.executionPeriod.end`; the CDU does not publish MedicationDispense yet. R4 `Task.statusReason` holds one concept: it carries the first rejection reason as a code and all reasons in its text.
 
 ## Resubmission
 

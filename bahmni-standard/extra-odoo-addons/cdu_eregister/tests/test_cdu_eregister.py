@@ -386,6 +386,40 @@ class TestCduEregisterIntegration(EregisterFixture):
         self.assertEqual(prescription.dosage_instructions, "Take one tablet at night")
         self.assertEqual(line.dosage_instructions, "1 tablet at 20:00 with food")
 
+    def test_collection_is_published_as_completed_with_the_collection_time(self):
+        prescription = self._pull()
+        prescription.write({"state": "dispatched"})
+        self.sync.cron_push_pending_statuses()
+
+        prescription.write({"state": "collected", "collected_at": "2026-10-10 10:45:16"})
+        self.sync.cron_push_pending_statuses()
+
+        task = self._task()
+        self.assertEqual(task["status"], "completed")
+        self.assertEqual(task["businessStatus"]["coding"][0]["code"], "collected")
+        self.assertEqual(task["executionPeriod"]["end"], "2026-10-10T10:45:16+00:00")
+        self.assertEqual(prescription.fhir_sync_state, "synced")
+
+        # Publishing again finds the Task already says so: nothing is sent.
+        put_count = len(self._puts())
+        prescription.write({"fhir_sync_state": "pending", "fhir_published_signature": False})
+        ok, _message = self.sync.push_prescription_status(prescription)
+        self.assertTrue(ok)
+        self.assertEqual(len(self._puts()), put_count)
+
+    def test_a_confirmed_return_is_published_as_failed(self):
+        prescription = self._pull()
+        prescription.write({"state": "dispatched"})
+        self.sync.cron_push_pending_statuses()
+
+        prescription.write({"state": "returned_uncollected", "returned_uncollected_at": "2026-10-11 07:00:00"})
+        self.sync.cron_push_pending_statuses()
+
+        task = self._task()
+        self.assertEqual(task["status"], "failed")
+        self.assertEqual(task["businessStatus"]["coding"][0]["code"], "uncollected-returned")
+        self.assertEqual(task["executionPeriod"]["end"], "2026-10-11T07:00:00+00:00")
+
     def test_failed_publication_retries_then_gives_up(self):
         prescription = self._pull()
         self.server.put_failure = (
