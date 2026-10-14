@@ -654,16 +654,26 @@ class CduCollectGoService(models.AbstractModel):
                 continue
             status_type = self._parcel_status_type(item)
             status_date = self._parcel_status_date(item)
-            status_at = parse_status_date(status_date, timezone)
-            status_at = status_at and status_at.replace(microsecond=0)  # Odoo stores whole seconds
+            status_at = self._whole_seconds(parse_status_date(status_date, timezone))
             # Updates can arrive out of order: never replace a newer status.
             lines = lines.filtered(
                 lambda line: not (
                     status_at
                     and line.collect_go_status_date
-                    and (parse_status_date(line.collect_go_status_date, timezone) or status_at) > status_at
+                    and (self._whole_seconds(parse_status_date(line.collect_go_status_date, timezone)) or status_at)
+                    > status_at
                 )
             )
+            # getParcelStatus is a snapshot: it repeats statuses already applied.
+            # Count a repeat as matched but don't act on it again, so an activity
+            # the admin has closed is not raised a second time.
+            repeats = lines.filtered(
+                lambda line: line.collect_go_status_received_at
+                and line.collect_go_parcel_status_type == status_type
+                and self._whole_seconds(parse_status_date(line.collect_go_status_date, timezone)) == status_at
+            )
+            matched_lines |= repeats
+            lines -= repeats
             if not lines:
                 continue
             values = {
@@ -683,6 +693,11 @@ class CduCollectGoService(models.AbstractModel):
         for box in matched_lines.mapped("box_id"):
             box._update_collect_go_status_summary()
         return len(matched_lines)
+
+    @staticmethod
+    def _whole_seconds(moment):
+        """Odoo stores whole seconds, so compare Collect & Go times that way."""
+        return moment and moment.replace(microsecond=0)
 
     def _parcel_external_reference(self, item):
         return self._first_value(
