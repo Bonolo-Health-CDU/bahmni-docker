@@ -152,6 +152,23 @@ class TestCollectGoStatuses(TransactionCase):
         )
         self.assertEqual(self.prescription.state, "dispatched")
 
+    def test_a_repeated_status_is_not_acted_on_again(self):
+        # getParcelStatus is a snapshot, so every poll repeats the latest status.
+        self.assertEqual(self._receive((15, "2026-10-10T10:00:00")), 1)
+        received_at = self.line.collect_go_status_received_at
+        self.prescription.activity_ids.action_feedback(feedback="Driver sent to fetch it.")
+        notes = len(self.prescription.message_ids)
+
+        with patch.object(fields.Datetime, "now", return_value=received_at + timedelta(minutes=5)):
+            self.assertEqual(self._receive((15, "2026-10-10T10:00:00")), 1)
+        self.assertFalse(self.prescription.activity_ids)
+        self.assertEqual(len(self.prescription.message_ids), notes)
+        self.assertEqual(self.line.collect_go_status_received_at, received_at)
+
+        # A new status is still acted on.
+        self._receive((8, "2026-10-10T11:00:00"))
+        self.assertEqual(self.prescription.activity_ids.summary, "Parcel delivered to the wrong location")
+
     def test_returned_to_vendor_means_back_at_the_cdu(self):
         self._receive((16, "2026-10-10T11:00:00"))
         self.assertEqual(self.prescription.state, "returned_uncollected")
