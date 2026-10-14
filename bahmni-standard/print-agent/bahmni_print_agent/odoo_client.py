@@ -36,6 +36,9 @@ class OdooPrintQueueClient:
     def get_pending_jobs(self, limit: int):
         return self._execute("bahmni.print.job", "api_get_pending_jobs", [limit])
 
+    def check_connection(self) -> bool:
+        return bool(self.uid)
+
     def mark_done(self, job_id: int, agent_name: str):
         return self._execute("bahmni.print.job", "api_mark_done", [job_id, agent_name])
 
@@ -44,6 +47,13 @@ class OdooPrintQueueClient:
             "bahmni.print.job",
             "api_mark_failed",
             [job_id, error_message, agent_name],
+        )
+
+    def retry_job(self, job_id: int):
+        return self._execute(
+            "bahmni.print.job",
+            "write",
+            [[int(job_id)], {"state": "pending"}],
         )
 
     def _execute(self, model: str, method: str, args: list):

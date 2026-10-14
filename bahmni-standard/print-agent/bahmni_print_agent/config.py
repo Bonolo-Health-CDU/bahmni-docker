@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from configparser import ConfigParser
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -22,6 +22,27 @@ class PrinterConfig:
     port: int = 9100
     command: str = ""
     queue: str = ""
+    test_language: str = ""
+
+
+@dataclass(frozen=True)
+class ElectionConfig:
+    enabled: bool = False
+    hostname: str = ""
+    priority: int = 100
+    port: int = 47990
+    broadcast_interval_seconds: float = 2.0
+    peer_timeout_seconds: float = 6.0
+    bind_host: str = ""
+    broadcast_address: str = "<broadcast>"
+    force_active: bool = False
+
+
+@dataclass(frozen=True)
+class StatusUiConfig:
+    host: str = "127.0.0.1"
+    port: int = 8765
+    refresh_seconds: float = 3.0
 
 
 @dataclass(frozen=True)
@@ -33,6 +54,9 @@ class AgentConfig:
     dry_run_output_dir: Path
     odoo: OdooConfig
     printers: dict[str, PrinterConfig]
+    config_dir: Path = Path(".")
+    election: ElectionConfig = field(default_factory=ElectionConfig)
+    status_ui: StatusUiConfig = field(default_factory=StatusUiConfig)
 
 
 def load_config(path: str | Path) -> AgentConfig:
@@ -68,7 +92,39 @@ def load_config(path: str | Path) -> AgentConfig:
             port=parser.getint(section, "port", fallback=9100),
             command=parser.get(section, "command", fallback=""),
             queue=parser.get(section, "queue", fallback=""),
+            test_language=parser.get(section, "test_language", fallback="").strip(),
         )
+
+    election = ElectionConfig(
+        enabled=parser.getboolean("election", "enabled", fallback=False),
+        hostname=parser.get("election", "hostname", fallback="").strip(),
+        priority=parser.getint("election", "priority", fallback=100),
+        port=parser.getint("election", "port", fallback=47990),
+        broadcast_interval_seconds=parser.getfloat(
+            "election",
+            "broadcast_interval_seconds",
+            fallback=2.0,
+        ),
+        peer_timeout_seconds=parser.getfloat(
+            "election",
+            "peer_timeout_seconds",
+            fallback=6.0,
+        ),
+        bind_host=parser.get("election", "bind_host", fallback="").strip(),
+        broadcast_address=parser.get(
+            "election",
+            "broadcast_address",
+            fallback="<broadcast>",
+        ).strip()
+        or "<broadcast>",
+        force_active=parser.getboolean("election", "force_active", fallback=False),
+    )
+
+    status_ui = StatusUiConfig(
+        host=parser.get("ui", "host", fallback="127.0.0.1").strip() or "127.0.0.1",
+        port=parser.getint("ui", "port", fallback=8765),
+        refresh_seconds=parser.getfloat("ui", "refresh_seconds", fallback=3.0),
+    )
 
     return AgentConfig(
         name=parser.get("agent", "name", fallback="CDU-PRINT-AGENT"),
@@ -80,6 +136,9 @@ def load_config(path: str | Path) -> AgentConfig:
         dry_run_output_dir=output_dir,
         odoo=odoo,
         printers=printers,
+        config_dir=config_path.parent,
+        election=election,
+        status_ui=status_ui,
     )
 
 
