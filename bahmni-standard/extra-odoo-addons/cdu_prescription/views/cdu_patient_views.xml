@@ -82,9 +82,9 @@
                                     <field name="prescription_date"/>
                                     <field name="state"
                                            widget="badge"
-                                           decoration-info="state not in ('rejected_to_call_center', 'rejected_to_facility', 'dispatched', 'cancelled')"
-                                           decoration-success="state == 'dispatched'"
-                                           decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility')"
+                                           decoration-info="state not in ('rejected_to_call_center', 'rejected_to_facility', 'dispatched', 'collected', 'returned_uncollected', 'cancelled')"
+                                           decoration-success="state in ('dispatched', 'collected')"
+                                           decoration-danger="state in ('rejected_to_call_center', 'rejected_to_facility', 'returned_uncollected')"
                                            decoration-muted="state == 'cancelled'"/>
                                     <field name="regimen_prescribed_raw"/>
                                     <field name="drug_pickup_point_raw"/>
