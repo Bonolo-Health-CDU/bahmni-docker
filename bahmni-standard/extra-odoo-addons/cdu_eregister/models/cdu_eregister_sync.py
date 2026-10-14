@@ -588,13 +588,32 @@ class CduEregisterSync(models.AbstractModel):
                 source = {"method": "GET", "url": client._endpoint(client._url(path)), "status_code": status_code}
                 self._apply_eregister_cancellation(prescription, task, source)
                 return False, _("eRegister has cancelled this prescription; nothing was published.")
+            already = (task.get("businessStatus") or {}).get("coding") or [{}]
+            if task.get("status") == desired[0] and already[0].get("code") == desired[1]:
+                # Already says exactly this (e.g. a final status published earlier).
+                prescription.write(
+                    {
+                        "fhir_task_status": desired[0],
+                        "fhir_business_status": desired[1],
+                        "fhir_published_signature": prescription._fhir_signature(desired),
+                        "fhir_sync_state": "synced",
+                        "fhir_sync_attempts": 0,
+                        "fhir_sync_error": False,
+                    }
+                )
+                return True, _("eRegister already shows this status.")
             if task.get("status") in ("completed", "failed", "entered-in-error"):
                 raise UserError(
                     _("The Task is '%s' in the repository; the CDU status was not published over it.")
                     % task.get("status")
                 )
             version_id = (task.get("meta") or {}).get("versionId")
-            client.put(path, self._task_with_status(task, desired), version_id=version_id, prescription=prescription)
+            client.put(
+                path,
+                self._task_with_status(task, desired, prescription),
+                version_id=version_id,
+                prescription=prescription,
+            )
         except UserError as exc:
             attempts = prescription.fhir_sync_attempts + 1
             max_attempts = self._max_publish_attempts()
@@ -621,7 +640,7 @@ class CduEregisterSync(models.AbstractModel):
         )
         return True, _("Published '%s' to eRegister.") % FULFILMENT_STATUS_DISPLAY[business_status]
 
-    def _task_with_status(self, task, desired):
+    def _task_with_status(self, task, desired, prescription=None):
         task_status, business_status, reason_codes, reason_text = desired
         task = copy.deepcopy(task)
         meta = task.get("meta") or {}
@@ -643,6 +662,10 @@ class CduEregisterSync(models.AbstractModel):
         else:
             task.pop("statusReason", None)
         task["lastModified"] = self._fhir_instant(fields.Datetime.now())
+        # When the parcel was collected, or confirmed back at the CDU.
+        ended_at = prescription and (prescription.collected_at or prescription.returned_uncollected_at)
+        if ended_at and task_status in ("completed", "failed"):
+            task["executionPeriod"] = dict(task.get("executionPeriod") or {}, end=self._fhir_instant(ended_at))
         return task
 
     def _max_publish_attempts(self):

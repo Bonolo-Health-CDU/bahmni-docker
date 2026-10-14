@@ -144,13 +144,7 @@ class CduReportEnrolment(models.Model):
                        (ARRAY_AGG(b.dispatched_by ORDER BY b.dispatched_at DESC NULLS LAST))[1] AS dispatched_by,
                        BOOL_OR(b.dispatch_status = 'dispatched') AS is_dispatched,
                        MAX(b.collect_go_status) AS collect_go_status,
-                       MAX(bl.collect_go_parcel_status) AS collection_status,
-                       MAX(bl.collect_go_status_received_at)
-                           FILTER (WHERE LOWER(COALESCE(bl.collect_go_parcel_status, '')) LIKE '%collect%') AS collection_date,
-                       MAX(bl.collect_go_status_received_at)
-                           FILTER (WHERE LOWER(COALESCE(bl.collect_go_parcel_status, '')) LIKE '%return%') AS return_date,
-                       BOOL_OR(LOWER(COALESCE(bl.collect_go_parcel_status, '')) LIKE '%collect%') AS is_collected,
-                       BOOL_OR(LOWER(COALESCE(bl.collect_go_parcel_status, '')) LIKE '%return%') AS is_returned
+                       MAX(bl.collect_go_parcel_status) AS collection_status
                   FROM cdu_box_line bl
                   JOIN cdu_box b ON b.id = bl.box_id
                  GROUP BY bl.prescription_id
@@ -222,10 +216,12 @@ class CduReportEnrolment(models.Model):
                    COALESCE(b.is_dispatched, FALSE) AS is_dispatched,
                    b.collect_go_status,
                    b.collection_status,
-                   b.collection_date,
-                   b.return_date,
-                   COALESCE(b.is_collected, FALSE) AS is_collected,
-                   COALESCE(b.is_returned, FALSE) AS is_returned
+                   -- Collected / returned come from the prescription, which only
+                   -- moves on confirmed Collect & Go statuses (not label text).
+                   p.collected_at AS collection_date,
+                   p.returned_uncollected_at AS return_date,
+                   (p.state = 'collected') AS is_collected,
+                   (p.state = 'returned_uncollected') AS is_returned
               FROM cdu_prescription p
          LEFT JOIN cdu_facility f ON f.id = p.facility_id
          LEFT JOIN cdu_collection_point cp ON cp.id = p.collection_point_id

@@ -2,20 +2,6 @@ from odoo import _, api, fields, models
 from odoo.exceptions import AccessError
 
 
-PRESCRIPTION_STATES = [
-    ("awaiting_verification", "Awaiting verification"),
-    ("awaiting_validation", "Awaiting validation"),
-    ("rejected_to_call_center", "Rejected to call center"),
-    ("rejected_to_facility", "Rejected to facility"),
-    ("awaiting_batching", "Awaiting batching"),
-    ("awaiting_picking", "Awaiting picking"),
-    ("awaiting_dispensing", "Awaiting dispensing"),
-    ("awaiting_bagging_qa", "Awaiting bagging / QA"),
-    ("awaiting_boxing", "Awaiting boxing"),
-    ("awaiting_dispatch", "Awaiting dispatch"),
-    ("dispatched", "Dispatched"),
-    ("cancelled", "Cancelled"),
-]
 
 
 class CduPrescriptionStatusHistory(models.Model):
@@ -24,14 +10,20 @@ class CduPrescriptionStatusHistory(models.Model):
     _order = "changed_at desc, id desc"
     _rec_name = "prescription_id"
 
+    @api.model
+    def _prescription_states(self):
+        return self.env["cdu.prescription"]._fields["state"].selection
+
     prescription_id = fields.Many2one(
         "cdu.prescription",
         required=True,
         ondelete="cascade",
         index=True,
     )
-    previous_status = fields.Selection(PRESCRIPTION_STATES, readonly=True, index=True)
-    new_status = fields.Selection(PRESCRIPTION_STATES, required=True, readonly=True, index=True)
+    # The prescription's own state list, so new workflow states (such as
+    # collected / returned uncollected) never fall out of step with history.
+    previous_status = fields.Selection("_prescription_states", readonly=True, index=True)
+    new_status = fields.Selection("_prescription_states", required=True, readonly=True, index=True)
     changed_at = fields.Datetime(required=True, readonly=True, index=True)
     changed_by = fields.Many2one("res.users", required=True, readonly=True, index=True)
     reason = fields.Char(readonly=True)

@@ -61,6 +61,9 @@ STATE_TO_TASK_STATUS = {
     "awaiting_boxing": ("in-progress", "in-preparation"),
     "awaiting_dispatch": ("in-progress", "ready-for-dispatch"),
     "dispatched": ("in-progress", "dispatched"),
+    # Final outcomes from Collect & Go (confirmed statuses only).
+    "collected": ("completed", "collected"),
+    "returned_uncollected": ("failed", "uncollected-returned"),
     "cancelled": ("cancelled", "cancelled"),
 }
 

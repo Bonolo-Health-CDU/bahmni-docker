@@ -1054,6 +1054,10 @@ class CduBoxLine(models.Model):
             and set(vals) - status_update_fields
         ):
             raise UserError(_("Parcels cannot be changed on a confirmed box."))
+        if not set(vals) - status_update_fields:
+            # A Collect & Go status update arrives after dispatch; the boxing
+            # rules (parcel awaiting boxing, same pickup point) don't apply.
+            return super().write(vals)
         if "box_id" in vals or "bagging_qa_id" in vals:
             self._validate_write_values_unique_parcels(vals)
         result = super().write(vals)

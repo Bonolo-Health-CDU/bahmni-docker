@@ -126,6 +126,9 @@ class CduPrescription(models.Model):
             ("awaiting_boxing", "Awaiting boxing"),
             ("awaiting_dispatch", "Awaiting dispatch"),
             ("dispatched", "Dispatched"),
+            # Set from confirmed Collect & Go parcel statuses (cdu_elmis).
+            ("collected", "Collected"),
+            ("returned_uncollected", "Returned uncollected"),
             ("cancelled", "Cancelled"),
         ],
         default="awaiting_verification",
@@ -166,6 +169,18 @@ class CduPrescription(models.Model):
         string="Rejected To",
         store=True,
         readonly=True,
+    )
+    collected_at = fields.Datetime(
+        string="Collected At",
+        readonly=True,
+        copy=False,
+        help="When the patient collected the parcel, as reported by Collect & Go.",
+    )
+    returned_uncollected_at = fields.Datetime(
+        string="Returned Uncollected At",
+        readonly=True,
+        copy=False,
+        help="When Collect & Go confirmed the uncollected parcel was back at the CDU.",
     )
     verified_by = fields.Many2one("res.users", readonly=True)
     verified_at = fields.Datetime(readonly=True)
