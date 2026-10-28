@@ -1,4 +1,5 @@
 import base64
+import re
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -6,7 +7,7 @@ from lxml import etree, html as lxml_html
 
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import Form, TransactionCase, tagged
 
 
 @tagged("post_install", "-at_install", "cdu_dispensing")
@@ -221,6 +222,134 @@ class TestCduDispensingWorkflow(TransactionCase):
         bag_job = print_jobs.filtered(lambda job: job.label_type == "bag_label")
         self.assertEqual(bag_job.command_language, "zpl")
         self.assertIn(first_prescription.name, bag_job.payload)
+
+    def _decode_bag_label_qr(self, payload):
+        field = re.search(r"\^FH_\^FDLA,((?:_[0-9A-F]{2})+)\^FS", payload)
+        self.assertIsNotNone(field, "Bag label must encode its QR field using ZPL field hex")
+        return bytes.fromhex(field.group(1).replace("_", "")).decode("utf-8")
+
+    def test_bag_barcode_reserves_the_parcel_reference_before_qa(self):
+        prescription = self._create_prescription("BAG-BARCODE", 10)
+        dispense = self._create_ready_dispense(prescription)
+        self._confirm_dispense_for_bagging(dispense)
+
+        job = dispense._enqueue_dispensing_print_job("bag_label")
+        qa = self.env["cdu.bagging.qa"].search([
+            ("prescription_id", "=", prescription.id),
+        ])
+        self.assertEqual(len(qa), 1)
+        self.assertEqual(qa.state, "draft")
+        self.assertTrue(qa.parcel_reference)
+        parcel_reference = qa.parcel_reference
+        barcode = re.search(r"\^BCN,70,Y,N,N\s*\^FD([^\^]+)\^FS", job.payload)
+        self.assertIsNotNone(barcode)
+        self.assertEqual(barcode.group(1), qa.barcode_reference)
+        self.assertNotIn("/", barcode.group(1))
+        self.assertEqual(
+            barcode.group(1),
+            self.env["cdu.collect.go.service"]._collect_go_external_reference(parcel_reference),
+        )
+
+        qa.with_user(self.admin).action_validate_label_qr(self._decode_bag_label_qr(job.payload))
+        self.assertEqual(qa.state, "confirmed")
+        self.assertEqual(qa.parcel_reference, parcel_reference)
+        self.assertEqual(dispense.get_bag_barcode_value(), barcode.group(1))
+
+    def test_bag_barcode_reuses_an_existing_parcel_on_reprint(self):
+        prescription = self._create_prescription("BAG-REPRINT", 10)
+        dispense = self._create_ready_dispense(prescription)
+        qa = self.env["cdu.bagging.qa"].create({
+            "prescription_id": prescription.id,
+            "dispense_id": dispense.id,
+            "state": "confirmed",
+            "parcel_reference": "CDU/PARCEL/2026/000123",
+        })
+
+        self.assertEqual(dispense.get_bag_barcode_value(), "CDUPARCEL2026000123")
+        self.assertEqual(dispense.get_bag_barcode_value(), "CDUPARCEL2026000123")
+        self.assertEqual(qa.parcel_reference, "CDU/PARCEL/2026/000123")
+        self.assertEqual(qa.state, "confirmed")
+        self.assertEqual(self.env["cdu.bagging.qa"].search_count([
+            ("prescription_id", "=", prescription.id),
+        ]), 1)
+
+    def test_bag_pdf_uses_the_same_tracking_barcode_and_qa_qr(self):
+        prescription = self._create_prescription("BAG-PDF-BARCODE", 10)
+        dispense = self._create_ready_dispense(prescription)
+        barcode = dispense.get_bag_barcode_value()
+        with patch.object(type(dispense), "get_barcode_data_uri", return_value="data:image/png;base64,") as render_barcode:
+            report_html, _ = self.env["ir.actions.report"].with_context(
+                cdu_label_layout="bag"
+            )._render_qweb_html("cdu_elmis.report_cdu_dispense_labels", dispense.ids)
+
+        self.assertEqual(render_barcode.call_args_list[0].args, (barcode,))
+        self.assertEqual(render_barcode.call_args_list[1].args, (dispense.get_label_qr_value(), "QR", 220, 220))
+        document = lxml_html.fromstring(report_html)
+        caption = document.xpath("//div[@class='cdu-barcode-caption']")[0]
+        self.assertEqual(caption.text_content().strip(), barcode)
+        self.assertNotIn("/", barcode)
+
+    def test_bag_label_qr_passes_qa_with_separate_patient_and_prescription(self):
+        prescription = self._create_prescription("QR-LINES", 10)
+        dispense = self._create_ready_dispense(prescription)
+        self._confirm_dispense_for_bagging(dispense)
+        qa = self.env["cdu.bagging.qa"].create({
+            "prescription_id": prescription.id,
+            "dispense_id": dispense.id,
+        })
+
+        job = dispense._enqueue_dispensing_print_job("bag_label")
+        scanned_value = self._decode_bag_label_qr(job.payload)
+
+        self.assertEqual(
+            scanned_value.splitlines(),
+            [dispense.patient_name, prescription.name],
+        )
+        result = qa.with_user(self.admin).action_validate_label_qr(scanned_value)
+
+        self.assertEqual(result["params"]["title"], "Bag passed QA")
+        self.assertEqual(qa.state, "confirmed")
+        self.assertEqual(prescription.state, "awaiting_boxing")
+
+    def test_bag_label_qr_preserves_special_characters_in_patient_name(self):
+        prescription = self._create_prescription("QR-SPECIAL", 10)
+        prescription.patient_first_name = 'Mpho_0A Mokoéna "Neo" ^QA~'
+        dispense = self._create_ready_dispense(prescription)
+        template = self.env.ref("cdu_elmis.template_bag_label_zpl")
+
+        # Both existing saved templates and templates with a hex indicator work.
+        for prefix in ("", "^FH_", "^FH\\"):
+            with self.subTest(prefix=prefix):
+                template.template_body = (
+                    "^XA\n^BQN,2,4\n" + prefix + "^FDLA,{qr_value}^FS\n^XZ"
+                )
+                payload = template.render_command_payload(dispense._get_print_template_values())
+                scanned_value = self._decode_bag_label_qr(payload)
+
+                self.assertEqual(scanned_value, dispense.get_label_qr_value())
+                self.assertEqual(scanned_value.splitlines()[0], prescription.patient_first_name)
+                self.assertNotIn(prescription.patient_first_name, payload)
+
+    def test_bag_label_qr_still_rejects_another_patients_label(self):
+        prescription = self._create_prescription("QR-EXPECTED", 10)
+        dispense = self._create_ready_dispense(prescription)
+        self._confirm_dispense_for_bagging(dispense)
+        qa = self.env["cdu.bagging.qa"].create({
+            "prescription_id": prescription.id,
+            "dispense_id": dispense.id,
+        })
+        other_prescription = self._create_prescription("QR-WRONG", 10)
+        other_dispense = self._create_ready_dispense(other_prescription)
+        job = other_dispense._enqueue_dispensing_print_job("bag_label")
+
+        with self.assertRaisesRegex(UserError, "Wrong box scanned"):
+            qa.with_user(self.admin).action_validate_label_qr(
+                self._decode_bag_label_qr(job.payload)
+            )
+
+        self.assertEqual(qa.state, "draft")
+        self.assertFalse(qa.patient_details_checked)
+        self.assertEqual(prescription.state, "awaiting_bagging_qa")
 
     def test_print_agent_api_can_process_jobs_without_printers(self):
         prescription = self._create_prescription("AGENT", 10)
@@ -858,6 +987,144 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(fulfilment.selected_stock_option_id, selected_option)
         self.assertEqual(fulfilment.selected_pack_size, 60)
         self.assertEqual(fulfilment.picking_line_id.quantity_to_pick, 1)
+
+    def _create_patient_rounded_picking(self, stock_on_hand=20):
+        medicine = self.env["product.template"].create(
+            {
+                "name": "Patient Rounded Medicine",
+                "type": "product",
+                "cdu_is_drug": True,
+                "cdu_catalog_source": "elmis",
+                "cdu_drug_code": "ROUND-PACK",
+                "cdu_default_daily_dose": 1,
+            }
+        )
+        for days in (35, 40):
+            prescription = self._create_prescription("ROUND-%s" % days, days)
+            prescription.write(
+                {"cdu_days_supply": days, "repeat_days": days, "total_days_supply": days}
+            )
+            prescription.product_line_ids.with_context(
+                cdu_allow_product_line_sync=True
+            ).write({"product_id": medicine.product_variant_id.id})
+        self.batch._generate_elmis_picking_lines()
+        option = self.env["cdu.elmis.stock.option"].create(
+            {
+                "batch_id": self.batch.id,
+                "facility_code": "TEST-CDU-STORE",
+                "program_code": "TEST-PROGRAM",
+                "orderable_code": "ROUND-PACK",
+                "orderable_name": "Patient Rounded Medicine 30 Tablets",
+                "pack_size": 30,
+                "lot": "ROUND-LOT",
+                "stock_on_hand": stock_on_hand,
+                "stock_on_hand_units": stock_on_hand * 30,
+            }
+        )
+        self.batch._apply_prescription_product_stock_options()
+        picking = self.batch.elmis_picking_line_ids
+        fulfilment = picking.fulfilment_line_ids
+        self.assertEqual(fulfilment.selected_stock_option_id, option)
+        return picking, fulfilment
+
+    def test_picking_rounds_packs_per_patient_in_defaults_report_and_allocation(self):
+        picking, fulfilment = self._create_patient_rounded_picking()
+
+        self.assertEqual(picking.required_units, 75)
+        self.assertEqual(picking.quantity_to_pick, 4)
+        self.assertEqual(picking.packs_to_pick, 4)
+        self.assertEqual(fulfilment.required_quantity, 4)
+        self.assertEqual(fulfilment.quantity_picked, 4)
+        self.assertEqual(picking.remaining_packs_to_pick, 0)
+        self.assertEqual(picking.summary_line_id.total_bottles, 4)
+        self.assertEqual(self.batch.patient_picking_line_ids.mapped("packs_to_pick"), [2, 2])
+        self.assertFalse(self.batch._get_picking_readiness_errors())
+
+        report_html, _ = self.env["ir.actions.report"]._render_qweb_html(
+            "cdu_elmis.report_cdu_elmis_picking_list", self.batch.ids
+        )
+        document = lxml_html.fromstring(report_html)
+        stock_rows = document.xpath("//table[contains(@class, 'cdu-picking-table')][1]/tbody/tr")
+        self.assertEqual(stock_rows[0].xpath("string(td[8])").strip(), "4")
+
+        params = self.env["ir.config_parameter"].sudo()
+        for key, value in {
+            "cdu.elmis.cdu_store_facility_code": "TEST-CDU-STORE",
+            "cdu.elmis.cdu_production_floor_facility_code": "TEST-CDU-PRODUCTION",
+            "cdu.elmis.default_program_code": "TEST-PROGRAM",
+            "cdu.elmis.picking_debit_reason_name": "Test debit",
+            "cdu.elmis.picking_credit_reason_name": "Test credit",
+        }.items():
+            params.set_param(key, value)
+        service_class = type(self.env["cdu.elmis.stock.service"])
+        with patch.object(service_class, "has_valid_current_user_elmis_token", return_value=True), \
+                patch.object(service_class, "post_internal_stock_event") as post_event, \
+                patch.object(service_class, "invalidate_stock_cache"):
+            self.batch.with_user(self.admin).action_confirm_elmis_picking()
+        self.assertTrue(self.batch.picking_confirmed_at)
+        self.assertEqual(post_event.call_count, 2)
+        for call in post_event.call_args_list:
+            self.assertEqual(call.kwargs["items"][0]["quantity"], 120)
+        self.assertEqual(self.batch.patient_picking_line_ids.mapped("picked_units"), [60, 60])
+        self.assertEqual(self.batch.patient_picking_line_ids.mapped("back_order_days"), [0, 0])
+
+    def test_picking_recalculates_each_patient_when_pack_size_changes(self):
+        picking, fulfilment = self._create_patient_rounded_picking()
+        first_option = fulfilment.selected_stock_option_id
+        larger_option = first_option.copy(
+            {"pack_size": 90, "stock_on_hand_units": 1800, "lot": "LARGE-PACK"}
+        )
+        for option, expected_packs in ((larger_option, 2), (first_option, 4)):
+            with self.subTest(pack_size=option.pack_size):
+                fulfilment.selected_stock_option_id = option
+                self.assertEqual(picking.packs_to_pick, expected_packs)
+                self.assertEqual(picking.quantity_to_pick, expected_packs)
+                self.assertEqual(fulfilment.quantity_picked, expected_packs)
+                self.assertEqual(picking.summary_line_id.total_bottles, expected_packs)
+                self.assertEqual(
+                    sum(self.batch.patient_picking_line_ids.mapped("packs_to_pick")),
+                    expected_packs,
+                )
+                self.assertFalse(self.batch._get_picking_readiness_errors())
+
+    def test_patient_rounded_picking_can_be_split_between_lots(self):
+        picking, first = self._create_patient_rounded_picking()
+        other_option = first.selected_stock_option_id.copy({"lot": "SECOND-LOT"})
+        second = self.env["cdu.picking.fulfilment.line"].create(
+            {
+                "batch_id": self.batch.id,
+                "picking_line_id": picking.id,
+                "selected_stock_option_id": other_option.id,
+            }
+        )
+        (first | second).write({"quantity_picked": 2})
+        self.assertEqual(picking.packs_to_pick, 4)
+        self.assertEqual(picking.total_quantity_picked, 4)
+        self.assertEqual(picking.remaining_packs_to_pick, 0)
+        self.assertFalse(self.batch._get_picking_readiness_errors())
+
+    def test_picking_wizard_updates_patient_total_before_saving_pack_choice(self):
+        picking, fulfilment = self._create_patient_rounded_picking()
+        larger_option = fulfilment.selected_stock_option_id.copy(
+            {"pack_size": 90, "stock_on_hand_units": 1800, "lot": "LARGE-PACK"}
+        )
+        wizard = self.env["cdu.elmis.picking.wizard"].create({"batch_id": self.batch.id})
+        with Form(wizard, view="cdu_elmis.view_cdu_elmis_picking_wizard_form") as form:
+            with form.elmis_picking_fulfilment_line_ids.edit(0) as row:
+                row.selected_stock_option_id = larger_option
+                self.assertEqual(row.quantity_picked, 2)
+                self.assertEqual(row.required_quantity, 2)
+        self.assertEqual(picking.quantity_to_pick, 2)
+
+    def test_patient_rounded_picking_still_requires_enough_stock(self):
+        picking, fulfilment = self._create_patient_rounded_picking(stock_on_hand=3)
+        self.assertEqual(picking.packs_to_pick, 4)
+        self.assertEqual(fulfilment.quantity_picked, 3)
+        self.assertTrue(
+            any("short by 1.00" in error for error in self.batch._get_picking_readiness_errors())
+        )
+        with self.assertRaisesRegex(ValidationError, "exceed available packs"), self.cr.savepoint():
+            fulfilment.quantity_picked = 4
 
     def test_picking_generation_links_same_named_products_by_summary_id(self):
         product_name = "Same Named Multi-line Medicine"

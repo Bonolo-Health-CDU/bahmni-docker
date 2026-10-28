@@ -92,17 +92,11 @@ class CduPrescriptionProductLine(models.Model):
 
     @api.constrains("prescription_id", "product_id")
     def _check_duplicate_product(self):
-        for line in self.filtered("product_id"):
-            duplicate_count = self.search_count(
-                [
-                    ("prescription_id", "=", line.prescription_id.id),
-                    ("product_id", "=", line.product_id.id),
-                ]
-            )
-            if duplicate_count > 1:
-                raise ValidationError(
-                    _("The same product cannot appear twice on one prescription.")
-                )
+        batch_ids = self.env.context.get("_cdu_product_line_batch_ids") or ()
+        prescriptions = self.filtered("product_id").mapped("prescription_id")
+        prescriptions.filtered(
+            lambda prescription: prescription.id not in batch_ids
+        )._check_duplicate_regimen_products()
 
     @api.model_create_multi
     def create(self, vals_list):

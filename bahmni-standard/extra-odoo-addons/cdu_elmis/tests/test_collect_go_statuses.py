@@ -89,6 +89,32 @@ class TestCollectGoStatuses(TransactionCase):
         self.assertEqual(status_label(12), "Collected by Customer")
         self.assertEqual(status_label(99), "Unknown status 99")
 
+    def test_printed_barcodes_match_collect_go_external_references(self):
+        self.collection_point.external_reference = "501"
+        self.env["ir.config_parameter"].sudo().set_param("cdu.collect_go.cdu_location_id", "1")
+        qa = self.line.bagging_qa_id
+        qa.parcel_reference = "CDU/PARCEL/2026/000123"
+        box = self.line.box_id
+        for box_name in ("CDU/BOX/2026/00027", "CDU/BOX/2026/" + "1234567890" * 3):
+            with self.subTest(box_name=box_name):
+                box.name = box_name
+                payload = self.service._build_box_parcel(box, self.service._collect_go_datetime())
+
+                self.assertEqual(payload["ExternalReference"], box._get_box_print_template_values()["box_barcode"])
+                self.assertEqual(payload["ExternalReference"], self.service._collect_go_external_reference(box_name))
+                self.assertNotIn("/", payload["ExternalReference"])
+                self.assertLessEqual(len(payload["ExternalReference"]), 20)
+                self.assertEqual(payload["ChildParcels"][0]["ExternalReference"], qa.dispense_id.get_bag_barcode_value())
+                self.assertEqual(payload["ChildParcels"][0]["ExternalReference"], "CDUPARCEL2026000123")
+
+    def test_slash_free_status_reference_matches_an_existing_parcel(self):
+        self.line.bagging_qa_id.parcel_reference = "CDU/PARCEL/2026/000123"
+        count = self._receive((12, "2026-10-10T12:45:16"), reference="CDUPARCEL2026000123")
+
+        self.assertEqual(count, 1)
+        self.assertEqual(self.prescription.state, "collected")
+        self.assertEqual(self.line.parcel_reference, "CDU/PARCEL/2026/000123")
+
     def test_parcels_are_read_from_inside_the_messages(self):
         payload = [
             message(parcel("B1", (5, "2026-10-10T08:00:00"))),

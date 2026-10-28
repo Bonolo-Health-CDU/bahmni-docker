@@ -1,7 +1,7 @@
 {
     "name": "CDU eLMIS Integration",
     "summary": "OpenLMIS stock management foundation for the CDU workflow",
-    "version": "16.0.1.1.0",
+    "version": "16.0.1.1.3",
     "category": "Healthcare",
     "author": "Ministry of Health",
     "license": "LGPL-3",
@@ -51,6 +51,9 @@
             "cdu_elmis/static/src/js/bagging_qa_qr_input.js",
             "cdu_elmis/static/src/js/box_documents_print.js",
             "cdu_elmis/static/src/js/elmis_picking_wizard.js",
+        ],
+        "web.qunit_suite_tests": [
+            "cdu_elmis/static/tests/elmis_picking_wizard_tests.js",
         ],
     },
     "installable": True,

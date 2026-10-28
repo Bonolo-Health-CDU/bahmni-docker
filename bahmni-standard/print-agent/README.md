@@ -135,6 +135,54 @@ That helper uses SumatraPDF for silent PDF printing. Install SumatraPDF on the
 printer PC or set the `CDU_SUMATRA_PDF` environment variable to
 `SumatraPDF.exe`.
 
+## Box Label and Manifest Routing
+
+Printing box documents creates two separate jobs:
+
+| Document | Format | Logical printer | Hardware |
+| --- | --- | --- | --- |
+| Box label | ZPL | `box_label_printer` | ZPL label printer |
+| Manifest | A4 PDF | `document_printer` | A4 document printer |
+
+Check the actual printer at each configured IP. Sending the box label's ZPL
+commands to an HP document printer can produce a sheet containing `^XA`, `^PW812`,
+and `^FO` instead of a label. A successful TCP connection does not establish that
+the printer understands ZPL.
+
+On Linux, `document_printer` must name the document printer's CUPS queue. Inspect
+its device URI and model with `lpstat -v QUEUE_NAME` and `lpoptions -p QUEUE_NAME`.
+For example, if the HP printer is installed as `CDU_HP_M227`:
+
+```ini
+[printer.document_printer]
+type = command
+queue = CDU_HP_M227
+test_language = pdf
+```
+
+After installing the manifest fix, upgrade the Odoo `cdu_elmis` module and restart
+the print agent. The upgrade repairs the bundled manifest template if it was
+configured as a label or routed to another logical printer. The agent rejects
+non-PDF document jobs and invalid PDF signatures. Use **Print Box Documents**
+again to generate fresh jobs after correcting the configuration; retrying an old
+job retains its original format and payload.
+
+## Collect-N-Go Barcodes
+
+The box and bag Code128 barcodes use the same slash-free `ExternalReference`
+sent to Collect-N-Go. For example, `CDU/BOX/2026/00027` is encoded as
+`CDUBOX202600027`. PDF labels and the manifest use the same barcode values as
+the ZPL labels.
+
+The bag's tracking barcode identifies its parcel. Odoo reserves that parcel
+reference before printing, and uses it again after QA and during dispatch.
+Scan this barcode in Collect-N-Go or when adding the bag to a box. The separate
+bag QR code carries the patient name and prescription reference for QA.
+
+After upgrading `cdu_elmis`, reprint affected labels to obtain the corrected
+barcodes. Existing Odoo record names and previously submitted Collect-N-Go
+references are retained.
+
 ## Active/Standby Election
 
 When running the agent on multiple CDU PCs, enable the peer election block on

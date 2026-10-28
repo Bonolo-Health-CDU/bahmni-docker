@@ -47,7 +47,7 @@ function lineLabel(data, index) {
     );
 }
 
-function validatePickingWizard(record) {
+export function validatePickingWizard(record) {
     if (!record || record.resModel !== WIZARD_MODEL) {
         return { valid: true, message: "" };
     }
@@ -72,11 +72,8 @@ function validatePickingWizard(record) {
         const stockOptionId = many2OneId(data.selected_stock_option_id);
         const pickedQty = numberValue(data.quantity_picked);
         const selectedPackSize = numberValue(data.selected_pack_size);
-        const requiredUnits = numberValue(data.required_units);
-        const requiredQty =
-            selectedPackSize > 0 && requiredUnits > 0
-                ? Math.ceil(requiredUnits / selectedPackSize)
-                : numberValue(data.required_quantity);
+        // The server rounds each patient's requirement before summing packs.
+        const requiredQty = numberValue(data.required_quantity);
         const stockOnHand = numberValue(data.selected_stock_on_hand);
 
         if (!stockOptionId) {
@@ -224,7 +221,8 @@ patch(FormController.prototype, "cdu_elmis.PickingWizardFormController", {
             return;
         }
         const validation = result || validatePickingWizard(this.model.root);
-        const button = root.querySelector(BUTTON_SELECTOR);
+        const buttonContainer = root.closest(".modal") || root;
+        const button = buttonContainer.querySelector(BUTTON_SELECTOR);
         if (button) {
             button.disabled = !validation.valid;
             button.classList.toggle("disabled", !validation.valid);

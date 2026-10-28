@@ -48,6 +48,7 @@ class PrinterDispatcher:
 
     def dispatch(self, job: dict) -> Path | None:
         payload = self._decode_payload(job)
+        self._validate_payload(job, payload)
         printer = self.config.printers.get(str(job["printer_key"]))
         if self.config.dry_run:
             return self._write_dry_run_file(job, payload)
@@ -121,6 +122,30 @@ class PrinterDispatcher:
         if job.get("payload_encoding") == "base64":
             return base64.b64decode(payload)
         return payload.encode("utf-8")
+
+    def _validate_payload(self, job: dict, payload: bytes):
+        language = job.get("command_language")
+        printer_key = job.get("printer_key")
+        if job.get("label_type") == "box_manifest" and (
+            language != "pdf" or printer_key != "document_printer"
+        ):
+            raise RuntimeError(
+                "Box manifests must be PDF jobs sent to document_printer. "
+                "Correct the manifest template in Odoo and regenerate the box documents."
+            )
+        if (
+            printer_key in ("document_printer", "dispensing_receipt_printer")
+            and language != "pdf"
+        ):
+            raise RuntimeError(
+                "Printer %s requires PDF; refusing to print %s label commands. "
+                "Check the print template's printer and command language."
+                % (printer_key, language)
+            )
+        if language == "pdf" and not payload.startswith(b"%PDF-"):
+            raise RuntimeError(
+                "Invalid PDF payload. Regenerate the document in Odoo before printing."
+            )
 
     def _write_dry_run_file(self, job: dict, payload: bytes) -> Path:
         self.config.dry_run_output_dir.mkdir(parents=True, exist_ok=True)

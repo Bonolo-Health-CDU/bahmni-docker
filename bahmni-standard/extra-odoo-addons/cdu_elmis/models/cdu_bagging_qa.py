@@ -10,6 +10,12 @@ class CduBaggingQa(models.Model):
 
     name = fields.Char(default="/", copy=False, readonly=True, tracking=True)
     parcel_reference = fields.Char(copy=False, readonly=True, tracking=True, index=True)
+    barcode_reference = fields.Char(
+        string="Parcel Barcode",
+        compute="_compute_barcode_reference",
+        store=True,
+        index=True,
+    )
     prescription_id = fields.Many2one(
         "cdu.prescription",
         required=True,
@@ -161,8 +167,11 @@ class CduBaggingQa(models.Model):
 
     @api.model
     def create(self, vals):
+        vals = dict(vals)
         if vals.get("name", "/") == "/":
             vals["name"] = self.env["ir.sequence"].next_by_code("cdu.bagging.qa") or "/"
+        if not vals.get("parcel_reference"):
+            vals["parcel_reference"] = self.env["ir.sequence"].next_by_code("cdu.parcel")
         if vals.get("prescription_id") and not vals.get("dispense_id"):
             dispense = self.env["cdu.dispense"].search(
                 [("prescription_id", "=", vals["prescription_id"])],
@@ -171,6 +180,18 @@ class CduBaggingQa(models.Model):
             if dispense:
                 vals["dispense_id"] = dispense.id
         return super().create(vals)
+
+    @api.depends("parcel_reference")
+    def _compute_barcode_reference(self):
+        service = self.env["cdu.collect.go.service"]
+        for qa in self:
+            qa.barcode_reference = service._collect_go_external_reference(
+                qa.parcel_reference
+            )
+
+    def _ensure_parcel_reference(self):
+        for qa in self.filtered(lambda record: not record.parcel_reference):
+            qa.parcel_reference = self.env["ir.sequence"].next_by_code("cdu.parcel")
 
     def _ensure_bagging_qa_access(self):
         if not (

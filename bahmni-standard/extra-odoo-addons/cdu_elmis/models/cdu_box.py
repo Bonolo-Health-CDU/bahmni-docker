@@ -12,6 +12,12 @@ class CduBox(models.Model):
     _order = "create_date desc"
 
     name = fields.Char(default="/", copy=False, readonly=True, tracking=True)
+    barcode_reference = fields.Char(
+        string="Box Barcode",
+        compute="_compute_barcode_reference",
+        store=True,
+        index=True,
+    )
     collection_point_id = fields.Many2one(
         "cdu.collection.point",
         string="Collection Point",
@@ -134,6 +140,12 @@ class CduBox(models.Model):
                         )
                     )
         return super().write(vals)
+
+    @api.depends("name")
+    def _compute_barcode_reference(self):
+        service = self.env["cdu.collect.go.service"]
+        for box in self:
+            box.barcode_reference = service._collect_go_external_reference(box.name)
 
     @api.depends("line_ids")
     def _compute_parcel_count(self):
@@ -324,9 +336,11 @@ class CduBox(models.Model):
                 [
                     "|",
                     "|",
+                    "|",
                     ("prescription_id.name", "=", values[0]),
                     ("parcel_reference", "=", values[0]),
                     ("name", "=", values[0]),
+                    ("barcode_reference", "=", values[0]),
                 ],
                 limit=1,
             )
@@ -599,6 +613,17 @@ class CduBox(models.Model):
     def _enqueue_box_print_job(self, label_type):
         self.ensure_one()
         template = self.env["bahmni.label.template"]._get_active_template(label_type)
+        if label_type == "box_manifest" and (
+            template.command_language != "pdf"
+            or template.printer_key != "document_printer"
+        ):
+            raise UserError(
+                _(
+                    "The box manifest print template must use PDF and the "
+                    "document_printer printer. Correct the print template, "
+                    "then print the box documents again."
+                )
+            )
         payload_encoding = "text"
         if template.command_language == "pdf":
             payload = self._render_box_pdf_print_payload(template)
@@ -624,7 +649,7 @@ class CduBox(models.Model):
         pdf_content, output_type = self.env["ir.actions.report"].with_context(
             force_report_rendering=True,
         )._render_qweb_pdf(template.report_name, res_ids=self.ids)
-        if output_type != "pdf":
+        if output_type != "pdf" or not pdf_content.startswith(b"%PDF-"):
             raise UserError(
                 _("Report %s did not render a PDF payload.") % template.report_name
             )
@@ -645,6 +670,7 @@ class CduBox(models.Model):
         )
         return {
             "box_reference": self.name or "",
+            "box_barcode": self.barcode_reference,
             "box_number": self.get_box_number(),
             "route_label": self.get_route_label(),
             "collection_point": self.collection_point_id.display_name or "",

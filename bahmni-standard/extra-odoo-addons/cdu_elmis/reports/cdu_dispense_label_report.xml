@@ -36,6 +36,7 @@
                     <t t-set="label_layout" t-value="dispense.env.context.get('cdu_label_layout', 'all')"/>
                     <t t-set="prescription" t-value="dispense.prescription_id"/>
                     <t t-set="script_number" t-value="prescription.name or dispense.name"/>
+                    <t t-set="bag_barcode" t-value="dispense.get_bag_barcode_value() if label_layout in ('all', 'bag') else ''"/>
                     <t t-set="facility_name" t-value="prescription.facility_name or dispense.env.company.name"/>
                     <t t-set="pickup_point" t-value="dispense.collection_point_id.name or prescription.drug_pickup_point_raw or ''"/>
                     <style>
@@ -347,10 +348,10 @@
                                     <div class="cdu-code-grid">
                                         <div class="cdu-code-barcode">
                                             <img class="cdu-barcode"
-                                                 t-att-src="dispense.get_barcode_data_uri(script_number)"
-                                                 t-att-alt="'Barcode for %s' % script_number"/>
+                                                 t-att-src="dispense.get_barcode_data_uri(bag_barcode)"
+                                                 t-att-alt="'Barcode for %s' % bag_barcode"/>
                                             <div class="cdu-barcode-caption">
-                                                <span t-esc="script_number"/>
+                                                <span t-esc="bag_barcode"/>
                                             </div>
                                         </div>
                                         <div class="cdu-code-qr">

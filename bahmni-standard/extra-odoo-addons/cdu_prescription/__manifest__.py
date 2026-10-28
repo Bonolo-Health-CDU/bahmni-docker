@@ -1,7 +1,7 @@
 {
     "name": "CDU Prescription",
     "summary": "Central Dispensing Unit prescription capture and workflow foundation",
-    "version": "16.0.1.1.0",
+    "version": "16.0.1.1.2",
     "category": "Healthcare",
     "author": "Ministry of Health",
     "license": "LGPL-3",
@@ -51,7 +51,11 @@
             "cdu_prescription/static/src/css/cdu_dashboard.css",
             "cdu_prescription/static/src/css/cdu_tablet.css",
             "cdu_prescription/static/src/js/cdu_dashboard.js",
+            "cdu_prescription/static/src/js/cdu_prescription_form.js",
             "cdu_prescription/static/src/xml/cdu_dashboard.xml",
+        ],
+        "web.qunit_suite_tests": [
+            "cdu_prescription/static/tests/cdu_prescription_form_tests.js",
         ],
     },
     "installable": True,

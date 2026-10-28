@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from lxml import etree
 
-from odoo import fields
+from odoo import Command, fields
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
@@ -240,6 +240,105 @@ class TestCduPrescriptionWorkflow(TransactionCase):
                     "imported_product_name": "Late Product",
                 }
             )
+
+    def test_deleted_product_can_be_reselected_in_another_existing_row(self):
+        for delete_first in (True, False):
+            with self.subTest(delete_first=delete_first):
+                prescription = self._create_prescription()
+                removed_line = prescription.product_line_ids
+                replacement = self.env["cdu.prescription.product.line"].create({
+                    "prescription_id": prescription.id,
+                    "imported_product_name": "Replacement regimen row",
+                    "dosage_instructions": "Take one tablet each evening.",
+                })
+                commands = [
+                    Command.delete(removed_line.id),
+                    Command.update(replacement.id, {"product_id": self.verification_product.id}),
+                ]
+                if not delete_first:
+                    commands.reverse()
+
+                prescription.with_user(self.data_clerk).write({"product_line_ids": commands})
+                prescription.with_user(self.data_clerk).action_mark_patient_verified()
+
+                self.assertFalse(removed_line.exists())
+                self.assertEqual(prescription.product_line_ids, replacement)
+                self.assertEqual(replacement.product_id, self.verification_product)
+                self.assertEqual(replacement.dosage_instructions, "Take one tablet each evening.")
+                self.assertEqual(prescription.state, "awaiting_validation")
+
+    def test_deleted_product_can_be_reselected_in_a_new_row(self):
+        prescription = self._create_prescription()
+        removed_line = prescription.product_line_ids
+
+        prescription.write({"product_line_ids": [
+            Command.create({
+                "product_id": self.verification_product.id,
+                "dosage_instructions": "Take one tablet each evening.",
+            }),
+            Command.delete(removed_line.id),
+        ]})
+
+        self.assertFalse(removed_line.exists())
+        self.assertEqual(len(prescription.product_line_ids), 1)
+        self.assertEqual(prescription.product_line_ids.product_id, self.verification_product)
+        prescription.with_user(self.data_clerk).action_mark_patient_verified()
+        self.assertEqual(prescription.state, "awaiting_validation")
+
+    def test_products_can_be_swapped_between_existing_rows(self):
+        prescription = self._create_prescription()
+        first_line = prescription.product_line_ids
+        second_product = self.env["product.template"].create({
+            "name": "Workflow Swap Medicine",
+            "type": "product",
+            "cdu_is_drug": True,
+        }).product_variant_id
+        second_line = self.env["cdu.prescription.product.line"].create({
+            "prescription_id": prescription.id,
+            "product_id": second_product.id,
+            "dosage_instructions": "Take two tablets at night.",
+        })
+
+        prescription.write({"product_line_ids": [
+            Command.update(first_line.id, {"product_id": second_product.id}),
+            Command.update(second_line.id, {"product_id": self.verification_product.id}),
+        ]})
+
+        self.assertEqual(first_line.product_id, second_product)
+        self.assertEqual(second_line.product_id, self.verification_product)
+        self.assertEqual(second_line.dosage_instructions, "Take two tablets at night.")
+
+    def test_genuine_duplicate_products_are_still_rejected_after_table_edits(self):
+        prescription = self._create_prescription()
+        replacement = self.env["cdu.prescription.product.line"].create({
+            "prescription_id": prescription.id,
+            "imported_product_name": "Additional regimen row",
+            "dosage_instructions": "Take one tablet at night.",
+        })
+        with self.assertRaisesRegex(ValidationError, "same product cannot appear twice"), self.cr.savepoint():
+            prescription.write({"product_line_ids": [
+                Command.update(replacement.id, {"product_id": self.verification_product.id}),
+            ]})
+
+        self.assertFalse(replacement.product_id)
+        self.assertEqual(len(prescription.product_line_ids), 2)
+        self.assertEqual(prescription.state, "awaiting_verification")
+
+    def test_direct_product_edits_still_reject_duplicates_after_a_table_save(self):
+        prescription = self._create_prescription()
+        line = prescription.product_line_ids
+        prescription.write({"product_line_ids": [
+            Command.update(line.id, {"dosage_instructions": "Take one tablet each morning."}),
+        ]})
+
+        with self.assertRaisesRegex(ValidationError, "same product cannot appear twice"), self.cr.savepoint():
+            self.env["cdu.prescription.product.line"].create({
+                "prescription_id": prescription.id,
+                "product_id": self.verification_product.id,
+            })
+
+        self.assertEqual(prescription.product_line_ids, line)
+        self.assertEqual(line.dosage_instructions, "Take one tablet each morning.")
 
     def test_prescription_form_contains_the_dynamic_regimen_table(self):
         view = self.env.ref("cdu_prescription.view_cdu_prescription_form")
