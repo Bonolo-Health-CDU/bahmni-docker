@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import base64
+import os
 import shlex
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
@@ -11,6 +13,29 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import AgentConfig, PrinterConfig
+
+PDF_SCRIPT = "print_pdf_windows.ps1"
+
+
+def agent_dir() -> Path:
+    """The agent's own files: unpacked from the .exe when packaged, else the project folder."""
+    return Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+
+
+def find_sumatra_pdf() -> Path | None:
+    """SumatraPDF for the PDF script: CDU_SUMATRA_PDF, the copy packaged with
+    the agent, or an installed one (the same places the script looks)."""
+    candidates = [
+        os.environ.get("CDU_SUMATRA_PDF"),
+        agent_dir() / "scripts" / "SumatraPDF.exe",
+    ]
+    for program_files in ("ProgramFiles", "ProgramFiles(x86)"):
+        if os.environ.get(program_files):
+            candidates.append(Path(os.environ[program_files]) / "SumatraPDF" / "SumatraPDF.exe")
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return Path(candidate)
+    return None
 
 
 @dataclass(frozen=True)
@@ -229,12 +254,20 @@ class PrinterDispatcher:
                     )
                 command = "lp -d %s {file}" % printer.queue
             parts = self._command_parts(command, payload_path)
-            completed = subprocess.run(
-                parts,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            try:
+                completed = subprocess.run(
+                    parts,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=self._command_env(),
+                )
+            except subprocess.CalledProcessError as error:
+                output = self._compact_status(" ".join((error.stderr or "", error.stdout or "")))
+                raise RuntimeError(
+                    "Print command for %s failed with exit code %s: %s"
+                    % (printer.key, error.returncode, output or "no output")
+                ) from error
             if printer.queue:
                 cups_job_id = self._extract_cups_job_id(completed.stdout)
                 if cups_job_id:
@@ -274,6 +307,14 @@ class PrinterDispatcher:
                 ok=True,
                 status="queue_ready",
                 detail=self._compact_status(status.stdout),
+            )
+        if printer.command and PDF_SCRIPT in printer.command and not find_sumatra_pdf():
+            return PrinterCheckResult(
+                key=printer.key,
+                ok=False,
+                status="missing_pdf_printer",
+                detail="SumatraPDF was not found. It is packaged with the agent; "
+                "when running from source, install it or set CDU_SUMATRA_PDF.",
             )
         if printer.command:
             return PrinterCheckResult(
@@ -358,6 +399,7 @@ class PrinterDispatcher:
         replacements = {
             "{file}": payload_path.as_posix(),
             "{config_dir}": self.config.config_dir.as_posix(),
+            "{agent_dir}": agent_dir().as_posix(),
         }
         parts = shlex.split(command)
         replaced_parts = []
@@ -366,6 +408,18 @@ class PrinterDispatcher:
                 part = part.replace(placeholder, value)
             replaced_parts.append(part)
         return replaced_parts
+
+    def _command_env(self) -> dict:
+        """Point the PDF script at the SumatraPDF packaged with the agent.
+
+        Also covers PCs whose config still runs a copy of the script beside
+        the config file: that copy reads CDU_SUMATRA_PDF too.
+        """
+        env = dict(os.environ)
+        sumatra = find_sumatra_pdf()
+        if sumatra and not env.get("CDU_SUMATRA_PDF"):
+            env["CDU_SUMATRA_PDF"] = str(sumatra)
+        return env
 
     def _extension(self, job: dict) -> str:
         command_language = job.get("command_language")

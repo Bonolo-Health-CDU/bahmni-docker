@@ -134,6 +134,20 @@ class TestCduBoxingWorkflow(TransactionCase):
         )
         self.assertIn("1 of 20", result["params"]["message"])
 
+    def test_bag_label_qr_adds_the_parcel_whatever_the_scanner_does_with_the_line_break(self):
+        patient, number = self.prescription.patient_first_name, self.prescription.name
+        for scanned in ("%s\n%s" % (patient, number), patient + number, "%s %s" % (patient, number)):
+            with self.subTest(scanned=scanned):
+                box = self.env["cdu.box"].with_user(self.admin).create({})
+                box.action_scan_bag_label(scanned)
+                self.assertEqual(box.line_ids.bagging_qa_id, self.parcel)
+                box.line_ids.unlink()
+
+        with self.assertRaisesRegex(UserError, "does not match an eligible parcel"):
+            self.env["cdu.box"].with_user(self.admin).create({}).action_scan_bag_label(
+                "Somebody Else" + number
+            )
+
     def test_duplicate_barcode_scan_is_blocked(self):
         box = self.env["cdu.box"].with_user(self.admin).create({})
         box.action_scan_bag_label(self.prescription.name)

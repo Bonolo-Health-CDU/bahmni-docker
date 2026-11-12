@@ -7,6 +7,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from .agent import STATUS_CHECK_INTERVAL_SECONDS
 from .config import StatusUiConfig
 from .runtime import AgentRuntime
 
@@ -63,12 +64,15 @@ class StatusServer:
                     self._send_html(_status_html(refresh_seconds))
                     return
                 if parsed.path == "/api/status":
+                    # live=1 (the Refresh button) checks Odoo and the printers
+                    # now; the page's periodic refresh reuses recent checks.
                     query = parse_qs(parsed.query)
                     live = query.get("live", ["0"])[0] == "1"
                     self._send_json(
                         runtime.snapshot(
                             check_odoo=live,
                             check_printers=live,
+                            max_age_seconds=STATUS_CHECK_INTERVAL_SECONDS,
                         )
                     )
                     return
@@ -326,7 +330,7 @@ def _status_html(refresh_seconds: float) -> str:
         <button onclick="postAction('/api/resume')">Resume</button>
         <button class="secondary" onclick="postAction('/api/pause')">Pause</button>
         <button class="secondary" onclick="postAction('/api/force-active')">Force Active</button>
-        <button class="secondary" onclick="loadStatus()">Refresh</button>
+        <button class="secondary" onclick="loadStatus(true)">Refresh</button>
       </div>
       <div id="message" class="message"></div>
     </section>
@@ -355,8 +359,8 @@ def _status_html(refresh_seconds: float) -> str:
   <script>
     const refreshMs = """ + str(refresh_ms) + """;
 
-    async function loadStatus() {
-      const response = await fetch('/api/status?live=1', {cache: 'no-store'});
+    async function loadStatus(live = false) {
+      const response = await fetch(live ? '/api/status?live=1' : '/api/status', {cache: 'no-store'});
       const status = await response.json();
       renderStatus(status);
     }

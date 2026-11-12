@@ -6,6 +6,14 @@ from PyInstaller.utils.hooks import collect_submodules
 spec_dir = Path(SPECPATH)
 project_dir = spec_dir.parent
 
+# SumatraPDF, downloaded and checked by scripts/build_windows_agent.ps1. It
+# sits beside print_pdf_windows.ps1, where the script looks for it.
+sumatra_exe = project_dir / "packaging" / "vendor" / "SumatraPDF.exe"
+if not sumatra_exe.is_file():
+    raise SystemExit(
+        "packaging/vendor/SumatraPDF.exe is missing: build with scripts/build_windows_agent.ps1"
+    )
+
 hiddenimports = []
 hiddenimports += collect_submodules("pystray")
 hiddenimports += collect_submodules("webview")
@@ -17,6 +25,7 @@ a = Analysis(
     datas=[
         (str(project_dir / "config.remote.example.ini"), "."),
         (str(project_dir / "scripts" / "print_pdf_windows.ps1"), "scripts"),
+        (str(sumatra_exe), "scripts"),
     ],
     hiddenimports=hiddenimports,
     hookspath=[],

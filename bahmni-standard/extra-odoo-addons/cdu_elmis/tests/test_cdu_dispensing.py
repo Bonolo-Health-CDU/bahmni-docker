@@ -311,6 +311,67 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(qa.state, "confirmed")
         self.assertEqual(prescription.state, "awaiting_boxing")
 
+    def test_bag_label_qr_passes_qa_whatever_the_scanner_does_with_the_line_break(self):
+        # USB scanners type the QR like a keyboard: some send the line break,
+        # some drop it or send a space, and a keyboard layout can change "/".
+        scans = {
+            "line break": lambda patient, number: "%s\n%s" % (patient, number),
+            "Windows line break and Enter suffix": lambda patient, number: "%s\r\n%s\r\n" % (patient, number),
+            "no line break": lambda patient, number: patient + number,
+            "space": lambda patient, number: "%s %s" % (patient, number),
+            "other punctuation, lower case": lambda patient, number: (patient + number.replace("/", "-")).lower(),
+        }
+        for index, (form, scan) in enumerate(scans.items()):
+            with self.subTest(form=form):
+                prescription = self._create_prescription("QR-SCANNER-%s" % index, 10)
+                dispense = self._create_ready_dispense(prescription)
+                self._confirm_dispense_for_bagging(dispense)
+                qa = self.env["cdu.bagging.qa"].create({
+                    "prescription_id": prescription.id,
+                    "dispense_id": dispense.id,
+                })
+
+                qa.with_user(self.admin).action_validate_label_qr(
+                    scan(dispense.patient_name, prescription.name)
+                )
+
+                self.assertEqual(qa.state, "confirmed")
+
+    def test_bag_label_qr_needs_both_patient_and_prescription(self):
+        prescription = self._create_prescription("QR-PARTIAL", 10)
+        dispense = self._create_ready_dispense(prescription)
+        self._confirm_dispense_for_bagging(dispense)
+        qa = self.env["cdu.bagging.qa"].create({
+            "prescription_id": prescription.id,
+            "dispense_id": dispense.id,
+        })
+        other = self._create_prescription("QR-PARTIAL-OTHER", 10)
+
+        for scanned in (
+            dispense.patient_name,
+            prescription.name,
+            dispense.patient_name + other.name,
+            other.patient_first_name + prescription.name,
+        ):
+            with self.subTest(scanned=scanned), self.assertRaisesRegex(UserError, "Wrong bag scanned"):
+                qa.with_user(self.admin).action_validate_label_qr(scanned)
+        with self.assertRaisesRegex(UserError, "Scan the QR code"):
+            qa.with_user(self.admin).action_validate_label_qr(" \n ")
+        self.assertEqual(qa.state, "draft")
+
+    def test_bag_label_qr_matching_tolerates_how_scanners_type_accents(self):
+        from ..models.bag_label_qr import matches_bag_label
+
+        for scanned in (
+            "Mpho Mokoéna\nCDU/RX/2026/00001",
+            "Mpho MokoenaCDU/RX/2026/00001",
+            "Mpho MokonaCDU/RX/2026/00001",
+        ):
+            with self.subTest(scanned=scanned):
+                self.assertTrue(matches_bag_label(scanned, "Mpho Mokoéna", "CDU/RX/2026/00001"))
+        self.assertFalse(matches_bag_label("Mpho MokoenaCDU/RX/2026/00002", "Mpho Mokoéna", "CDU/RX/2026/00001"))
+        self.assertFalse(matches_bag_label("Mpho Mokoena", "Mpho Mokoéna", False))
+
     def test_bag_label_qr_preserves_special_characters_in_patient_name(self):
         prescription = self._create_prescription("QR-SPECIAL", 10)
         prescription.patient_first_name = 'Mpho_0A Mokoéna "Neo" ^QA~'
@@ -342,7 +403,7 @@ class TestCduDispensingWorkflow(TransactionCase):
         other_dispense = self._create_ready_dispense(other_prescription)
         job = other_dispense._enqueue_dispensing_print_job("bag_label")
 
-        with self.assertRaisesRegex(UserError, "Wrong box scanned"):
+        with self.assertRaisesRegex(UserError, "Wrong bag scanned"):
             qa.with_user(self.admin).action_validate_label_qr(
                 self._decode_bag_label_qr(job.payload)
             )

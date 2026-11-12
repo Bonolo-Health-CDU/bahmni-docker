@@ -331,6 +331,7 @@ class CduBox(models.Model):
             raise UserError(_("Scan a bag label first."))
 
         BaggingQa = self.env["cdu.bagging.qa"]
+        parcel = BaggingQa
         if len(values) == 1:
             parcel = BaggingQa.search(
                 [
@@ -344,18 +345,17 @@ class CduBox(models.Model):
                 ],
                 limit=1,
             )
-        elif len(values) == 2:
-            scanned_patient, scanned_prescription = values
-            candidates = BaggingQa.search(
-                [("prescription_id.name", "=", scanned_prescription)]
-            )
-            normalize = lambda value: " ".join((value or "").split()).casefold()
+        if not parcel:
+            # The bag label QR: patient name and prescription number, with or
+            # without the line break, depending on the scanner.
+            candidates = BaggingQa.search([("prescription_id.name", "in", values)])
+            if not candidates:
+                candidates = BaggingQa.search(
+                    [("prescription_id.state", "in", ("awaiting_boxing", "awaiting_dispatch"))]
+                )
             parcel = candidates.filtered(
-                lambda candidate: normalize(candidate.patient_name)
-                == normalize(scanned_patient)
+                lambda candidate: candidate._matches_bag_label_qr(scanned_value)
             )[:1]
-        else:
-            parcel = BaggingQa
 
         if not parcel:
             raise UserError(

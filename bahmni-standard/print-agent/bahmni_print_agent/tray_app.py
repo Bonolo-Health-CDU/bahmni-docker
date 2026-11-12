@@ -8,7 +8,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from .agent import PrintAgent
+from .agent import STATUS_CHECK_INTERVAL_SECONDS, PrintAgent
 from .config import load_config
 from .runtime import AgentRuntime
 from .status_server import StatusServer
@@ -129,7 +129,7 @@ def _run_pystray(runtime: AgentRuntime, status_server: StatusServer) -> int:
 
     def refresh_icon():
         while not stop_event.is_set():
-            snapshot = runtime.snapshot(check_odoo=True, check_printers=True)
+            snapshot = runtime.snapshot(max_age_seconds=STATUS_CHECK_INTERVAL_SECONDS)
             icon.icon = _tray_image(Image, ImageDraw, _tray_color(snapshot))
             icon.title = _tray_title(snapshot)
             stop_event.wait(5)
