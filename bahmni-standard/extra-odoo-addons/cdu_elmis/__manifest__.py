@@ -46,6 +46,7 @@
             "cdu_elmis/static/src/js/no_trailing_zeros_float_field.js",
             "cdu_elmis/static/src/js/dispensing_labels_print.js",
             "cdu_elmis/static/src/js/box_parcel_scanner.js",
+            "cdu_elmis/static/src/js/bagging_qa_scan_detector.js",
             "cdu_elmis/static/src/js/box_bag_label_scan_input.js",
             "cdu_elmis/static/src/js/bagging_qa_qr_scanner.js",
             "cdu_elmis/static/src/js/bagging_qa_qr_input.js",
