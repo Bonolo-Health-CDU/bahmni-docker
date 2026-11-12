@@ -410,7 +410,7 @@ class CduCollectGoService(models.AbstractModel):
                 for line in box.line_ids
             ],
             "Customer": None,
-            "ExternalReference": self._collect_go_external_reference(box.name),
+            "ExternalReference": box.barcode_reference,
             "ScheduledDeliveryDate": self._date_to_collect_go_datetime(
                 box.next_drug_pickup_date
             )
@@ -431,9 +431,7 @@ class CduCollectGoService(models.AbstractModel):
         return {
             "ChildParcels": None,
             "Customer": self._build_customer(prescription),
-            "ExternalReference": self._collect_go_external_reference(
-                line.parcel_reference
-            ),
+            "ExternalReference": line.bagging_qa_id.barcode_reference,
             "LocationID": collection_location,
             "ParcelID": None,
             "ParcelStatusType": 0,
@@ -641,15 +639,11 @@ class CduCollectGoService(models.AbstractModel):
                 continue
             if allowed_references and parcel_reference not in allowed_references:
                 continue
-            lines = BoxLine.search([("parcel_reference", "=", parcel_reference)])
-            if not lines:
-                candidates = BoxLine.search([("parcel_reference", "!=", False)])
-                lines = candidates.filtered(
-                    lambda line: self._collect_go_external_reference(
-                        line.parcel_reference
-                    )
-                    == parcel_reference
-                )
+            lines = BoxLine.search([
+                "|",
+                ("parcel_reference", "=", parcel_reference),
+                ("bagging_qa_id.barcode_reference", "=", parcel_reference),
+            ])
             if not lines:
                 continue
             status_type = self._parcel_status_type(item)

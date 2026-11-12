@@ -13,6 +13,11 @@ from .printers import PrinterDispatcher
 
 _logger = logging.getLogger(__name__)
 
+# The status page and tray refresh every few seconds. They reuse a check
+# younger than this instead of contacting Odoo and every printer each time.
+# Polling refreshes the Odoo status on its own.
+STATUS_CHECK_INTERVAL_SECONDS = 30.0
+
 
 class PrintAgent:
     def __init__(
@@ -35,6 +40,9 @@ class PrintAgent:
         self.recent_jobs = deque(maxlen=50)
         self.odoo_reachable: bool | None = None
         self.last_odoo_error = ""
+        self._odoo_checked_at: float | None = None
+        self._printer_results: list[dict] = []
+        self._printers_checked_at: float | None = None
         self.last_poll_at = ""
         self._paused = False
         self._lock = threading.RLock()
@@ -162,16 +170,25 @@ class PrintAgent:
         self,
         check_odoo: bool = False,
         check_printers: bool = False,
+        max_age_seconds: float | None = None,
     ) -> dict:
-        odoo_status = self.check_odoo() if check_odoo else {
-            "reachable": self.odoo_reachable,
-            "last_error": self.last_odoo_error,
-        }
-        printer_status = (
-            [result.to_dict() for result in self.dispatcher.check_printers()]
-            if check_printers
-            else []
-        )
+        """The agent's status. check_* forces a fresh check; with
+        max_age_seconds, a check older than that (or never run) is redone."""
+        if check_odoo or self._is_stale(self._odoo_checked_at, max_age_seconds):
+            odoo_status = self.check_odoo()
+        else:
+            odoo_status = {
+                "reachable": self.odoo_reachable,
+                "last_error": self.last_odoo_error,
+            }
+        if check_printers or self._is_stale(self._printers_checked_at, max_age_seconds):
+            printer_status = [result.to_dict() for result in self.dispatcher.check_printers()]
+            with self._lock:
+                self._printer_results = printer_status
+                self._printers_checked_at = time.monotonic()
+        else:
+            with self._lock:
+                printer_status = list(self._printer_results)
         return {
             "agent_name": self.config.name,
             "role": self.role,
@@ -190,6 +207,13 @@ class PrintAgent:
         with self._lock:
             self.odoo_reachable = reachable
             self.last_odoo_error = error
+            self._odoo_checked_at = time.monotonic()
+
+    @staticmethod
+    def _is_stale(checked_at: float | None, max_age_seconds: float | None) -> bool:
+        if max_age_seconds is None:
+            return False
+        return checked_at is None or time.monotonic() - checked_at >= max_age_seconds
 
     def _remember_job(self, job: dict, state: str, error: str = ""):
         with self._lock:

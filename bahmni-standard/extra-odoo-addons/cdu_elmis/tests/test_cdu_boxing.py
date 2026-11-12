@@ -1,7 +1,12 @@
 import base64
+import re
 from datetime import timedelta
+from io import BytesIO
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 from lxml import etree, html as lxml_html
+from PyPDF2 import PdfFileReader
 
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
@@ -129,12 +134,37 @@ class TestCduBoxingWorkflow(TransactionCase):
         )
         self.assertIn("1 of 20", result["params"]["message"])
 
+    def test_bag_label_qr_adds_the_parcel_whatever_the_scanner_does_with_the_line_break(self):
+        patient, number = self.prescription.patient_first_name, self.prescription.name
+        for scanned in ("%s\n%s" % (patient, number), patient + number, "%s %s" % (patient, number)):
+            with self.subTest(scanned=scanned):
+                box = self.env["cdu.box"].with_user(self.admin).create({})
+                box.action_scan_bag_label(scanned)
+                self.assertEqual(box.line_ids.bagging_qa_id, self.parcel)
+                box.line_ids.unlink()
+
+        with self.assertRaisesRegex(UserError, "does not match an eligible parcel"):
+            self.env["cdu.box"].with_user(self.admin).create({}).action_scan_bag_label(
+                "Somebody Else" + number
+            )
+
     def test_duplicate_barcode_scan_is_blocked(self):
         box = self.env["cdu.box"].with_user(self.admin).create({})
         box.action_scan_bag_label(self.prescription.name)
 
         with self.assertRaises(UserError):
             box.action_scan_bag_label(self.prescription.name)
+
+    def test_boxing_accepts_the_slash_free_bag_barcode(self):
+        self.parcel.parcel_reference = "CDU/PARCEL/2026/000123"
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+
+        box.action_scan_bag_label("CDUPARCEL2026000123")
+
+        self.assertEqual(box.line_ids.bagging_qa_id, self.parcel)
+        self.assertEqual(box.parcel_count, 1)
+        with self.assertRaises(UserError):
+            box.action_scan_bag_label("CDUPARCEL2026000123")
 
     def test_added_parcels_are_removed_from_manual_selection_domain(self):
         second_parcel = self._create_confirmed_parcel("AVAILABLE")
@@ -190,6 +220,9 @@ class TestCduBoxingWorkflow(TransactionCase):
             " ".join(produced_by_value.text_content().split()),
             "Bonolo Health",
         )
+        barcode_src = document.xpath("//img[@class='cdu-box-label-barcode']/@src")[0]
+        self.assertEqual(parse_qs(urlparse(barcode_src).query)["value"], [box.barcode_reference])
+        self.assertNotIn("/", box.barcode_reference)
 
         manifest_html, _report_type = self.env[
             "ir.actions.report"
@@ -207,6 +240,8 @@ class TestCduBoxingWorkflow(TransactionCase):
             " ".join(manifest_produced_by[0].text_content().split()),
             "Produced By: Bonolo Health",
         )
+        barcode_src = manifest_document.xpath("//img[@class='cdu-box-manifest-barcode']/@src")[0]
+        self.assertEqual(parse_qs(urlparse(barcode_src).query)["value"], [box.barcode_reference])
 
     def test_box_document_printing_queues_label_and_manifest_jobs(self):
         box = self.env["cdu.box"].with_user(self.admin).create({})
@@ -239,9 +274,46 @@ class TestCduBoxingWorkflow(TransactionCase):
         self.assertEqual(box_label.payload_encoding, "text")
         self.assertTrue(box_label.payload.startswith("^XA"))
         self.assertIn(box.name, box_label.payload)
+        barcode = re.search(r"\^BCN,120,Y,N,N\s*\^FD([^\^]+)\^FS", box_label.payload)
+        self.assertIsNotNone(barcode)
+        self.assertEqual(barcode.group(1), box.barcode_reference)
+        self.assertNotIn("/", barcode.group(1))
         self.assertEqual(manifest.command_language, "pdf")
         self.assertEqual(manifest.payload_encoding, "base64")
-        self.assertTrue(base64.b64decode(manifest.payload).startswith(b"%PDF"))
+        pdf_content = base64.b64decode(manifest.payload)
+        self.assertTrue(pdf_content.startswith(b"%PDF-"))
+        report = self.env.ref("cdu_elmis.action_report_cdu_box_manifest")
+        self.assertEqual(report.paperformat_id.format, "A4")
+        page = PdfFileReader(BytesIO(pdf_content)).getPage(0)
+        self.assertAlmostEqual(float(page.mediaBox.getWidth()), 595, delta=2)
+        self.assertAlmostEqual(float(page.mediaBox.getHeight()), 842, delta=2)
+
+    def test_manifest_rejects_label_template_or_wrong_printer(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        template = self.env.ref("cdu_elmis.template_box_manifest_pdf")
+        for language, printer_key in (
+            ("zpl", "document_printer"),
+            ("pdf", "box_label_printer"),
+        ):
+            with self.subTest(language=language, printer_key=printer_key):
+                template.write({
+                    "command_language": language,
+                    "printer_key": printer_key,
+                    "template_body": "^XA\n^FO40,30^FDBox: {box_reference}^FS\n^XZ",
+                })
+                with self.assertRaisesRegex(UserError, "manifest print template must use PDF"):
+                    box._enqueue_box_print_job("box_manifest")
+
+    def test_manifest_rejects_non_pdf_report_content(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        template = self.env.ref("cdu_elmis.template_box_manifest_pdf")
+        with patch.object(
+            type(self.env["ir.actions.report"]),
+            "_render_qweb_pdf",
+            return_value=(b'<div class="footer">Generated by Collect-N-Go</div>^XA', "pdf"),
+        ):
+            with self.assertRaisesRegex(UserError, "did not render a PDF payload"):
+                box._render_box_pdf_print_payload(template)
 
     def test_boxing_filters_are_registered(self):
         for view_xmlid in (

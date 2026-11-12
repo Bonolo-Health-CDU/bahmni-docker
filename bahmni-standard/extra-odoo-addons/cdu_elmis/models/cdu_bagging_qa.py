@@ -1,6 +1,8 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
+from .bag_label_qr import matches_bag_label, scan_key
+
 
 class CduBaggingQa(models.Model):
     _name = "cdu.bagging.qa"
@@ -10,6 +12,12 @@ class CduBaggingQa(models.Model):
 
     name = fields.Char(default="/", copy=False, readonly=True, tracking=True)
     parcel_reference = fields.Char(copy=False, readonly=True, tracking=True, index=True)
+    barcode_reference = fields.Char(
+        string="Parcel Barcode",
+        compute="_compute_barcode_reference",
+        store=True,
+        index=True,
+    )
     prescription_id = fields.Many2one(
         "cdu.prescription",
         required=True,
@@ -161,8 +169,11 @@ class CduBaggingQa(models.Model):
 
     @api.model
     def create(self, vals):
+        vals = dict(vals)
         if vals.get("name", "/") == "/":
             vals["name"] = self.env["ir.sequence"].next_by_code("cdu.bagging.qa") or "/"
+        if not vals.get("parcel_reference"):
+            vals["parcel_reference"] = self.env["ir.sequence"].next_by_code("cdu.parcel")
         if vals.get("prescription_id") and not vals.get("dispense_id"):
             dispense = self.env["cdu.dispense"].search(
                 [("prescription_id", "=", vals["prescription_id"])],
@@ -171,6 +182,18 @@ class CduBaggingQa(models.Model):
             if dispense:
                 vals["dispense_id"] = dispense.id
         return super().create(vals)
+
+    @api.depends("parcel_reference")
+    def _compute_barcode_reference(self):
+        service = self.env["cdu.collect.go.service"]
+        for qa in self:
+            qa.barcode_reference = service._collect_go_external_reference(
+                qa.parcel_reference
+            )
+
+    def _ensure_parcel_reference(self):
+        for qa in self.filtered(lambda record: not record.parcel_reference):
+            qa.parcel_reference = self.env["ir.sequence"].next_by_code("cdu.parcel")
 
     def _ensure_bagging_qa_access(self):
         if not (
@@ -315,6 +338,11 @@ class CduBaggingQa(models.Model):
             raise UserError(_("This Bagging / QA record is not linked to a dispense record."))
         return dispenses.action_print_labels()
 
+    def _matches_bag_label_qr(self, scanned_value):
+        """Whether a scan is this parcel's bag label QR (see bag_label_qr)."""
+        self.ensure_one()
+        return matches_bag_label(scanned_value, self.patient_name, self.prescription_id.name)
+
     def action_scan_label_qr(self):
         self.ensure_one()
         self._ensure_bagging_qa_access()
@@ -332,36 +360,27 @@ class CduBaggingQa(models.Model):
         if self.state != "draft":
             raise UserError(_("QR verification is only available for draft Bagging / QA records."))
 
-        values = [
+        scanned_lines = [
             value.strip()
             for value in str(scanned_value or "").replace("\r\n", "\n").split("\n")
             if value.strip()
         ]
-        if len(values) != 2:
-            raise UserError(
-                _("This is not a valid CDU bag label QR code. Please scan the QR code on the bag.")
-            )
+        if not scan_key(scanned_value):
+            raise UserError(_("Scan the QR code on the bag label."))
 
-        scanned_patient, scanned_prescription = values
         expected_patient = (self.patient_name or "").strip()
         expected_prescription = (self.prescription_id.name or "").strip()
-        normalize = lambda value: " ".join(value.split()).casefold()
-
-        if (
-            normalize(scanned_patient) != normalize(expected_patient)
-            or normalize(scanned_prescription) != normalize(expected_prescription)
-        ):
+        if not self._matches_bag_label_qr(scanned_value):
             raise UserError(
                 _(
-                    "Wrong box scanned.\n\n"
+                    "Wrong bag scanned.\n\n"
                     "Expected: %(patient)s / %(prescription)s\n"
-                    "Scanned: %(scanned_patient)s / %(scanned_prescription)s"
+                    "Scanned: %(scanned)s"
                 )
                 % {
                     "patient": expected_patient,
                     "prescription": expected_prescription,
-                    "scanned_patient": scanned_patient,
-                    "scanned_prescription": scanned_prescription,
+                    "scanned": " / ".join(scanned_lines),
                 }
             )
 

@@ -253,7 +253,12 @@ class CduPrescription(models.Model):
         if "regimen_prescribed_raw" in vals:
             regimen = self._find_matching_regimen(vals.get("regimen_prescribed_raw"))
             vals["regimen_id"] = (regimen.id if regimen else False )
-        result = super().write(vals)
+        write_records = self
+        if "product_line_ids" in vals:
+            # One2many updates run before queued deletions. Validate duplicates
+            # on the final table, after all commands have been applied.
+            write_records = self.with_context(_cdu_product_line_batch_ids=self.ids)
+        result = super(CduPrescription, write_records).write(vals)
 
         duration_fields = {
             "prescription_date",
@@ -266,6 +271,15 @@ class CduPrescription(models.Model):
         if "next_drug_pickup_date" in vals:
             self._check_required_next_drug_pickup_date()
         return result
+
+    @api.constrains("product_line_ids")
+    def _check_duplicate_regimen_products(self):
+        for prescription in self:
+            selected_lines = prescription.product_line_ids.filtered("product_id")
+            if len(selected_lines) != len(selected_lines.mapped("product_id")):
+                raise ValidationError(
+                    _("The same product cannot appear twice on one prescription.")
+                )
 
     def _seed_product_lines(self):
         ProductLine = self.env["cdu.prescription.product.line"]

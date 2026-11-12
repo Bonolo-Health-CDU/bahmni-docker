@@ -719,6 +719,7 @@ class CduDispense(models.Model):
             "patient_identifier": self.patient_identifier or "",
             "patient_phone": self.patient_phone or "",
             "script_number": script_number,
+            "bag_barcode": self.get_bag_barcode_value(),
             "pickup_point": pickup_point,
             "next_collection_date": self._format_print_date(
                 self.next_drug_pickup_date
@@ -796,6 +797,19 @@ class CduDispense(models.Model):
         )
         encoded = base64.b64encode(barcode).decode("ascii")
         return "data:image/png;base64,%s" % encoded
+
+    def get_bag_barcode_value(self):
+        """Reserve the parcel reference before printing its tracking barcode."""
+        self.ensure_one()
+        BaggingQa = self.env["cdu.bagging.qa"]
+        qa = BaggingQa.search([("prescription_id", "=", self.prescription_id.id)], limit=1)
+        if not qa:
+            qa = BaggingQa.create({
+                "prescription_id": self.prescription_id.id,
+                "dispense_id": self.id,
+            })
+        qa._ensure_parcel_reference()
+        return qa.barcode_reference
 
     def get_label_qr_value(self):
         self.ensure_one()

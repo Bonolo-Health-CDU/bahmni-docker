@@ -1,3 +1,5 @@
+import re
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -84,7 +86,30 @@ class BahmniLabelTemplate(models.Model):
                 for key, value in (values or {}).items()
             }
         )
-        return (self.template_body or "").format_map(render_values)
+        template_body = self.template_body or ""
+        # Saved templates are noupdate records. Keep their Code128 fields in
+        # sync with the slash-free reference submitted to Collect-N-Go.
+        if self.command_language == "zpl":
+            if self.label_type == "bag_label":
+                template_body = template_body.replace(
+                    "^FD{script_number}^FS", "^FD{bag_barcode}^FS"
+                )
+            elif self.label_type == "box_label":
+                template_body = template_body.replace(
+                    "^FD{box_reference}^FS", "^FD{box_barcode}^FS"
+                )
+        if self.command_language == "zpl" and "{qr_value}" in template_body:
+            # QR data includes the newline separating patient and prescription.
+            # Encode the original UTF-8 bytes with ^FH instead of flattening
+            # whitespace or removing characters as we do for visible text.
+            qr_value = str((values or {}).get("qr_value") or "")
+            encoded_qr = "".join("_%02X" % byte for byte in qr_value.encode("utf-8"))
+            template_body = re.sub(
+                r"(?:\^FH[^^~]?)?(\^FD[^^~]*?)\{qr_value\}",
+                lambda match: "^CI28^FH_" + match.group(1) + encoded_qr,
+                template_body,
+            )
+        return template_body.format_map(render_values)
 
     def _format_template_value(self, value):
         if value is False or value is None:

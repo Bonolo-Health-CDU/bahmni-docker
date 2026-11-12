@@ -55,7 +55,7 @@ PRINT {copies}
 ^FO24,20^FDScript: {script_number}^FS
 ^FO24,62^BY2,2,70
 ^BCN,70,Y,N,N
-^FD{script_number}^FS
+^FD{bag_barcode}^FS
 ^FO590,20
 ^BQN,2,4
 ^FDLA,{qr_value}^FS
@@ -92,7 +92,7 @@ PRINT {copies}
 ^FO40,30^FDBox: {box_reference}^FS
 ^FO40,90^BY3,2,120
 ^BCN,120,Y,N,N
-^FD{box_reference}^FS
+^FD{box_barcode}^FS
 ^CF0,32
 ^FO40,260^FDProduction Date: {production_date}^FS
 ^FO40,320^FDBox Nr: {box_number}^FS
