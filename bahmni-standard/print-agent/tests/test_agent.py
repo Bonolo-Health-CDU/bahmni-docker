@@ -1,9 +1,13 @@
 import base64
 import json
+import socket
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 import urllib.request
+from xmlrpc.server import SimpleXMLRPCRequestHandler, SimpleXMLRPCServer
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -18,6 +22,7 @@ from bahmni_print_agent.config import (
     load_config,
 )
 from bahmni_print_agent.election import PeerElection
+from bahmni_print_agent.odoo_client import OdooPrintQueueClient
 from bahmni_print_agent.printers import PrinterDispatcher
 from bahmni_print_agent.runtime import AgentRuntime
 from bahmni_print_agent.status_server import StatusServer
@@ -45,6 +50,38 @@ class FakeClient:
     def retry_job(self, job_id):
         self.retried.append(job_id)
         return True
+
+
+class FakeOdooServer:
+    """A stand-in Odoo XML-RPC server that can be stopped."""
+
+    def __init__(self):
+        self.calls = []
+        class Handler(SimpleXMLRPCRequestHandler):
+            rpc_paths = ("/xmlrpc/2/common", "/xmlrpc/2/object")
+
+        self._server = SimpleXMLRPCServer(
+            ("127.0.0.1", 0), requestHandler=Handler, logRequests=False, allow_none=True
+        )
+        self._server.register_function(self._authenticate, "authenticate")
+        self._server.register_function(self._execute_kw, "execute_kw")
+        self.url = "http://127.0.0.1:%s" % self._server.server_address[1]
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    def _authenticate(self, db, login, password, context):
+        self.calls.append("authenticate")
+        return 7 if password == "secret" else False
+
+    def _execute_kw(self, db, uid, password, model, method, args, kwargs=None):
+        self.calls.append(method)
+        if method == "api_get_pending_jobs":
+            return []
+        return True
+
+    def stop(self):
+        self._server.shutdown()
+        self._server.server_close()
 
 
 class FakeElection:
@@ -421,6 +458,170 @@ class PrintAgentTests(unittest.TestCase):
             self.assertEqual(snapshot["recent_jobs"][0]["id"], 12)
             self.assertEqual(snapshot["recent_jobs"][0]["state"], "done")
             self.assertEqual(snapshot["printers"][0]["status"], "dry_run")
+
+    def test_odoo_check_contacts_odoo_every_time(self):
+        server = FakeOdooServer()
+        client = OdooPrintQueueClient(
+            OdooConfig(url=server.url, db="odoo", username="print_agent", password="secret")
+        )
+        try:
+            self.assertTrue(client.check_connection())
+            self.assertTrue(client.check_connection())
+            self.assertEqual(server.calls.count("check_access_rights"), 2)
+        finally:
+            server.stop()
+
+        # Logged in earlier, but Odoo is gone now: the check must fail.
+        with self.assertRaises(OSError):
+            client.check_connection()
+
+    def test_odoo_check_fails_with_wrong_password(self):
+        server = FakeOdooServer()
+        try:
+            client = OdooPrintQueueClient(
+                OdooConfig(url=server.url, db="odoo", username="print_agent", password="wrong")
+            )
+            with self.assertRaisesRegex(RuntimeError, "authentication failed"):
+                client.check_connection()
+        finally:
+            server.stop()
+
+    def test_odoo_check_gives_up_quickly_when_odoo_does_not_answer(self):
+        # Accepts the connection but never replies, like a hung server.
+        silent = socket.socket()
+        silent.bind(("127.0.0.1", 0))
+        silent.listen()
+        try:
+            client = OdooPrintQueueClient(
+                OdooConfig(
+                    url="http://127.0.0.1:%s" % silent.getsockname()[1],
+                    db="odoo",
+                    username="print_agent",
+                    password="secret",
+                    timeout_seconds=0.5,
+                )
+            )
+            started = time.monotonic()
+            with self.assertRaises(OSError):
+                client.check_connection()
+            self.assertLess(time.monotonic() - started, 3)
+        finally:
+            silent.close()
+
+    def test_status_pill_shows_odoo_unavailable_after_it_stops(self):
+        server = FakeOdooServer()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = replace(
+                self._config(temp_dir),
+                odoo=OdooConfig(url=server.url, db="odoo", username="print_agent", password="secret"),
+            )
+            agent = PrintAgent(config, dispatcher=PrinterDispatcher(config))
+            try:
+                agent.process_once()
+                self.assertTrue(agent.status_snapshot(max_age_seconds=30)["odoo"]["reachable"])
+            finally:
+                server.stop()
+
+            # A failed poll is what the page shows; its periodic refresh must
+            # not overwrite it with an old "reachable".
+            with self.assertRaises(OSError):
+                agent.process_once()
+            status = agent.status_snapshot(max_age_seconds=30)["odoo"]
+            self.assertFalse(status["reachable"])
+            self.assertTrue(status["last_error"])
+
+            # A standby agent does not poll: the periodic check finds out instead.
+            agent._set_odoo_status(True)
+            self.assertFalse(agent.status_snapshot(max_age_seconds=0)["odoo"]["reachable"])
+            # The Refresh button checks at once.
+            agent._set_odoo_status(True)
+            self.assertFalse(agent.status_snapshot(check_odoo=True)["odoo"]["reachable"])
+
+    def test_status_page_reuses_recent_checks(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = self._config(temp_dir)
+            client = FakeClient([])
+            client.check_connection = MagicMock(return_value=True)
+            dispatcher = PrinterDispatcher(config)
+            agent = PrintAgent(config, client=client, dispatcher=dispatcher)
+
+            with patch.object(dispatcher, "check_printers", wraps=dispatcher.check_printers) as check_printers:
+                first = agent.status_snapshot(max_age_seconds=30)
+                second = agent.status_snapshot(max_age_seconds=30)
+                agent.status_snapshot(check_odoo=True, check_printers=True)
+
+            self.assertEqual(client.check_connection.call_count, 2)
+            self.assertEqual(check_printers.call_count, 2)
+            self.assertEqual(second["printers"], first["printers"])
+            self.assertEqual(first["printers"][0]["status"], "dry_run")
+
+    def _pdf_command_config(self, temp_dir):
+        config = self._config(temp_dir)
+        return replace(
+            config,
+            dry_run=False,
+            printers={
+                "document_printer": PrinterConfig(
+                    key="document_printer",
+                    type="command",
+                    command='powershell -File {agent_dir}/scripts/print_pdf_windows.ps1 -PrinterName "CDU DOCUMENT" -File {file}',
+                )
+            },
+        )
+
+    def test_pdf_command_uses_the_packaged_script_and_sumatra(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle = Path(temp_dir) / "_MEI12345"
+            (bundle / "scripts").mkdir(parents=True)
+            sumatra = bundle / "scripts" / "SumatraPDF.exe"
+            sumatra.write_bytes(b"MZ")
+            dispatcher = PrinterDispatcher(self._pdf_command_config(temp_dir))
+            job = {
+                "id": 31,
+                "label_type": "box_manifest",
+                "printer_key": "document_printer",
+                "command_language": "pdf",
+                "payload": base64.b64encode(b"%PDF-1.4 manifest").decode(),
+                "payload_encoding": "base64",
+            }
+
+            with patch("sys._MEIPASS", str(bundle), create=True), patch.dict(
+                "os.environ", {"CDU_SUMATRA_PDF": ""}
+            ), patch("bahmni_print_agent.printers.subprocess.run") as run:
+                run.return_value = subprocess.CompletedProcess([], 0, "", "")
+                dispatcher.dispatch(job)
+                self.assertTrue(dispatcher.check_printer("document_printer").ok)
+
+            parts = run.call_args.args[0]
+            self.assertEqual(parts[2], bundle.as_posix() + "/scripts/print_pdf_windows.ps1")
+            self.assertEqual(parts[4], "CDU DOCUMENT")
+            self.assertEqual(run.call_args.kwargs["env"]["CDU_SUMATRA_PDF"], str(sumatra))
+
+    def test_pdf_printer_check_reports_missing_sumatra(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dispatcher = PrinterDispatcher(self._pdf_command_config(temp_dir))
+            with patch("sys._MEIPASS", temp_dir, create=True), patch.dict(
+                "os.environ", {"CDU_SUMATRA_PDF": "", "ProgramFiles": temp_dir, "ProgramFiles(x86)": temp_dir}
+            ):
+                result = dispatcher.check_printer("document_printer")
+            self.assertFalse(result.ok)
+            self.assertEqual(result.status, "missing_pdf_printer")
+
+    def test_failed_print_command_reports_the_scripts_error(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dispatcher = PrinterDispatcher(self._pdf_command_config(temp_dir))
+            job = {
+                "id": 32,
+                "label_type": "box_manifest",
+                "printer_key": "document_printer",
+                "command_language": "pdf",
+                "payload": base64.b64encode(b"%PDF-1.4 manifest").decode(),
+                "payload_encoding": "base64",
+            }
+            failure = subprocess.CalledProcessError(3, ["powershell"], "", "SumatraPDF.exe was not found.")
+            with patch("bahmni_print_agent.printers.subprocess.run", side_effect=failure):
+                with self.assertRaisesRegex(RuntimeError, "exit code 3: SumatraPDF.exe was not found"):
+                    dispatcher.dispatch(job)
 
     def test_retry_failed_job_calls_odoo_client_and_updates_recent_job(self):
         with tempfile.TemporaryDirectory() as temp_dir:

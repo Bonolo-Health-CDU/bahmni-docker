@@ -31,7 +31,7 @@ if (-not $SumatraPath) {
 }
 
 if (-not $SumatraPath -or -not (Test-Path -LiteralPath $SumatraPath)) {
-    Write-Error "SumatraPDF.exe was not found. Install SumatraPDF or set CDU_SUMATRA_PDF."
+    Write-Error "SumatraPDF.exe was not found. It is packaged with the print agent (the agent passes it in CDU_SUMATRA_PDF); otherwise install SumatraPDF or set CDU_SUMATRA_PDF."
     exit 3
 }
 

@@ -60,10 +60,12 @@ class AgentRuntime:
         self,
         check_odoo: bool = False,
         check_printers: bool = False,
+        max_age_seconds: float | None = None,
     ) -> dict:
         snapshot = self.agent.status_snapshot(
             check_odoo=check_odoo,
             check_printers=check_printers,
+            max_age_seconds=max_age_seconds,
         )
         snapshot["runtime"] = {
             "running": bool(self._thread and self._thread.is_alive()),

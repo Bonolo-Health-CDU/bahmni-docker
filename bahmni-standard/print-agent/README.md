@@ -123,17 +123,26 @@ command = lp -d HP_LaserJet {file}
 
 The `{file}` placeholder is replaced with a temporary payload file path.
 
-The command can also use `{config_dir}`, which is replaced with the directory
-containing the active INI file. The remote example uses this for the Windows PDF
+The command can also use:
+
+- `{agent_dir}`: the agent's own files. In the Windows executable this is where
+  the packaged `scripts/print_pdf_windows.ps1` and SumatraPDF are unpacked.
+- `{config_dir}`: the directory containing the active INI file.
+
+The remote example prints PDFs (manifests, receipts) on Windows with the packaged
 helper:
 
 ```ini
-command = powershell -ExecutionPolicy Bypass -File {config_dir}/scripts/print_pdf_windows.ps1 -PrinterName "HP LaserJet" -File {file}
+command = powershell -ExecutionPolicy Bypass -File {agent_dir}/scripts/print_pdf_windows.ps1 -PrinterName "CDU_DOCUMENT" -File {file}
 ```
 
-That helper uses SumatraPDF for silent PDF printing. Install SumatraPDF on the
-printer PC or set the `CDU_SUMATRA_PDF` environment variable to
-`SumatraPDF.exe`.
+The helper prints silently with SumatraPDF, which is packaged inside
+`BahmniPrintAgent.exe`; nothing needs installing on the PCs. The agent passes the
+packaged copy to the helper in `CDU_SUMATRA_PDF`, so older configs that run a copy
+of the helper from `{config_dir}/scripts` use it too. To use another SumatraPDF,
+set `CDU_SUMATRA_PDF` to its `SumatraPDF.exe`. When running from source, install
+SumatraPDF or set `CDU_SUMATRA_PDF`. The status page's printer **Test** reports
+`missing_pdf_printer` if SumatraPDF cannot be found.
 
 ## Box Label and Manifest Routing
 
@@ -212,11 +221,16 @@ cd print-agent
 powershell -ExecutionPolicy Bypass -File scripts/build_windows_agent.ps1
 ```
 
-The executable is written to:
+The script downloads SumatraPDF (version and SHA-256 pinned in the script; a
+mismatching download is refused) and packages it with the agent. The executable
+is written to:
 
 ```text
 dist\BahmniPrintAgent.exe
 ```
+
+SumatraPDF is free software under the GPLv3, packaged unmodified. Its source code
+is at https://github.com/sumatrapdfreader/sumatrapdf.
 
 Copy `config.remote.example.ini` to `config.local.ini` beside the executable and
 edit it for that PC. To run at login:
