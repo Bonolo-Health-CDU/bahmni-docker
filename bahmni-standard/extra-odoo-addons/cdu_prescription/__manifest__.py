@@ -1,10 +1,11 @@
 {
     "name": "CDU Prescription",
     "summary": "Central Dispensing Unit prescription capture and workflow foundation",
-    "version": "16.0.1.1.2",
+    "version": "16.0.1.2.0",
     "category": "Healthcare",
     "author": "Ministry of Health",
     "license": "LGPL-3",
+    "external_dependencies": {"python": ["openpyxl"]},
     "depends": [
         "base",
         "web",
