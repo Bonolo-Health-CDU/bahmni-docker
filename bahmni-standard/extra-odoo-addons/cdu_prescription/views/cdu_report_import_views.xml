@@ -42,14 +42,17 @@
                         <span class="o_cdu_intake_eyebrow">Report intake</span>
                         <h1><field name="name"/></h1>
                         <p class="o_cdu_intake_subtitle">
-                            Upload an eRegister report and review every imported, updated, duplicate, or failed row.
+                            Upload an eRegister report in CSV or Excel (.xlsx) format.
                         </p>
+                    </div>
+                    <div class="alert alert-warning" role="alert" attrs="{'invisible': [('error_message', '=', False)]}">
+                        <field name="error_message" nolabel="1"/>
                     </div>
                     <group class="o_cdu_intake_summary_grid">
                         <group string="Source" class="o_cdu_intake_card">
                             <field name="source_facility_id"/>
                             <field name="ingestion_channel"/>
-                            <field name="source_file" filename="source_file_name"/>
+                            <field name="source_file" filename="source_file_name" options="{'accepted_file_extensions': '.csv,.xlsx'}"/>
                             <field name="source_file_name" invisible="1"/>
                             <field name="remote_file_id"/>
                             <field name="remote_file_etag"/>
@@ -79,7 +82,7 @@
                                 <tree class="o_cdu_intake_list"
                                       decoration-danger="status == 'failed'"
                                       decoration-muted="status == 'duplicate'">
-                                    <field name="row_number"/>
+                                    <field name="row_number" string="Source Row"/>
                                     <field name="patient_name"/>
                                     <field name="eregister_id"/>
                                     <field name="prescription_date"/>
@@ -93,12 +96,9 @@
                                            decoration-success="status == 'imported'"
                                            decoration-warning="status == 'duplicate'"
                                            decoration-danger="status == 'failed'"/>
-                                    <field name="error_message"/>
+                                    <field name="error_message" string="Reason"/>
                                 </tree>
                             </field>
-                        </page>
-                        <page string="Errors">
-                            <field name="error_message"/>
                         </page>
                     </notebook>
                 </sheet>
