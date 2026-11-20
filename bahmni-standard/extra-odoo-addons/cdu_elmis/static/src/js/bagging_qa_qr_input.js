@@ -5,8 +5,8 @@ import { browser } from "@web/core/browser/browser";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { TextField } from "@web/views/fields/text/text_field";
+import { SCAN_IDLE_MS, createScanDetector } from "./bagging_qa_scan_detector";
 
-const SCAN_DEBOUNCE_MS = 350;
 const SUCCESS_NAVIGATION_DELAY_MS = 1500;
 
 export class BaggingQaQrInputField extends TextField {
@@ -17,6 +17,7 @@ export class BaggingQaQrInputField extends TextField {
         this.orm = useService("orm");
         this._isValidatingScan = false;
         this._lastSubmittedScan = "";
+        this._scanDetector = createScanDetector();
         this._onScanKeydown = this._onScanKeydown.bind(this);
     }
 
@@ -38,6 +39,8 @@ export class BaggingQaQrInputField extends TextField {
 
     onInput() {
         super.onInput(...arguments);
+        const value = this.textareaRef.el ? this.textareaRef.el.value : "";
+        this._scanDetector.input(Date.now(), value.length);
         this._scheduleScanValidation();
     }
 
@@ -54,38 +57,39 @@ export class BaggingQaQrInputField extends TextField {
             this._clearScanInput();
             return;
         }
-        if (ev.key === "Enter" && this._hasCompleteScan(ev.currentTarget.value)) {
+        // Some scanners send the QR's line break as Ctrl+J, which opens
+        // Chrome's downloads instead. Odoo matches the scan without it.
+        if (ev.ctrlKey && (ev.key === "j" || ev.key === "J")) {
+            ev.preventDefault();
+            return;
+        }
+        // An Enter in the middle of a scan is the QR's line break: let it in
+        // and submit once the scan ends. An Enter typed by a person submits.
+        if (ev.key === "Enter" && !this._scanDetector.inBurst(Date.now())) {
             ev.preventDefault();
             ev.stopPropagation();
+            browser.clearTimeout(this._scanTimer);
             this._validateScannedValue(ev.currentTarget.value);
         }
     }
 
     _scheduleScanValidation() {
         browser.clearTimeout(this._scanTimer);
-        const value = this.textareaRef.el ? this.textareaRef.el.value : "";
-        if (!this._hasCompleteScan(value)) {
-            return;
-        }
-        this._scanTimer = browser.setTimeout(
-            () => this._validateScannedValue(value),
-            SCAN_DEBOUNCE_MS
-        );
-    }
-
-    _hasCompleteScan(value) {
-        const scanLines = String(value || "")
-            .replace(/\r\n/g, "\n")
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean);
-        return scanLines.length >= 2 && scanLines[0].length >= 2 && scanLines[1].length >= 5;
+        // A scan ends when nothing more arrives; it does not need an Enter or
+        // a line break from the scanner. Typing waits for the person's Enter.
+        this._scanTimer = browser.setTimeout(() => {
+            const value = this.textareaRef.el ? this.textareaRef.el.value : "";
+            if (this._scanDetector.isScan()) {
+                this._validateScannedValue(value);
+            }
+        }, SCAN_IDLE_MS);
     }
 
     async _clearScanInput() {
         if (this.textareaRef.el) {
             this.textareaRef.el.value = "";
         }
+        this._scanDetector.reset();
         await this.props.update(false);
         this._focusScanInput();
     }

@@ -9,6 +9,8 @@ from urllib import error, request
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 
+from .collect_go_status import parse_status_date, status_label
+
 
 _logger = logging.getLogger(__name__)
 
@@ -408,7 +410,7 @@ class CduCollectGoService(models.AbstractModel):
                 for line in box.line_ids
             ],
             "Customer": None,
-            "ExternalReference": self._collect_go_external_reference(box.name),
+            "ExternalReference": box.barcode_reference,
             "ScheduledDeliveryDate": self._date_to_collect_go_datetime(
                 box.next_drug_pickup_date
             )
@@ -429,9 +431,7 @@ class CduCollectGoService(models.AbstractModel):
         return {
             "ChildParcels": None,
             "Customer": self._build_customer(prescription),
-            "ExternalReference": self._collect_go_external_reference(
-                line.parcel_reference
-            ),
+            "ExternalReference": line.bagging_qa_id.barcode_reference,
             "LocationID": collection_location,
             "ParcelID": None,
             "ParcelStatusType": 0,
@@ -580,16 +580,36 @@ class CduCollectGoService(models.AbstractModel):
         return response_text or _("No response body returned.")
 
     def _extract_parcel_status_items(self, response_payload):
+        """The parcels in a getParcelStatus response.
+
+        Collect & Go answers with a list of messages ({"method":
+        "UpdateParcelStatus", "body": "<JSON>"}), each body holding
+        {"Parcels": [...]}. Unwrap every level until parcels are found.
+        """
         payload = self._unwrap_collect_go_body(response_payload)
         if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
+            items = []
+            for element in payload:
+                if not isinstance(element, dict):
+                    continue
+                if self._parcel_external_reference(element):
+                    items.append(element)
+                elif element.get("body") or element.get("Body") or self._parcel_list(element):
+                    items.extend(self._extract_parcel_status_items(element))
+            return items
         if not isinstance(payload, dict):
             return []
+        parcels = self._parcel_list(payload)
+        if parcels is not None:
+            return [item for item in parcels if isinstance(item, dict)]
+        return [payload] if self._parcel_external_reference(payload) else []
+
+    def _parcel_list(self, payload):
         for key in ("ParcelStatuses", "parcelStatuses", "Parcels", "parcels", "Statuses", "statuses", "Items", "items", "Data", "data"):
             value = payload.get(key)
             if isinstance(value, list):
-                return [item for item in value if isinstance(item, dict)]
-        return [payload] if self._parcel_external_reference(payload) else []
+                return value
+        return None
 
     def _unwrap_collect_go_body(self, response_payload):
         if not isinstance(response_payload, dict):
@@ -612,36 +632,66 @@ class CduCollectGoService(models.AbstractModel):
 
         matched_lines = BoxLine.browse()
         now = fields.Datetime.now()
+        timezone = self.env["ir.config_parameter"].sudo().get_param("cdu.collect_go.status_timezone") or "Africa/Maseru"
         for item in items:
             parcel_reference = self._parcel_external_reference(item)
             if not parcel_reference:
                 continue
             if allowed_references and parcel_reference not in allowed_references:
                 continue
-            lines = BoxLine.search([("parcel_reference", "=", parcel_reference)])
+            lines = BoxLine.search([
+                "|",
+                ("parcel_reference", "=", parcel_reference),
+                ("bagging_qa_id.barcode_reference", "=", parcel_reference),
+            ])
             if not lines:
-                candidates = BoxLine.search([("parcel_reference", "!=", False)])
-                lines = candidates.filtered(
-                    lambda line: self._collect_go_external_reference(
-                        line.parcel_reference
-                    )
-                    == parcel_reference
+                continue
+            status_type = self._parcel_status_type(item)
+            status_date = self._parcel_status_date(item)
+            status_at = self._whole_seconds(parse_status_date(status_date, timezone))
+            # Updates can arrive out of order: never replace a newer status.
+            lines = lines.filtered(
+                lambda line: not (
+                    status_at
+                    and line.collect_go_status_date
+                    and (self._whole_seconds(parse_status_date(line.collect_go_status_date, timezone)) or status_at)
+                    > status_at
                 )
+            )
+            # getParcelStatus is a snapshot: it repeats statuses already applied.
+            # Count a repeat as matched but don't act on it again, so an activity
+            # the admin has closed is not raised a second time.
+            repeats = lines.filtered(
+                lambda line: line.collect_go_status_received_at
+                and line.collect_go_parcel_status_type == status_type
+                and self._whole_seconds(parse_status_date(line.collect_go_status_date, timezone)) == status_at
+            )
+            matched_lines |= repeats
+            lines -= repeats
             if not lines:
                 continue
             values = {
-                "collect_go_parcel_status_type": self._parcel_status_type(item),
+                "collect_go_parcel_status_type": status_type,
                 "collect_go_parcel_status": self._parcel_status_label(item),
                 "collect_go_status_received_at": now,
-                "collect_go_status_date": self._parcel_status_date(item),
+                "collect_go_status_date": status_date,
                 "collect_go_status_raw_json": self._to_pretty_json(item),
             }
             lines.write(values)
             matched_lines |= lines
+            if status_type is not False:
+                lines.mapped("prescription_id")._apply_collect_go_status(
+                    status_type, values["collect_go_parcel_status"], status_at or now
+                )
 
         for box in matched_lines.mapped("box_id"):
             box._update_collect_go_status_summary()
         return len(matched_lines)
+
+    @staticmethod
+    def _whole_seconds(moment):
+        """Odoo stores whole seconds, so compare Collect & Go times that way."""
+        return moment and moment.replace(microsecond=0)
 
     def _parcel_external_reference(self, item):
         return self._first_value(
@@ -655,16 +705,30 @@ class CduCollectGoService(models.AbstractModel):
         )
 
     def _parcel_status_type(self, item):
-        value = self._first_value(item, "ParcelStatusType", "parcelStatusType", "StatusType", "statusType")
-        if value is False:
-            tracking_status = self._latest_tracking_status(item)
-            value = self._first_value(tracking_status, "TrackingStatusType", "trackingStatusType")
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return False
+        """The parcel's latest TrackingStatusType (Collect & Go's status list).
+
+        ParcelStatusType is a different field, used only when a parcel has no
+        tracking history. 0 is a real code, so it is not treated as missing.
+        """
+        tracking_status = self._latest_tracking_status(item)
+        for source, keys in (
+            (tracking_status, ("TrackingStatusType", "trackingStatusType")),
+            (item, ("ParcelStatusType", "parcelStatusType", "StatusType", "statusType")),
+        ):
+            for key in keys:
+                value = source.get(key) if isinstance(source, dict) else None
+                if value is None or value == "":
+                    continue
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    continue
+        return False
 
     def _parcel_status_label(self, item):
+        status_type = self._parcel_status_type(item)
+        if status_type is not False:
+            return status_label(status_type)
         label = self._first_value(
             item,
             "ParcelStatus",
@@ -676,10 +740,7 @@ class CduCollectGoService(models.AbstractModel):
             "Description",
             "description",
         )
-        if label:
-            return label
-        status_type = self._parcel_status_type(item)
-        return _("Status Type %s") % status_type if status_type is not False else _("Status update received")
+        return label or _("Status update received")
 
     def _parcel_status_date(self, item):
         value = self._first_value(item, "Date", "date", "StatusDate", "statusDate", "Timestamp", "timestamp")
@@ -693,7 +754,16 @@ class CduCollectGoService(models.AbstractModel):
         if not isinstance(tracking_statuses, list) or not tracking_statuses:
             return {}
         tracking_statuses = [status for status in tracking_statuses if isinstance(status, dict)]
-        return tracking_statuses[-1] if tracking_statuses else {}
+        if not tracking_statuses:
+            return {}
+        # The newest by date; list order is the tie-breaker (and the fallback).
+        dated = [
+            (parse_status_date(self._first_value(status, "Date", "date", "Timestamp", "timestamp")), index, status)
+            for index, status in enumerate(tracking_statuses)
+        ]
+        if all(moment for moment, _index, _status in dated):
+            return max(dated, key=lambda entry: (entry[0], entry[1]))[2]
+        return tracking_statuses[-1]
 
     def _first_value(self, item, *keys):
         if not isinstance(item, dict):

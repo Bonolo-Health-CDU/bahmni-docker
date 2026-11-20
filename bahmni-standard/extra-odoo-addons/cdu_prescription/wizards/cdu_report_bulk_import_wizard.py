@@ -56,7 +56,7 @@ class CduReportBulkImportWizard(models.TransientModel):
     def action_import_reports(self):
         self.ensure_one()
         if not self.file_ids:
-            raise UserError(_("Please upload at least one eRegister CSV report."))
+            raise UserError(_("Upload at least one eRegister report in CSV or Excel (.xlsx) format."))
 
         run_ids = []
         result_lines = []
@@ -85,27 +85,7 @@ class CduReportBulkImportWizard(models.TransientModel):
             })
             run_ids.append(run.id)
 
-            if not self._is_csv_file(file_name):
-                run.write({
-                    "state": "failed",
-                    "ingested_at": fields.Datetime.now(),
-                    "error_message": _("Only CSV files can be imported with this wizard."),
-                })
-            elif not attachment.datas:
-                run.write({
-                    "state": "failed",
-                    "ingested_at": fields.Datetime.now(),
-                    "error_message": _("The uploaded file is empty or could not be read."),
-                })
-            else:
-                try:
-                    run._import_file()
-                except Exception as error:
-                    run.write({
-                        "state": "failed",
-                        "ingested_at": fields.Datetime.now(),
-                        "error_message": str(error),
-                    })
+            run._import_file()
 
             counts[run.state] = counts.get(run.state, 0) + 1
             for field_name in row_totals:
@@ -182,9 +162,6 @@ class CduReportBulkImportWizard(models.TransientModel):
             "view_mode": "form",
             "target": "new",
         }
-
-    def _is_csv_file(self, file_name):
-        return (file_name or "").lower().endswith(".csv")
 
     def _result_line_values(self, sequence, file_name, run):
         return {

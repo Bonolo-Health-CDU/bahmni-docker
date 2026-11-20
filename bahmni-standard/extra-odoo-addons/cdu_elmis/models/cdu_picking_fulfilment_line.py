@@ -1,5 +1,3 @@
-import math
-
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -31,7 +29,7 @@ class CduPickingFulfilmentLine(models.Model):
     )
     required_quantity = fields.Float(
         string="Required Packs",
-        related="picking_line_id.packs_to_pick",
+        compute="_compute_required_quantity",
         readonly=True,
     )
     prescription_count = fields.Integer(
@@ -83,6 +81,17 @@ class CduPickingFulfilmentLine(models.Model):
     selected_lot_expiry = fields.Date(string="Expiry Date")
     selected_stock_on_hand = fields.Integer(string="Available Packs", readonly=True)
     quantity_picked = fields.Float(string="Picked Packs")
+
+    @api.depends(
+        "picking_line_id.packs_to_pick",
+        "selected_pack_size",
+        "selected_stock_option_id.pack_size",
+    )
+    def _compute_required_quantity(self):
+        for line in self:
+            # During an onchange, the parent's saved stock choice may still
+            # have the previous pack size. Use this row's current selection.
+            line.required_quantity = line._calculate_required_packs_for_selected_stock()
 
     @api.constrains("quantity_picked", "selected_stock_option_id", "selected_stock_on_hand")
     def _check_quantity_picked(self):
@@ -192,8 +201,7 @@ class CduPickingFulfilmentLine(models.Model):
 
     def _calculate_required_packs_for_selected_stock(self):
         self.ensure_one()
+        if not self.picking_line_id:
+            return 0.0
         pack_size = self.selected_pack_size or self.selected_stock_option_id.pack_size or 0
-        required_units = self.required_units or self.picking_line_id.required_units or 0.0
-        if required_units > 0 and pack_size > 0:
-            return math.ceil(required_units / pack_size)
-        return self.required_quantity or 0.0
+        return self.picking_line_id._calculate_required_packs(pack_size=pack_size)

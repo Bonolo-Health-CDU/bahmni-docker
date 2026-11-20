@@ -1,6 +1,7 @@
+import base64
+
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.osv import expression
 from werkzeug import urls
 
 
@@ -11,6 +12,12 @@ class CduBox(models.Model):
     _order = "create_date desc"
 
     name = fields.Char(default="/", copy=False, readonly=True, tracking=True)
+    barcode_reference = fields.Char(
+        string="Box Barcode",
+        compute="_compute_barcode_reference",
+        store=True,
+        index=True,
+    )
     collection_point_id = fields.Many2one(
         "cdu.collection.point",
         string="Collection Point",
@@ -19,6 +26,11 @@ class CduBox(models.Model):
     next_drug_pickup_date = fields.Date(string="Next Drug Pickup Date", tracking=True)
     max_parcels = fields.Integer(default=20, required=True, tracking=True)
     line_ids = fields.One2many("cdu.box.line", "box_id", string="Parcels")
+    available_bagging_qa_ids = fields.Many2many(
+        "cdu.bagging.qa",
+        compute="_compute_available_bagging_qa_ids",
+        string="Available Parcels",
+    )
     parcel_count = fields.Integer(compute="_compute_parcel_count", store=True)
     bag_label_scan_input = fields.Text(
         string="Scan Bag Label Barcode",
@@ -129,10 +141,34 @@ class CduBox(models.Model):
                     )
         return super().write(vals)
 
+    @api.depends("name")
+    def _compute_barcode_reference(self):
+        service = self.env["cdu.collect.go.service"]
+        for box in self:
+            box.barcode_reference = service._collect_go_external_reference(box.name)
+
     @api.depends("line_ids")
     def _compute_parcel_count(self):
         for box in self:
             box.parcel_count = len(box.line_ids)
+
+    @api.depends("line_ids.bagging_qa_id")
+    def _compute_available_bagging_qa_ids(self):
+        BaggingQa = self.env["cdu.bagging.qa"]
+        boxed_parcel_ids = set(
+            self.env["cdu.box.line"].search([]).mapped("bagging_qa_id").ids
+        )
+        for box in self:
+            unavailable_ids = boxed_parcel_ids | set(
+                box.line_ids.mapped("bagging_qa_id").ids
+            )
+            domain = [
+                ("state", "=", "confirmed"),
+                ("prescription_id.state", "=", "awaiting_boxing"),
+            ]
+            if unavailable_ids:
+                domain.append(("id", "not in", list(unavailable_ids)))
+            box.available_bagging_qa_ids = BaggingQa.search(domain)
 
     def _compute_bag_label_scan_input(self):
         for box in self:
@@ -295,29 +331,31 @@ class CduBox(models.Model):
             raise UserError(_("Scan a bag label first."))
 
         BaggingQa = self.env["cdu.bagging.qa"]
+        parcel = BaggingQa
         if len(values) == 1:
             parcel = BaggingQa.search(
                 [
                     "|",
                     "|",
+                    "|",
                     ("prescription_id.name", "=", values[0]),
                     ("parcel_reference", "=", values[0]),
                     ("name", "=", values[0]),
+                    ("barcode_reference", "=", values[0]),
                 ],
                 limit=1,
             )
-        elif len(values) == 2:
-            scanned_patient, scanned_prescription = values
-            candidates = BaggingQa.search(
-                [("prescription_id.name", "=", scanned_prescription)]
-            )
-            normalize = lambda value: " ".join((value or "").split()).casefold()
+        if not parcel:
+            # The bag label QR: patient name and prescription number, with or
+            # without the line break, depending on the scanner.
+            candidates = BaggingQa.search([("prescription_id.name", "in", values)])
+            if not candidates:
+                candidates = BaggingQa.search(
+                    [("prescription_id.state", "in", ("awaiting_boxing", "awaiting_dispatch"))]
+                )
             parcel = candidates.filtered(
-                lambda candidate: normalize(candidate.patient_name)
-                == normalize(scanned_patient)
+                lambda candidate: candidate._matches_bag_label_qr(scanned_value)
             )[:1]
-        else:
-            parcel = BaggingQa
 
         if not parcel:
             raise UserError(
@@ -551,24 +589,95 @@ class CduBox(models.Model):
         sticky=False,
         next_action=False,
     ):
+        print_jobs = self._enqueue_box_print_jobs()
         return {
             "type": "ir.actions.client",
-            "tag": "cdu_print_box_documents",
+            "tag": "display_notification",
             "params": {
-                "report_actions": [
-                    self.env.ref("cdu_elmis.action_report_cdu_box_label").report_action(
-                        self, config=False
-                    ),
-                    self.env.ref("cdu_elmis.action_report_cdu_box_manifest").report_action(
-                        self, config=False
-                    ),
-                ],
                 "title": title,
-                "message": message,
-                "notification_type": notification_type,
+                "message": _("%(message)s %(count)s print jobs were queued.")
+                % {"message": message, "count": len(print_jobs)},
+                "type": notification_type,
                 "sticky": sticky,
                 "next": next_action,
             },
+        }
+
+    def _enqueue_box_print_jobs(self):
+        print_jobs = self.env["bahmni.print.job"]
+        for box in self:
+            for label_type in ("box_label", "box_manifest"):
+                print_jobs |= box._enqueue_box_print_job(label_type)
+        return print_jobs
+
+    def _enqueue_box_print_job(self, label_type):
+        self.ensure_one()
+        template = self.env["bahmni.label.template"]._get_active_template(label_type)
+        if label_type == "box_manifest" and (
+            template.command_language != "pdf"
+            or template.printer_key != "document_printer"
+        ):
+            raise UserError(
+                _(
+                    "The box manifest print template must use PDF and the "
+                    "document_printer printer. Correct the print template, "
+                    "then print the box documents again."
+                )
+            )
+        payload_encoding = "text"
+        if template.command_language == "pdf":
+            payload = self._render_box_pdf_print_payload(template)
+            payload_encoding = "base64"
+        else:
+            payload = template.render_command_payload(
+                self._get_box_print_template_values()
+            )
+        return self.env["bahmni.print.job"].create(
+            {
+                "label_type": label_type,
+                "printer_key": template.printer_key,
+                "command_language": template.command_language,
+                "payload": payload,
+                "payload_encoding": payload_encoding,
+                "res_model": self._name,
+                "res_id": self.id,
+            }
+        )
+
+    def _render_box_pdf_print_payload(self, template):
+        self.ensure_one()
+        pdf_content, output_type = self.env["ir.actions.report"].with_context(
+            force_report_rendering=True,
+        )._render_qweb_pdf(template.report_name, res_ids=self.ids)
+        if output_type != "pdf" or not pdf_content.startswith(b"%PDF-"):
+            raise UserError(
+                _("Report %s did not render a PDF payload.") % template.report_name
+            )
+        return base64.b64encode(pdf_content).decode("ascii")
+
+    def _get_box_print_template_values(self):
+        self.ensure_one()
+        production_at = fields.Datetime.to_datetime(
+            self.confirmed_at or fields.Datetime.now()
+        )
+        production_date = fields.Date.to_string(
+            fields.Datetime.context_timestamp(self, production_at).date()
+        )
+        collection_date = (
+            fields.Date.to_string(self.next_drug_pickup_date)
+            if self.next_drug_pickup_date
+            else ""
+        )
+        return {
+            "box_reference": self.name or "",
+            "box_barcode": self.barcode_reference,
+            "box_number": self.get_box_number(),
+            "route_label": self.get_route_label(),
+            "collection_point": self.collection_point_id.display_name or "",
+            "collection_date": collection_date,
+            "production_date": production_date,
+            "parcel_count": self.parcel_count,
+            "produced_by": "Bonolo Health",
         }
 
     def get_barcode_url(self, value, width=760, height=120):
@@ -971,6 +1080,10 @@ class CduBoxLine(models.Model):
             and set(vals) - status_update_fields
         ):
             raise UserError(_("Parcels cannot be changed on a confirmed box."))
+        if not set(vals) - status_update_fields:
+            # A Collect & Go status update arrives after dispatch; the boxing
+            # rules (parcel awaiting boxing, same pickup point) don't apply.
+            return super().write(vals)
         if "box_id" in vals or "bagging_qa_id" in vals:
             self._validate_write_values_unique_parcels(vals)
         result = super().write(vals)
@@ -990,24 +1103,35 @@ class CduBoxLine(models.Model):
             parcels_by_box.setdefault(box_id, []).append(parcel_id)
 
         for box_id, parcel_ids in parcels_by_box.items():
-            if len(parcel_ids) != len(set(parcel_ids)):
-                self._raise_duplicate_parcel_error(parcel_ids[0])
+            seen_ids = set()
+            for parcel_id in parcel_ids:
+                if parcel_id in seen_ids:
+                    self._raise_duplicate_parcel_error(parcel_id)
+                seen_ids.add(parcel_id)
 
         if not parcels_by_box:
             return
 
-        domains = []
-        for box_id, parcel_ids in parcels_by_box.items():
-            domains.append(
-                [
-                    ("box_id", "=", box_id),
-                    ("bagging_qa_id", "in", list(set(parcel_ids))),
-                ]
-            )
-        domain = expression.OR(domains)
-        duplicate = self.search(domain, limit=1)
+        parcel_ids = [
+            parcel_id
+            for parcel_ids_for_box in parcels_by_box.values()
+            for parcel_id in parcel_ids_for_box
+        ]
+        seen_ids = set()
+        for parcel_id in parcel_ids:
+            if parcel_id in seen_ids:
+                self._raise_duplicate_parcel_error(parcel_id)
+            seen_ids.add(parcel_id)
+
+        duplicate = self.search(
+            [("bagging_qa_id", "in", list(set(parcel_ids)))],
+            limit=1,
+        )
         if duplicate:
-            self._raise_duplicate_parcel_error(duplicate.bagging_qa_id.id)
+            self._raise_duplicate_parcel_error(
+                duplicate.bagging_qa_id.id,
+                box=duplicate.box_id,
+            )
 
     def _validate_write_values_unique_parcels(self, vals):
         for line in self:
@@ -1018,17 +1142,24 @@ class CduBoxLine(models.Model):
             duplicate = self.search(
                 [
                     ("id", "!=", line.id),
-                    ("box_id", "=", box_id),
                     ("bagging_qa_id", "=", parcel_id),
                 ],
                 limit=1,
             )
             if duplicate:
-                self._raise_duplicate_parcel_error(parcel_id)
+                self._raise_duplicate_parcel_error(parcel_id, box=duplicate.box_id)
 
-    def _raise_duplicate_parcel_error(self, parcel_id):
+    def _raise_duplicate_parcel_error(self, parcel_id, box=False):
         parcel = self.env["cdu.bagging.qa"].browse(parcel_id)
         parcel_label = parcel.parcel_reference or parcel.display_name
+        if box:
+            raise ValidationError(
+                _("%(parcel)s has already been added to box %(box)s.")
+                % {
+                    "parcel": parcel_label,
+                    "box": box.display_name,
+                }
+            )
         raise ValidationError(_("%s has already been added to this box.") % parcel_label)
 
     def unlink(self):

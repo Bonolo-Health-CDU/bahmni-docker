@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_report_cdu_summary" model="ir.actions.report">
+        <field name="name">CDU Report Summary</field>
+        <field name="model">cdu.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">cdu_reporting.report_cdu_summary</field>
+        <field name="report_file">cdu_reporting.report_cdu_summary</field>
+        <field name="print_report_name">'CDU Report - %s' % (object.date_to or '')</field>
+    </record>
+</odoo>
+

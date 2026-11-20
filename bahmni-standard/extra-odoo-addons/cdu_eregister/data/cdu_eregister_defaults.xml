@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <!-- Demo-stack defaults. The password is deliberately not shipped: set it in
+         CDU > Configuration > eRegister Integration. -->
+    <record id="param_base_url" model="ir.config_parameter">
+        <field name="key">cdu.eregister.base_url</field>
+        <field name="value">http://host.docker.internal:5001/fhir</field>
+    </record>
+    <record id="param_username" model="ir.config_parameter">
+        <field name="key">cdu.eregister.username</field>
+        <field name="value">cdu</field>
+    </record>
+    <record id="param_cdu_organization_id" model="ir.config_parameter">
+        <field name="key">cdu.eregister.cdu_organization_id</field>
+        <field name="value">1-LESOTHO-CDU</field>
+    </record>
+    <record id="param_sync_enabled" model="ir.config_parameter">
+        <field name="key">cdu.eregister.sync_enabled</field>
+        <field name="value">True</field>
+    </record>
+</odoo>

@@ -58,6 +58,11 @@ class CduDispense(models.Model):
         store=True,
         readonly=True,
     )
+    duration_days = fields.Integer(
+        string="Duration Days",
+        related="prescription_id.cdu_days_supply",
+        readonly=True,
+    )
     collection_point_id = fields.Many2one(
         "cdu.collection.point",
         related="prescription_id.collection_point_id",
@@ -68,6 +73,7 @@ class CduDispense(models.Model):
         [
             ("draft", "Draft"),
             ("confirmed", "Confirmed"),
+            ("cancelled", "Cancelled"),
         ],
         default="draft",
         tracking=True,
@@ -92,12 +98,20 @@ class CduDispense(models.Model):
     dispensing_readiness_message = fields.Text(compute="_compute_dispensing_readiness")
     confirmed_by = fields.Many2one("res.users", readonly=True)
     confirmed_at = fields.Datetime(readonly=True)
+    cancelled_by = fields.Many2one("res.users", readonly=True)
+    cancelled_at = fields.Datetime(readonly=True)
     labels_printed_by = fields.Many2one("res.users", readonly=True)
     labels_printed_at = fields.Datetime(readonly=True)
     labels_printed = fields.Boolean(
         string="Labels Printed",
         compute="_compute_labels_printed",
         store=True,
+    )
+    print_job_ids = fields.One2many(
+        "bahmni.print.job",
+        "dispense_id",
+        string="Print Jobs",
+        readonly=True,
     )
     _AUTO_REFRESH_FORM_FIELDS = frozenset(
         (
@@ -175,6 +189,23 @@ class CduDispense(models.Model):
                 if matched:
                     fulfilment_lines = matched
 
+            if not fulfilment_lines and prescription.product_line_ids:
+                for prescription_line in prescription.product_line_ids:
+                    self.env["cdu.dispense.stock.selection"].create(
+                        {
+                            "dispense_id": dispense.id,
+                            "openmrs_drug_name": (
+                                prescription_line.product_id.display_name
+                                or prescription_line.imported_product_name
+                            ),
+                            "quantity_dispensed": 1,
+                            "dosage_instructions": (
+                                prescription_line.dosage_instructions
+                            ),
+                        }
+                    )
+                continue
+
             if not fulfilment_lines and prescription.regimen_prescribed_raw:
                 self.env["cdu.dispense.stock.selection"].create(
                     {
@@ -203,6 +234,31 @@ class CduDispense(models.Model):
                         if prescription_count
                         else line.quantity_picked
                     )
+                product = (
+                    patient_line.product_id
+                    or line.picking_line_id.summary_line_id.product_id
+                )
+                prescription_line = prescription.product_line_ids.filtered(
+                    lambda product_line, product=product: (
+                        product
+                        and product_line.product_id == product
+                    )
+                )[:1]
+                if not prescription_line:
+                    candidate_names = {
+                        (line.openmrs_drug_name or "").strip().lower(),
+                        (line.selected_orderable_name or "").strip().lower(),
+                    }
+                    prescription_line = prescription.product_line_ids.filtered(
+                        lambda product_line, candidate_names=candidate_names: (
+                            (
+                                product_line.imported_product_name
+                                or product_line.product_id.display_name
+                                or ""
+                            ).strip().lower()
+                            in candidate_names
+                        )
+                    )[:1]
                 self.env["cdu.dispense.stock.selection"].create(
                     {
                         "dispense_id": dispense.id,
@@ -218,10 +274,16 @@ class CduDispense(models.Model):
                         "selected_lot_expiry": line.selected_lot_expiry,
                         "selected_stock_on_hand": line.selected_stock_on_hand,
                         "quantity_dispensed": quantity or 1,
+                        "dosage_instructions": (
+                            prescription_line.dosage_instructions
+                            if prescription_line
+                            else prescription.dosage_instructions
+                        ),
                     }
                 )
 
     @api.depends(
+        "state",
         "stock_selection_ids.stock_option_id",
         "stock_selection_ids.selected_orderable_name",
         "stock_selection_ids.quantity_dispensed",
@@ -241,6 +303,9 @@ class CduDispense(models.Model):
     def _get_dispensing_readiness_errors(self):
         self.ensure_one()
         errors = []
+        if self.state == "cancelled":
+            errors.append(_("Dispensing has been cancelled."))
+            return errors
         if not self.stock_selection_ids:
             errors.append(_("Add at least one dispense stock selection."))
             return errors
@@ -408,6 +473,8 @@ class CduDispense(models.Model):
         for dispense in self:
             if dispense.state == "confirmed":
                 raise UserError(_("Dispensing has already been confirmed for %s.") % dispense.name)
+            if dispense.state != "draft":
+                raise UserError(_("Only draft dispensing jobs can be confirmed."))
             dispense._ensure_dispensing_ready()
             dispense.write(
                 {
@@ -418,19 +485,17 @@ class CduDispense(models.Model):
             )
             if dispense.prescription_id.state == "awaiting_dispensing":
                 dispense.prescription_id.write({"state": "awaiting_bagging_qa"})
-        report_action = self.with_context(
-            cdu_label_layout="all"
-        )._action_generate_labels()
+        print_jobs = self._enqueue_dispensing_print_jobs(label_layout="all")
         return {
             "type": "ir.actions.client",
-            "tag": "cdu_print_dispensing_labels_and_continue",
+            "tag": "display_notification",
             "params": {
-                "report_action": report_action,
                 "title": _("Dispensing confirmed"),
                 "message": _(
-                    "Labels were generated. Continuing the dispensing workflow."
-                ),
-                "notification_type": "success",
+                    "%s print jobs were queued. Continuing the dispensing workflow."
+                )
+                % len(print_jobs),
+                "type": "success",
                 "sticky": False,
                 "next": self._get_next_dispensing_action(),
             },
@@ -449,6 +514,41 @@ class CduDispense(models.Model):
         if self.state != "draft":
             raise UserError(_("Only an active dispensing task can be rejected."))
         return self.prescription_id.action_reject_to_facility()
+
+    def action_cancel_dispensing(self):
+        self.ensure_one()
+        self._ensure_dispensing_access()
+        if self.state == "cancelled":
+            raise UserError(_("Dispensing has already been cancelled for %s.") % self.name)
+        if self.state != "draft":
+            raise UserError(_("Only draft dispensing jobs can be cancelled."))
+
+        self.write(
+            {
+                "state": "cancelled",
+                "cancelled_by": self.env.user.id,
+                "cancelled_at": fields.Datetime.now(),
+            }
+        )
+        self.sudo().message_post(
+            body=_(
+                "Dispensing job cancelled. The prescription remains in the dispensing work queue."
+            )
+        )
+        action = self.env.ref("cdu_elmis.action_cdu_dispensing_work_queue").read()[0]
+        action["views"] = [(False, "tree"), (False, "form")]
+        action = self._action_as_main_target(action)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Dispensing cancelled"),
+                "message": _("The prescription remains available for dispensing."),
+                "type": "warning",
+                "sticky": False,
+                "next": action,
+            },
+        }
 
     def action_mark_labels_printed(self):
         self._ensure_dispensing_access()
@@ -480,9 +580,42 @@ class CduDispense(models.Model):
             if dispense.state != "confirmed":
                 raise UserError(_("Confirm dispensing before printing labels."))
 
-        return self._action_generate_labels()
+        label_layout = self.env.context.get("cdu_label_layout", "all")
+        print_jobs = self._enqueue_dispensing_print_jobs(label_layout=label_layout)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Dispensing labels queued"),
+                "message": _("%s print jobs were queued.") % len(print_jobs),
+                "type": "success",
+                "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
+            },
+        }
 
-    def _action_generate_labels(self):
+    def _enqueue_dispensing_print_jobs(self, label_layout="all"):
+        label_types = self._get_label_types_for_layout(label_layout)
+        print_jobs = self.env["bahmni.print.job"]
+        for dispense in self:
+            dispense._mark_labels_print_queued()
+            for label_type in label_types:
+                print_jobs |= dispense._enqueue_dispensing_print_job(label_type)
+        return print_jobs
+
+    def _get_label_types_for_layout(self, label_layout):
+        layouts = {
+            "all": ("dispensing_slip", "medicine_label", "bag_label"),
+            "slip": ("dispensing_slip",),
+            "medicine": ("medicine_label",),
+            "bag": ("bag_label",),
+        }
+        try:
+            return layouts[label_layout]
+        except KeyError:
+            raise UserError(_("Unknown dispensing print layout: %s") % label_layout)
+
+    def _mark_labels_print_queued(self):
         for dispense in self:
             if not dispense.labels_printed_at:
                 dispense.write(
@@ -491,13 +624,127 @@ class CduDispense(models.Model):
                         "labels_printed_at": fields.Datetime.now(),
                     }
                 )
-        label_layout = self.env.context.get("cdu_label_layout", "all")
-        return self.env.ref("cdu_elmis.action_report_cdu_dispense_labels").with_context(
-            cdu_label_layout=label_layout,
-        ).report_action(
-            self,
-            config=False,
+
+    def _enqueue_dispensing_print_job(self, label_type):
+        self.ensure_one()
+        template = self.env["bahmni.label.template"]._get_active_template(label_type)
+        if label_type == "medicine_label" and template.command_language != "pdf":
+            jobs = self.env["bahmni.print.job"]
+            for line in self.stock_selection_ids:
+                copies = int(line.quantity_dispensed or 0)
+                if copies <= 0:
+                    continue
+                payload = template.render_command_payload(
+                    self._get_print_template_values(line=line, copies=copies)
+                )
+                jobs |= self._create_print_job(
+                    template,
+                    label_type=label_type,
+                    payload=payload,
+                    payload_encoding="text",
+                )
+            return jobs
+
+        payload_encoding = "text"
+        if template.command_language == "pdf":
+            payload = self._render_pdf_print_payload(
+                template,
+                label_layout=self._get_pdf_layout_for_label_type(label_type),
+            )
+            payload_encoding = "base64"
+        else:
+            payload = template.render_command_payload(
+                self._get_print_template_values(copies=1)
+            )
+        return self._create_print_job(
+            template,
+            label_type=label_type,
+            payload=payload,
+            payload_encoding=payload_encoding,
         )
+
+    def _create_print_job(self, template, label_type, payload, payload_encoding):
+        self.ensure_one()
+        return self.env["bahmni.print.job"].create(
+            {
+                "label_type": label_type,
+                "printer_key": template.printer_key,
+                "command_language": template.command_language,
+                "payload": payload,
+                "payload_encoding": payload_encoding,
+                "res_model": self._name,
+                "res_id": self.id,
+                "dispense_id": self.id,
+            }
+        )
+
+    def _render_pdf_print_payload(self, template, label_layout):
+        self.ensure_one()
+        pdf_content, output_type = self.env["ir.actions.report"].with_context(
+            force_report_rendering=True,
+            cdu_label_layout=label_layout,
+        )._render_qweb_pdf(template.report_name, res_ids=self.ids)
+        if output_type != "pdf":
+            raise UserError(
+                _("Report %s did not render a PDF payload.") % template.report_name
+            )
+        return base64.b64encode(pdf_content).decode("ascii")
+
+    def _get_pdf_layout_for_label_type(self, label_type):
+        return {
+            "dispensing_slip": "slip",
+            "medicine_label": "medicine",
+            "bag_label": "bag",
+        }.get(label_type, "all")
+
+    def _get_print_template_values(self, line=False, copies=1):
+        self.ensure_one()
+        prescription = self.prescription_id
+        script_number = prescription.name or self.name or ""
+        pickup_point = (
+            self.collection_point_id.name
+            or prescription.drug_pickup_point_raw
+            or ""
+        )
+        printed_at = self.labels_printed_at or fields.Datetime.now()
+        medicine_name = ""
+        dosage_instructions = ""
+        if line:
+            medicine_name = line.selected_orderable_name or line.openmrs_drug_name or ""
+            dosage_instructions = line.dosage_instructions or ""
+        return {
+            "facility_name": prescription.facility_name or self.env.company.name,
+            "facility_code": prescription.facility_code or "",
+            "patient_name": self.patient_name or "",
+            "patient_identifier": self.patient_identifier or "",
+            "patient_phone": self.patient_phone or "",
+            "script_number": script_number,
+            "bag_barcode": self.get_bag_barcode_value(),
+            "pickup_point": pickup_point,
+            "next_collection_date": self._format_print_date(
+                self.next_drug_pickup_date
+            ),
+            "collection_date": self._format_print_date(
+                prescription.prescription_date
+            ),
+            "medicine_name": medicine_name,
+            "dosage_instructions": dosage_instructions,
+            "quantity_dispensed": line.quantity_dispensed if line else "",
+            "copies": max(int(copies or 1), 1),
+            "repeat_number": 1,
+            "dispenser_name": self.labels_printed_by.name or self.env.user.name,
+            "printed_at": self._format_print_datetime(printed_at),
+            "qr_value": self.get_label_qr_value(),
+        }
+
+    def _format_print_date(self, value):
+        return fields.Date.to_string(value) if value else ""
+
+    def _format_print_datetime(self, value):
+        if not value:
+            return ""
+        localized = fields.Datetime.context_timestamp(self, value)
+        return localized.strftime("%Y-%m-%d %H:%M")
 
     def _get_next_dispensing_action(self):
         self.ensure_one()
@@ -517,7 +764,7 @@ class CduDispense(models.Model):
             "cdu_elmis.action_cdu_dispensing_work_queue"
         ).read()[0]
         action["views"] = [(False, "tree"), (False, "form")]
-        return action
+        return self._action_as_main_target(action)
 
     def action_open_next_dispensing_task(self):
         self.ensure_one()
@@ -551,6 +798,19 @@ class CduDispense(models.Model):
         encoded = base64.b64encode(barcode).decode("ascii")
         return "data:image/png;base64,%s" % encoded
 
+    def get_bag_barcode_value(self):
+        """Reserve the parcel reference before printing its tracking barcode."""
+        self.ensure_one()
+        BaggingQa = self.env["cdu.bagging.qa"]
+        qa = BaggingQa.search([("prescription_id", "=", self.prescription_id.id)], limit=1)
+        if not qa:
+            qa = BaggingQa.create({
+                "prescription_id": self.prescription_id.id,
+                "dispense_id": self.id,
+            })
+        qa._ensure_parcel_reference()
+        return qa.barcode_reference
+
     def get_label_qr_value(self):
         self.ensure_one()
         prescription_number = self.prescription_id.name or self.name or ""
@@ -564,6 +824,27 @@ class CduDispense(models.Model):
         self.ensure_one()
         return self._action_open()
 
+    def _action_as_main_target(self, action):
+        action = dict(action)
+        action["target"] = "main"
+        return action
+
+    def _restart_cancelled_dispensing(self):
+        for dispense in self.filtered(lambda record: record.state == "cancelled"):
+            dispense.stock_selection_ids.with_context(
+                cdu_allow_dispense_line_sync=True
+            ).unlink()
+            dispense.stock_summary_ids.unlink()
+            dispense.stock_option_ids.unlink()
+            dispense.write(
+                {
+                    "state": "draft",
+                    "cancelled_by": False,
+                    "cancelled_at": False,
+                }
+            )
+            dispense._prefill_from_picking()
+
     def _action_open(self):
         self.ensure_one()
         return {
@@ -572,5 +853,6 @@ class CduDispense(models.Model):
             "res_model": "cdu.dispense",
             "res_id": self.id,
             "view_mode": "form",
-            "target": "current",
+            "views": [(False, "form")],
+            "target": "main",
         }

@@ -17,12 +17,12 @@
 
                     <div attrs="{'invisible': [('state', '!=', 'upload')]}">
                         <div class="alert alert-info" role="alert">
-                            Upload one or more eRegister CSV reports. CDU will read each file's Location column and create one report import per file.
+                            Upload one or more eRegister reports in CSV or Excel (.xlsx) format. Include Location in each report.
                         </div>
                         <group string="Report Files">
                             <field name="file_ids"
                                    widget="many2many_binary"
-                                   options="{'accepted_file_extensions': '.csv'}"
+                                   options="{'accepted_file_extensions': '.csv,.xlsx'}"
                                    nolabel="1"/>
                         </group>
                         <group string="Ready">
@@ -88,7 +88,7 @@
                                 <field name="duplicate_rows"/>
                                 <field name="failed_rows"/>
                                 <field name="report_run_id"/>
-                                <field name="error_message"/>
+                                <field name="error_message" string="Reason"/>
                             </tree>
                         </field>
                     </div>

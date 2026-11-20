@@ -1,0 +1,153 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 3202 >>
+stream
+BT
+/F2 16 Tf
+1 0 0 1 54 738 Tm (CDU Printing Agent Test Instructions) Tj
+/F1 10 Tf
+1 0 0 1 54 724 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 710 Tm (Purpose) Tj
+/F1 10 Tf
+1 0 0 1 54 696 Tm (These steps show how to demonstrate automatic printing without physical printers.) Tj
+/F1 10 Tf
+1 0 0 1 54 682 Tm (Odoo queues the print jobs, the Print Agent pulls them, dry-run mode writes files) Tj
+/F1 10 Tf
+1 0 0 1 54 668 Tm (locally, and Odoo marks the jobs as Done.) Tj
+/F1 10 Tf
+1 0 0 1 54 654 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 640 Tm (1. Upgrade the Odoo module) Tj
+/F1 10 Tf
+1 0 0 1 54 626 Tm (Upgrade the CDU eLMIS Integration module so the new print queue models, print) Tj
+/F1 10 Tf
+1 0 0 1 54 612 Tm (templates, and menus are loaded.) Tj
+/F1 10 Tf
+1 0 0 1 54 598 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 584 Tm (2. Confirm a dispense) Tj
+/F1 10 Tf
+1 0 0 1 54 570 Tm (In Odoo, open the dispensing workflow and click Confirm Dispensing. You should see) Tj
+/F1 10 Tf
+1 0 0 1 54 556 Tm (a message similar to: 3 print jobs were queued.) Tj
+/F1 10 Tf
+1 0 0 1 54 542 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 528 Tm (3. Check the queue in Odoo) Tj
+/F1 10 Tf
+1 0 0 1 54 514 Tm (Go to Configuration > Print Jobs, or open the confirmed dispense record and check) Tj
+/F1 10 Tf
+1 0 0 1 54 500 Tm (the Print Jobs tab. Expected pending jobs include: dispensing_slip to) Tj
+/F1 10 Tf
+1 0 0 1 54 486 Tm (document_printer as PDF, medicine_label to product_printer as TSPL, and bag_label) Tj
+/F1 10 Tf
+1 0 0 1 54 472 Tm (to bagging_printer as ZPL.) Tj
+/F1 10 Tf
+1 0 0 1 54 458 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 444 Tm (4. Prepare the Print Agent config) Tj
+/F1 10 Tf
+1 0 0 1 54 430 Tm (Open a terminal and run:) Tj
+/F1 10 Tf
+1 0 0 1 54 416 Tm (cd /home/dinny/Documents/CDU/bahmni-docker/bahmni-standard/print-agent) Tj
+/F1 10 Tf
+1 0 0 1 54 402 Tm (cp config.example.ini config.local.ini) Tj
+/F1 10 Tf
+1 0 0 1 54 388 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 374 Tm (Edit config.local.ini and set:) Tj
+/F1 10 Tf
+1 0 0 1 54 360 Tm ([odoo]) Tj
+/F1 10 Tf
+1 0 0 1 54 346 Tm (url = http://localhost:8071) Tj
+/F1 10 Tf
+1 0 0 1 54 332 Tm (db = odoo) Tj
+/F1 10 Tf
+1 0 0 1 54 318 Tm (username = cdu.admin) Tj
+/F1 10 Tf
+1 0 0 1 54 304 Tm (password = eLMIS@1234) Tj
+/F1 10 Tf
+1 0 0 1 54 290 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 276 Tm (5. Run the agent once) Tj
+/F1 10 Tf
+1 0 0 1 54 262 Tm (From the print-agent folder, run:) Tj
+/F1 10 Tf
+1 0 0 1 54 248 Tm (PYTHONPATH=. python3 -m bahmni_print_agent --config config.local.ini --once) Tj
+/F1 10 Tf
+1 0 0 1 54 234 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 220 Tm (6. Check generated files) Tj
+/F1 10 Tf
+1 0 0 1 54 206 Tm (In dry-run mode, the agent does not print to real printers. It writes files to:) Tj
+/F1 10 Tf
+1 0 0 1 54 192 Tm (/home/dinny/Documents/CDU/bahmni-docker/bahmni-standard/print-agent/printed-) Tj
+/F1 10 Tf
+1 0 0 1 54 178 Tm (output/) Tj
+/F1 10 Tf
+1 0 0 1 54 164 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 150 Tm (You should see PDF, TSPL, or ZPL payload files.) Tj
+/F1 10 Tf
+1 0 0 1 54 136 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 122 Tm (7. Refresh Odoo Print Jobs) Tj
+/F1 10 Tf
+1 0 0 1 54 108 Tm (Refresh Configuration > Print Jobs. The processed jobs should move from Pending to) Tj
+/F1 10 Tf
+1 0 0 1 54 94 Tm (Done.) Tj
+/F1 10 Tf
+1 0 0 1 54 80 Tm () Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 607 >>
+stream
+BT
+/F1 10 Tf
+1 0 0 1 54 738 Tm (Continuous mode) Tj
+/F1 10 Tf
+1 0 0 1 54 724 Tm (To keep the agent polling continuously, run:) Tj
+/F1 10 Tf
+1 0 0 1 54 710 Tm (PYTHONPATH=. python3 -m bahmni_print_agent --config config.local.ini) Tj
+/F1 10 Tf
+1 0 0 1 54 696 Tm () Tj
+/F1 10 Tf
+1 0 0 1 54 682 Tm (Real printer setup later) Tj
+/F1 10 Tf
+1 0 0 1 54 668 Tm (When Windows PCs and printers are available, change dry_run = false and configure) Tj
+/F1 10 Tf
+1 0 0 1 54 654 Tm (product_printer, bagging_printer, and document_printer with the real printer IPs) Tj
+/F1 10 Tf
+1 0 0 1 54 640 Tm (or print commands.) Tj
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000360 00000 n 
+0000003614 00000 n 
+0000003853 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+4511
+%%EOF

@@ -16,6 +16,16 @@
 
                         <field name="cdu_is_drug"/>
 
+                        <field name="cdu_catalog_source"/>
+
+                        <field name="cdu_generic_name"/>
+
+                        <field name="cdu_strength"/>
+
+                        <field name="cdu_dosage_form"/>
+
+                        <field name="cdu_verification_label" readonly="1"/>
+
                         <field name="cdu_drug_code"/>
 
                         <field name="cdu_pack_size"/>

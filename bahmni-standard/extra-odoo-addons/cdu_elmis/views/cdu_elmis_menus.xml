@@ -85,6 +85,14 @@
         groups="cdu_prescription.group_cdu_admin"/>
 
     <menuitem
+        id="menu_cdu_elmis_orderable_catalog"
+        name="Medicine Catalogue Mappings"
+        parent="cdu_prescription.menu_cdu_configuration"
+        action="action_cdu_elmis_orderable_catalog"
+        sequence="75"
+        groups="cdu_prescription.group_cdu_admin"/>
+
+    <menuitem
         id="menu_cdu_elmis_api_logs"
         name="eLMIS API Logs"
         parent="cdu_prescription.menu_cdu_configuration"

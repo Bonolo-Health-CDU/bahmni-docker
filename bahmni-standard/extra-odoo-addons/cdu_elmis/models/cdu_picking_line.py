@@ -1,5 +1,3 @@
-import math
-
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -139,6 +137,7 @@ class CduPickingLine(models.Model):
         "summary_line_id.pack_size",
         "required_units",
         "pack_size",
+        "packs_to_pick",
     )
     def _compute_stock_quantities(self):
         for line in self:
@@ -148,7 +147,7 @@ class CduPickingLine(models.Model):
             line.available_quantity = available_packs * pack_size
             line.picked_quantity = picked_packs * pack_size
             line.remaining_quantity = max((line.required_units or 0.0) - line.picked_quantity, 0.0)
-            line.remaining_packs_to_pick = max((line._calculate_required_packs() or 0.0) - picked_packs, 0.0)
+            line.remaining_packs_to_pick = max((line.packs_to_pick or 0.0) - picked_packs, 0.0)
 
     @api.depends(
         "quantity_to_pick",
@@ -159,9 +158,12 @@ class CduPickingLine(models.Model):
         "summary_line_id.total_tablets",
         "batch_id.patient_picking_line_ids.effective_repeat_days",
         "batch_id.patient_picking_line_ids.required_units",
+        "batch_id.patient_picking_line_ids.required_quantity",
         "batch_id.patient_picking_line_ids.daily_dose",
         "batch_id.patient_picking_line_ids.drug_name",
         "batch_id.patient_picking_line_ids.product_id",
+        "summary_line_id.product_id",
+        "openmrs_drug_name",
     )
     def _compute_report_quantity_fields(self):
         for line in self:
@@ -205,12 +207,19 @@ class CduPickingLine(models.Model):
             or 0
         )
 
-    def _calculate_required_packs(self):
+    def _calculate_required_packs(self, pack_size=None):
         self.ensure_one()
         required_units = self.required_units or self.summary_line_id.total_tablets or 0.0
-        pack_size = self._get_effective_pack_size()
+        if pack_size is None:
+            pack_size = self._get_effective_pack_size()
         if required_units > 0 and pack_size > 0:
-            return math.ceil(required_units / pack_size)
+            # Each patient receives whole bottles; residual units cannot be
+            # pooled across prescriptions before rounding.
+            return self.batch_id._calculate_total_bottles_from_patient_lines(
+                self._get_matching_patient_picking_lines(),
+                pack_size,
+                required_units=required_units,
+            )
         return self.quantity_to_pick or 0.0
 
     @api.depends(

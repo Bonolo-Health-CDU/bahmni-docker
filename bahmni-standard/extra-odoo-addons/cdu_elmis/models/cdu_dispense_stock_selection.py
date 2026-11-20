@@ -5,7 +5,7 @@ from odoo.exceptions import ValidationError
 class CduDispenseStockSelection(models.Model):
     _name = "cdu.dispense.stock.selection"
     _description = "CDU Dispense Stock Selection"
-    _order = "dispense_id, openmrs_drug_name, selected_orderable_name, selected_lot, id"
+    _order = "dispense_id, id"
 
     dispense_id = fields.Many2one(
         "cdu.dispense",
@@ -56,9 +56,6 @@ class CduDispenseStockSelection(models.Model):
     )
     dosage_instructions = fields.Text(
         string="Dosing / Instructions",
-        related="prescription_id.dosage_instructions",
-        readonly=False,
-        store=True,
     )
 
     @api.depends("selected_pack_size", "quantity_dispensed")
@@ -104,8 +101,8 @@ class CduDispenseStockSelection(models.Model):
                SET dosage_instructions = prescription.dosage_instructions
               FROM cdu_prescription prescription
              WHERE prescription.id = selection.prescription_id
-               AND COALESCE(selection.dosage_instructions, '') !=
-                   COALESCE(prescription.dosage_instructions, '')
+               AND COALESCE(selection.dosage_instructions, '') = ''
+               AND COALESCE(prescription.dosage_instructions, '') != ''
             """
         )
 
@@ -126,16 +123,59 @@ class CduDispenseStockSelection(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        self._check_target_dispenses_are_draft(vals_list)
+        for values in vals_list:
+            if not values.get("openmrs_drug_name") and values.get("stock_option_id"):
+                option = self.env["cdu.dispense.stock.option"].browse(
+                    values["stock_option_id"]
+                )
+                values["openmrs_drug_name"] = option.orderable_name or False
+            if values.get("dosage_instructions") or not values.get("dispense_id"):
+                continue
+            dispense = self.env["cdu.dispense"].browse(values["dispense_id"])
+            values["dosage_instructions"] = (
+                dispense.prescription_id.dosage_instructions or False
+            )
         records = super().create(vals_list)
         if any(values.get("stock_option_id") for values in vals_list):
             records._sync_stock_option()
         return records
 
     def write(self, vals):
+        self._check_dispenses_are_draft()
         result = super().write(vals)
         if "stock_option_id" in vals:
             self._sync_stock_option()
         return result
+
+    def unlink(self):
+        self._check_dispenses_are_draft()
+        return super().unlink()
+
+    @api.model
+    def _check_target_dispenses_are_draft(self, vals_list):
+        if self.env.context.get("cdu_allow_dispense_line_sync"):
+            return
+        dispense_ids = {
+            values.get("dispense_id")
+            for values in vals_list
+            if values.get("dispense_id")
+        }
+        confirmed = self.env["cdu.dispense"].browse(dispense_ids).filtered(
+            lambda dispense: dispense.state != "draft"
+        )
+        if confirmed:
+            raise ValidationError(
+                _("Regimen products cannot be added after dispensing is confirmed.")
+            )
+
+    def _check_dispenses_are_draft(self):
+        if self.env.context.get("cdu_allow_dispense_line_sync"):
+            return
+        if self.filtered(lambda line: line.dispense_id.state != "draft"):
+            raise ValidationError(
+                _("Regimen products cannot be changed after dispensing is confirmed.")
+            )
 
     def _sync_stock_option(self):
         for line in self:
@@ -150,6 +190,8 @@ class CduDispenseStockSelection(models.Model):
                 line.selected_lot_expiry = False
                 line.selected_stock_on_hand = 0
                 continue
+            if not line.openmrs_drug_name:
+                line.openmrs_drug_name = option.orderable_name
             line.selected_orderable_code = option.orderable_code
             line.selected_orderable_id = option.orderable_id
             line.selected_orderable_name = option.orderable_name

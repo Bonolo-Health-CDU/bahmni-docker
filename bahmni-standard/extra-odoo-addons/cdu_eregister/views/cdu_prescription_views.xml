@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_cdu_prescription_form_eregister" model="ir.ui.view">
+        <field name="name">cdu.prescription.form.eregister</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_cancel']" position="after">
+                <button name="action_push_eregister_status"
+                        string="Publish Status to eRegister"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': ['|', ('intake_source', '!=', 'eregister_fhir'), ('eregister_cancelled', '=', True)]}"/>
+            </xpath>
+            <xpath expr="//div[hasclass('o_cdu_record_hero')]" position="before">
+                <field name="intake_source" invisible="1"/>
+                <field name="eregister_cancelled" invisible="1"/>
+                <div class="alert alert-danger" role="alert"
+                     attrs="{'invisible': ['|', ('eregister_cancelled', '=', False), ('state', '=', 'cancelled')]}">
+                    <strong>Cancelled in eRegister.</strong>
+                    The facility cancelled this prescription after CDU production started.
+                    Decide whether to stop it, then cancel it here if needed.
+                </div>
+                <div class="alert alert-warning" role="alert"
+                     attrs="{'invisible': [('fhir_sync_state', '!=', 'failed')]}">
+                    <strong>Status not published to eRegister.</strong>
+                    <field name="fhir_sync_error" readonly="1" nolabel="1"/>
+                </div>
+            </xpath>
+            <xpath expr="//field[@name='report_run_id']" position="before">
+                <field name="intake_source"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="eRegister" attrs="{'invisible': [('intake_source', '!=', 'eregister_fhir')]}">
+                    <group>
+                        <group string="FHIR Records">
+                            <field name="eregister_order_uuid"/>
+                            <field name="fhir_task_id"/>
+                            <field name="fhir_medication_request_id"/>
+                            <field name="fhir_patient_id"/>
+                        </group>
+                        <group string="Status Published to eRegister">
+                            <field name="fhir_sync_state" widget="badge"
+                                   decoration-success="fhir_sync_state == 'synced'"
+                                   decoration-warning="fhir_sync_state == 'pending'"
+                                   decoration-danger="fhir_sync_state == 'failed'"/>
+                            <field name="fhir_task_status"/>
+                            <field name="fhir_business_status"/>
+                            <field name="fhir_synced_at"/>
+                            <field name="fhir_sync_attempts"/>
+                            <field name="eregister_cancelled_at" attrs="{'invisible': [('eregister_cancelled', '=', False)]}"/>
+                        </group>
+                    </group>
+                    <field name="eregister_api_log_ids">
+                        <tree create="0" edit="0" delete="0" decoration-danger="not success">
+                            <field name="timestamp"/>
+                            <field name="call_type"/>
+                            <field name="http_method"/>
+                            <field name="http_status_code"/>
+                            <field name="success"/>
+                            <field name="error_message"/>
+                        </tree>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_cdu_prescription_tree_eregister" model="ir.ui.view">
+        <field name="name">cdu.prescription.tree.eregister</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="before">
+                <field name="intake_source" optional="hide"/>
+                <field name="fhir_sync_state" string="eRegister Status" optional="hide"
+                       widget="badge"
+                       decoration-success="fhir_sync_state == 'synced'"
+                       decoration-warning="fhir_sync_state == 'pending'"
+                       decoration-danger="fhir_sync_state == 'failed'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_cdu_prescription_search_eregister" model="ir.ui.view">
+        <field name="name">cdu.prescription.search.eregister</field>
+        <field name="model">cdu.prescription</field>
+        <field name="inherit_id" ref="cdu_prescription.view_cdu_prescription_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='patient_identifier']" position="after">
+                <field name="eregister_order_uuid"/>
+            </xpath>
+            <xpath expr="//filter[@name='needs_attention']" position="after">
+                <filter string="From eRegister (FHIR)" name="from_eregister" domain="[('intake_source', '=', 'eregister_fhir')]"/>
+                <filter string="eRegister Status Failed" name="eregister_status_failed" domain="[('fhir_sync_state', '=', 'failed')]"/>
+                <filter string="Cancelled in eRegister" name="eregister_cancelled" domain="[('eregister_cancelled', '=', True)]"/>
+            </xpath>
+            <xpath expr="//filter[@name='group_state']" position="after">
+                <filter string="Intake Source" name="group_intake_source" context="{'group_by': 'intake_source'}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

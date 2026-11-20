@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="cdu_prescription.menu_cdu_root" model="ir.ui.menu">
+        <field name="groups_id" eval="[(4, ref('cdu_reporting.group_cdu_reporting_user')), (4, ref('cdu_reporting.group_cdu_reporting_manager'))]"/>
+    </record>
+
+    <menuitem id="menu_cdu_reporting" name="Reporting"
+              parent="cdu_prescription.menu_cdu_root" sequence="40"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+    <menuitem id="menu_cdu_report_enrolment" name="Patient Enrolment"
+              parent="menu_cdu_reporting" action="action_cdu_report_enrolment" sequence="10"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+    <menuitem id="menu_cdu_report_verification" name="Prescription Verification"
+              parent="menu_cdu_reporting" action="action_cdu_report_verification" sequence="20"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+    <menuitem id="menu_cdu_report_validation" name="Prescription Validation"
+              parent="menu_cdu_reporting" action="action_cdu_report_validation" sequence="30"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+    <menuitem id="menu_cdu_report_dispensing" name="Dispensing"
+              parent="menu_cdu_reporting" action="action_cdu_report_dispensing" sequence="40"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+    <menuitem id="menu_cdu_report_parcel_production" name="Parcel Production"
+              parent="menu_cdu_reporting" action="action_cdu_report_parcel_production" sequence="50"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+    <menuitem id="menu_cdu_report_parcel_forecast" name="Parcel Forecasting"
+              parent="menu_cdu_reporting" action="action_cdu_report_parcel_forecast" sequence="60"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+    <menuitem id="menu_cdu_report_generate" name="Generate Report"
+              parent="menu_cdu_reporting" action="action_cdu_report_wizard" sequence="90"
+              groups="cdu_reporting.group_cdu_reporting_user"/>
+</odoo>
+

@@ -198,23 +198,10 @@ class CduBatch(models.Model):
         for batch in self:
             patient_line_vals, summary_vals = batch._prepare_picking_line_values()
 
-            elmis_line_vals = []
-            
-            for item in summary_vals:
-                product = self.env["product.product"].browse(item["product_id"]).exists()
-                elmis_line_vals.append({
-                    "batch_id": batch.id,
-                    "openmrs_drug_name": item["unmapped_drug_name"],
-                    "openmrs_drug_uuid": (
-                        product.product_tmpl_id.cdu_openmrs_drug_uuid
-                        if product
-                        else False
-                    ),
-                    "quantity_to_pick": item["total_bottles"] or 0.0,
-                    "prescription_count": item["prescription_count"],
-                })
-            
-            # Use write with command tuples to ensure generated lines are refreshed in UI.
+            # Summary lines are grouped by product ID, so create them before the
+            # eLMIS lines and link the records directly. Linking by display name
+            # is ambiguous when separate product records share the same name.
+            batch.elmis_picking_line_ids.unlink()
             batch.write({
                 "patient_picking_line_ids": [(5, 0, 0)] + [
                     (0, 0, values) for values in patient_line_vals
@@ -222,10 +209,49 @@ class CduBatch(models.Model):
                 "picking_line_ids": [(5, 0, 0)] + [
                     (0, 0, values) for values in summary_vals
                 ],
-                "elmis_picking_line_ids": [(5, 0, 0)] + [(0, 0, v) for v in elmis_line_vals]
             })
             batch.flush_recordset(["patient_picking_line_ids", "picking_line_ids"])
-            batch._link_elmis_lines_to_summary_lines()
+
+            elmis_line_vals = []
+
+            for summary_line in batch.picking_line_ids:
+                product = summary_line.product_id
+                template = product.product_tmpl_id if product else self.env["product.template"]
+                mappings = template.cdu_elmis_orderable_catalog_ids.filtered("active")
+                sole_mapping = mappings if len(mappings) == 1 else self.env[
+                    "cdu.elmis.orderable.catalog"
+                ]
+                elmis_line_vals.append({
+                    "batch_id": batch.id,
+                    "summary_line_id": summary_line.id,
+                    "openmrs_drug_name": summary_line.unmapped_drug_name,
+                    "openmrs_drug_uuid": (
+                        template.cdu_openmrs_drug_uuid
+                        if product
+                        else False
+                    ),
+                    "selected_orderable_code": (
+                        sole_mapping.orderable_code
+                        or template.cdu_drug_code
+                        or False
+                    ),
+                    "selected_orderable_id": (
+                        sole_mapping.orderable_id
+                        or template.cdu_elmis_orderable_id
+                        or False
+                    ),
+                    "selected_orderable_name": (
+                        sole_mapping.full_name
+                        or product.with_context(
+                            cdu_generic_catalog_label=True
+                        ).display_name
+                        or False
+                    ),
+                    "quantity_to_pick": summary_line.total_bottles or 0.0,
+                    "prescription_count": summary_line.prescription_count,
+                })
+
+            self.env["cdu.picking.line"].create(elmis_line_vals)
             batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
 
     def _generate_unmapped_elmis_picking_lines(self, mapped_prescription_ids):
@@ -652,15 +678,51 @@ class CduBatch(models.Model):
 
     def _link_elmis_lines_to_summary_lines(self):
         for batch in self:
-            summary_lines_by_name = {
-                (line.unmapped_drug_name or "").strip().lower(): line
-                for line in batch.picking_line_ids
-            }
+            used_summary_lines = batch.elmis_picking_line_ids.mapped("summary_line_id")
             for line in batch.elmis_picking_line_ids:
+                if (
+                    line.summary_line_id
+                    and line.summary_line_id.batch_id == batch
+                ):
+                    continue
                 key = (line.openmrs_drug_name or "").strip().lower()
-                summary_line = summary_lines_by_name.get(key)
-                if summary_line:
-                    line.summary_line_id = summary_line.id
+                candidates = batch.picking_line_ids.filtered(
+                    lambda summary_line: (
+                        (summary_line.unmapped_drug_name or "").strip().lower() == key
+                        and summary_line not in used_summary_lines
+                    )
+                )
+                if not candidates:
+                    continue
+
+                # Stable integration identifiers disambiguate legacy unlinked
+                # rows where possible. The first unused same-name summary is a
+                # safe final fallback because the relationship is one-to-one.
+                matching_candidates = candidates.filtered(
+                    lambda summary_line: (
+                        summary_line.product_id
+                        and (
+                            (
+                                line.openmrs_drug_uuid
+                                and summary_line.product_id.product_tmpl_id.cdu_openmrs_drug_uuid
+                                == line.openmrs_drug_uuid
+                            )
+                            or (
+                                line.selected_orderable_id
+                                and summary_line.product_id.product_tmpl_id.cdu_elmis_orderable_id
+                                == line.selected_orderable_id
+                            )
+                            or (
+                                line.selected_orderable_code
+                                and summary_line.product_id.product_tmpl_id.cdu_drug_code
+                                == line.selected_orderable_code
+                            )
+                        )
+                    )
+                )
+                summary_line = (matching_candidates or candidates).sorted("id")[:1]
+                line.summary_line_id = summary_line.id
+                used_summary_lines |= summary_line
 
     def _build_picking_stock_event_items(self, reason_name):
         self.ensure_one()
@@ -1060,6 +1122,52 @@ class CduBatch(models.Model):
         if option_values:
             self.env["cdu.elmis.stock.option"].create(option_values)
         self._rebuild_elmis_stock_summaries()
+        self._apply_prescription_product_stock_options()
+
+    def _apply_prescription_product_stock_options(self):
+        """Carry verification product choices into picking and select their FEFO lot."""
+        for batch in self:
+            batch.elmis_picking_line_ids._ensure_default_fulfilment_line()
+            for picking_line in batch.elmis_picking_line_ids:
+                product = picking_line.summary_line_id.product_id
+                template = product.product_tmpl_id
+                if not template:
+                    continue
+                mappings = template.cdu_elmis_orderable_catalog_ids.filtered("active")
+                orderable_ids = set(mappings.mapped("orderable_id"))
+                orderable_codes = set(mappings.mapped("orderable_code"))
+                if template.cdu_elmis_orderable_id:
+                    orderable_ids.add(template.cdu_elmis_orderable_id)
+                if template.cdu_drug_code and not mappings:
+                    orderable_codes.add(template.cdu_drug_code)
+                if not orderable_ids and not orderable_codes:
+                    continue
+                fulfilment_line = picking_line.fulfilment_line_ids.filtered(
+                    lambda line: not line.selected_stock_option_id
+                )[:1]
+                if not fulfilment_line:
+                    continue
+                options = batch.elmis_stock_option_ids.filtered(
+                    lambda option: option.stock_on_hand > 0
+                    and (
+                        not option.expiration_date
+                        or option.expiration_date >= fields.Date.context_today(batch)
+                    )
+                    and (
+                        option.orderable_id in orderable_ids
+                        or option.orderable_code in orderable_codes
+                    )
+                )
+                if not options:
+                    continue
+                option = options.sorted(
+                    key=lambda stock: (
+                        stock.expiration_date or fields.Date.to_date("9999-12-31"),
+                        stock.lot or "",
+                        stock.id,
+                    )
+                )[:1]
+                fulfilment_line.selected_stock_option_id = option.id
 
     def _rebuild_elmis_stock_summaries(self):
         Summary = self.env["cdu.elmis.stock.summary"]
@@ -1126,6 +1234,12 @@ class CduBatch(models.Model):
                 stock_on_hand_units = self._coerce_quantity_units(card.get("stockOnHand"))
                 if stock_on_hand_units <= 0:
                     continue
+                expiration_date = fields.Date.to_date(card.get("expirationDate"))
+                if (
+                    expiration_date
+                    and expiration_date < fields.Date.context_today(self)
+                ):
+                    continue
                 card_pack_size = (
                     self._extract_elmis_pack_size(card, orderable_name)
                     or pack_size
@@ -1147,7 +1261,7 @@ class CduBatch(models.Model):
                         "lot": card.get("lot"),
                         "stock_on_hand": stock_on_hand_packs,
                         "stock_on_hand_units": stock_on_hand_units,
-                        "expiration_date": fields.Date.to_date(card.get("expirationDate")),
+                        "expiration_date": expiration_date,
                         "occurred_date": fields.Date.to_date(card.get("occurredDate")),
                     }
                 )
@@ -1165,6 +1279,10 @@ class CduBatch(models.Model):
         for entry in summary.get("canFulfillForMe") or []:
             stock_on_hand_units = self._coerce_quantity_units(entry.get("stockOnHand"))
             if stock_on_hand_units <= 0:
+                continue
+
+            expiration_date = fields.Date.to_date(entry.get("lotExpirationDate"))
+            if expiration_date and expiration_date < fields.Date.context_today(self):
                 continue
 
             orderable = entry.get("orderable") or {}
@@ -1189,9 +1307,7 @@ class CduBatch(models.Model):
                     "lot_id": lot_id,
                     "stock_on_hand": stock_on_hand_packs,
                     "stock_on_hand_units": stock_on_hand_units,
-                    "expiration_date": fields.Date.to_date(
-                        entry.get("lotExpirationDate")
-                    ),
+                    "expiration_date": expiration_date,
                     "occurred_date": fields.Date.to_date(entry.get("occurredDate")),
                 }
             )

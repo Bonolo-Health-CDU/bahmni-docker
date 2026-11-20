@@ -5,6 +5,7 @@ import { browser } from "@web/core/browser/browser";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { TextField } from "@web/views/fields/text/text_field";
+import { createScanDetector } from "./bagging_qa_scan_detector";
 
 const SCAN_DEBOUNCE_MS = 500;
 
@@ -15,6 +16,7 @@ export class BoxBagLabelScanInputField extends TextField {
         this.notification = useService("notification");
         this.orm = useService("orm");
         this._isSubmitting = false;
+        this._scanDetector = createScanDetector();
         this._onScanKeydown = this._onScanKeydown.bind(this);
     }
 
@@ -38,6 +40,7 @@ export class BoxBagLabelScanInputField extends TextField {
         super.onInput(...arguments);
         browser.clearTimeout(this._scanTimer);
         const value = this.textareaRef.el ? this.textareaRef.el.value : "";
+        this._scanDetector.input(Date.now(), value.length);
         if (String(value || "").trim()) {
             this._scanTimer = browser.setTimeout(
                 () => this._submitScan(value),
@@ -50,6 +53,15 @@ export class BoxBagLabelScanInputField extends TextField {
         if (ev.key === "Escape") {
             ev.preventDefault();
             this._clearAndFocus();
+            return;
+        }
+        // The bag label QR's line break may arrive as Ctrl+J (Chrome's
+        // downloads) or as an Enter in the middle of the scan; neither ends it.
+        if (ev.ctrlKey && (ev.key === "j" || ev.key === "J")) {
+            ev.preventDefault();
+            return;
+        }
+        if (ev.key === "Enter" && this._scanDetector.inBurst(Date.now())) {
             return;
         }
         if (ev.key === "Enter" && String(ev.currentTarget.value || "").trim()) {
@@ -75,6 +87,7 @@ export class BoxBagLabelScanInputField extends TextField {
         if (this.textareaRef.el) {
             this.textareaRef.el.value = "";
         }
+        this._scanDetector.reset();
         await this.props.update(false);
         this._focusScanInput();
     }

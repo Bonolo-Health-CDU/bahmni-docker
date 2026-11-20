@@ -17,7 +17,7 @@
                         type="object"
                         class="btn-secondary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                        attrs="{'invisible': [('state', 'not in', ('awaiting_bagging_qa', 'awaiting_boxing', 'awaiting_dispatch', 'dispatched'))]}"/>
+                        attrs="{'invisible': [('state', 'not in', ('awaiting_bagging_qa', 'awaiting_boxing', 'awaiting_dispatch', 'dispatched', 'collected', 'returned_uncollected'))]}"/>
             </xpath>
         </field>
     </record>
@@ -28,7 +28,8 @@
         <field name="arch" type="xml">
             <tree class="o_cdu_production_list"
                   default_order="next_drug_pickup_date asc, patient_name asc"
-                  decoration-success="state == 'confirmed'">
+                  decoration-success="state == 'confirmed'"
+                  decoration-muted="state == 'cancelled'">
                 <field name="name"/>
                 <field name="patient_name"/>
                 <field name="patient_identifier"/>
@@ -39,7 +40,8 @@
                 <field name="state"
                        widget="badge"
                        decoration-info="state == 'draft'"
-                       decoration-success="state == 'confirmed'"/>
+                       decoration-success="state == 'confirmed'"
+                       decoration-muted="state == 'cancelled'"/>
             </tree>
         </field>
     </record>
@@ -55,7 +57,7 @@
                             type="object"
                             class="btn-primary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
-                            confirm="Confirm dispensing for this prescription?&#10;&#10;Before continuing, make sure the eLMIS product, batch number, dispensed packs, and dosing instructions are correct.&#10;&#10;This moves the prescription to Awaiting Bagging / QA and generates the dispensing slip, medicine label, and bag label. eLMIS stock is not consumed at this step; consumption happens when the box is confirmed."
+                            confirm="Confirm dispensing for this prescription?&#10;&#10;Before continuing, make sure the eLMIS product, batch number, dispensed packs, and dosing instructions are correct.&#10;&#10;This moves the prescription to Awaiting Bagging / QA and queues the dispensing slip, medicine label, and bag label for the Print Agent. eLMIS stock is not consumed at this step; consumption happens when the box is confirmed."
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_reject_to_call_center"
                             string="Reject to Call Center"
@@ -69,6 +71,13 @@
                             class="btn-danger"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_cancel_dispensing"
+                            string="Cancel Dispensing"
+                            type="object"
+                            class="btn-secondary o_cdu_cancel_dispensing_button"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            confirm="Cancel this dispensing job?&#10;&#10;The prescription will stay in the dispensing work queue and can be started again."
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
                     <button name="action_print_labels"
                             string="Reprint Labels"
                             type="object"
@@ -81,7 +90,7 @@
                             class="btn-secondary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': ['|', ('state', '!=', 'confirmed'), ('labels_printed', '=', True)]}"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,cancelled"/>
                 </header>
                 <sheet>
                     <div class="oe_title o_cdu_workspace_hero">
@@ -124,6 +133,10 @@
                                 <field name="production_stock_refreshed_at" nolabel="1" readonly="1"/>
                                 <label for="dispensing_ready"/>
                                 <field name="dispensing_ready" nolabel="1" readonly="1"/>
+                                <label for="cancelled_at" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
+                                <field name="cancelled_at" nolabel="1" readonly="1" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
+                                <label for="cancelled_by" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
+                                <field name="cancelled_by" nolabel="1" readonly="1" attrs="{'invisible': [('state', '!=', 'cancelled')]}"/>
                             </div>
                         </div>
                         <div class="o_cdu_batch_card">
@@ -144,20 +157,35 @@
                     </div>
 
                     <notebook class="o_cdu_workspace_notebook">
-                        <page string="Dispense Selections">
+                        <page string="Regimen">
                             <div class="alert alert-info o_cdu_elmis_fulfilment_hint" role="alert">
-                                Selections are prefilled from the batch picking lines. Production Floor stock refreshes automatically when dispensing starts and when this page is loaded. Confirm or adjust the exact product, batch, quantity, and dosing instructions.
+                                Products are prefilled from the patient prescription and batch picking lines. Add or remove products as needed, then confirm the exact product, batch, quantity, and dosing instructions.
                             </div>
-                            <field name="stock_selection_ids">
-                                <tree editable="bottom" default_order="openmrs_drug_name asc, selected_orderable_name asc, selected_lot asc">
+                            <div class="o_cdu_elmis_section_title">Regimen Products</div>
+                            <field name="stock_selection_ids"
+                                   string="Regimen Products"
+                                   class="o_cdu_regimen_product_list"
+                                   attrs="{'readonly': [('state', '!=', 'draft')]}">
+                                <tree editable="bottom">
+                                    <control>
+                                        <create string="Add Product"/>
+                                    </control>
                                     <field name="dispense_id" invisible="1"/>
-                                    <field name="openmrs_drug_name"/>
-                                    <field name="stock_option_id" string="Dispense From" options="{'no_create': True, 'no_open': True}"/>
-                                    <field name="selected_orderable_name" readonly="1"/>
-                                    <field name="selected_pack_size" string="Pack Size" readonly="1"/>
-                                    <field name="selected_lot" readonly="1"/>
-                                    <field name="selected_lot_expiry" readonly="1"/>
-                                    <field name="selected_stock_on_hand" string="Available Packs" readonly="1"/>
+                                    <field name="stock_option_id"
+                                           string="Product"
+                                           class="o_cdu_regimen_product_column"
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                    <field name="dosage_instructions"
+                                           string="Dosage / Instructions"
+                                           class="o_cdu_regimen_dosage_column"/>
+                                    <field name="openmrs_drug_name"
+                                           string="Prescribed Product / Regimen"
+                                           optional="hide"/>
+                                    <field name="selected_orderable_name" readonly="1" optional="hide"/>
+                                    <field name="selected_pack_size" string="Pack Size" readonly="1" optional="hide"/>
+                                    <field name="selected_lot" readonly="1" optional="hide"/>
+                                    <field name="selected_lot_expiry" readonly="1" optional="hide"/>
+                                    <field name="selected_stock_on_hand" string="Available Packs" readonly="1" optional="hide"/>
                                     <field name="quantity_dispensed"
                                            string="Dispensed Packs"
                                            widget="cdu_no_trailing_zeros_float"
@@ -166,13 +194,18 @@
                                            string="Dispensed Units"
                                            widget="cdu_no_trailing_zeros_float"
                                            readonly="1"/>
-                                    <field name="dosage_instructions"/>
                                     <field name="selected_orderable_code" optional="hide"/>
                                     <field name="selected_orderable_id" optional="hide"/>
                                     <field name="selected_lot_id" optional="hide"/>
                                     <field name="picking_fulfilment_line_id" optional="hide"/>
                                 </tree>
                             </field>
+                            <group class="o_cdu_regimen_schedule">
+                                <field name="duration_days" readonly="1"/>
+                                <field name="next_drug_pickup_date"
+                                       string="Next Refill Date"
+                                       readonly="1"/>
+                            </group>
                         </page>
                         <page string="Available CDU Production Floor Stock">
                             <div class="alert alert-info o_cdu_elmis_empty_stock_hint"
@@ -272,6 +305,26 @@
                                 </tree>
                             </field>
                         </page>
+                        <page string="Print Jobs">
+                            <field name="print_job_ids" readonly="1">
+                                <tree decoration-info="state == 'pending'"
+                                      decoration-success="state == 'done'"
+                                      decoration-danger="state == 'failed'">
+                                    <field name="create_date"/>
+                                    <field name="name"/>
+                                    <field name="label_type"/>
+                                    <field name="printer_key"/>
+                                    <field name="command_language"/>
+                                    <field name="state"
+                                           widget="badge"
+                                           decoration-info="state == 'pending'"
+                                           decoration-success="state == 'done'"
+                                           decoration-danger="state == 'failed'"/>
+                                    <field name="agent_name"/>
+                                    <field name="error_message"/>
+                                </tree>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
                 <div class="oe_chatter">
@@ -302,6 +355,7 @@
                 <separator/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <filter string="Cancelled" name="cancelled" domain="[('state', '=', 'cancelled')]"/>
                 <group expand="0" string="Group By">
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                     <filter string="Batch" name="group_batch" context="{'group_by': 'batch_id'}"/>

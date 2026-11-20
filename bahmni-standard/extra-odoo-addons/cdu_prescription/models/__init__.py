@@ -9,6 +9,7 @@ from . import cdu_facility
 from . import cdu_onedrive
 from . import cdu_batch
 from . import cdu_prescription
+from . import cdu_prescription_product_line
 from . import cdu_report_import
 from . import cdu_product_template
 from . import cdu_regimen

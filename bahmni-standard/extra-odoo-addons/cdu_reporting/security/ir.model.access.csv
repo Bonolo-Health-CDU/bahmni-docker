@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cdu_report_enrolment_user,cdu.report.enrolment reporting user,model_cdu_report_enrolment,cdu_reporting.group_cdu_reporting_user,1,0,0,0
+access_cdu_report_verification_user,cdu.report.verification reporting user,model_cdu_report_verification,cdu_reporting.group_cdu_reporting_user,1,0,0,0
+access_cdu_report_validation_user,cdu.report.validation reporting user,model_cdu_report_validation,cdu_reporting.group_cdu_reporting_user,1,0,0,0
+access_cdu_report_dispensing_user,cdu.report.dispensing reporting user,model_cdu_report_dispensing,cdu_reporting.group_cdu_reporting_user,1,0,0,0
+access_cdu_report_parcel_production_user,cdu.report.parcel.production reporting user,model_cdu_report_parcel_production,cdu_reporting.group_cdu_reporting_user,1,0,0,0
+access_cdu_report_parcel_forecast_user,cdu.report.parcel.forecast reporting user,model_cdu_report_parcel_forecast,cdu_reporting.group_cdu_reporting_user,1,0,0,0
+access_cdu_status_history_user,cdu.prescription.status.history reporting user,model_cdu_prescription_status_history,cdu_reporting.group_cdu_reporting_user,1,0,0,0
+access_cdu_report_wizard_user,cdu.report.wizard reporting user,model_cdu_report_wizard,cdu_reporting.group_cdu_reporting_user,1,1,1,1
+

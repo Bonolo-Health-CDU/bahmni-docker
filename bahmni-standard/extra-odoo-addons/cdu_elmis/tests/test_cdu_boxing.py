@@ -1,9 +1,15 @@
+import base64
+import re
 from datetime import timedelta
+from io import BytesIO
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
-from lxml import etree
+from lxml import etree, html as lxml_html
+from PyPDF2 import PdfFileReader
 
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -68,6 +74,49 @@ class TestCduBoxingWorkflow(TransactionCase):
             }
         )
 
+    def _create_confirmed_parcel(self, suffix):
+        today = fields.Date.today()
+        patient = self.env["res.partner"].create(
+            {
+                "name": "Boxing Test Patient %s" % suffix,
+                "customer_rank": 1,
+                "cdu_eregister_id": "TEST-BOXING-EREGISTER-%s" % suffix,
+            }
+        )
+        prescription = self.env["cdu.prescription"].create(
+            {
+                "facility_id": self.facility.id,
+                "facility_name": self.facility.name,
+                "facility_code": self.facility.code,
+                "prescription_date": today,
+                "patient_id": patient.id,
+                "patient_identifier": patient.cdu_eregister_id,
+                "patient_first_name": patient.name,
+                "regimen_prescribed_raw": "TEST-BOXING-REGIMEN",
+                "dosage_instructions": "Take one tablet daily.",
+                "drug_pickup_point_raw": self.collection_point.name,
+                "collection_point_id": self.collection_point.id,
+                "next_drug_pickup_date": today + timedelta(days=30),
+                "state": "awaiting_boxing",
+            }
+        )
+        dispense = self.env["cdu.dispense"].with_context(
+            cdu_skip_auto_refresh_production_stock=True
+        ).create(
+            {
+                "prescription_id": prescription.id,
+                "state": "confirmed",
+            }
+        )
+        return self.env["cdu.bagging.qa"].create(
+            {
+                "prescription_id": prescription.id,
+                "dispense_id": dispense.id,
+                "state": "confirmed",
+                "parcel_reference": "TEST-PARCEL-%s" % suffix,
+            }
+        )
+
     def test_barcode_scan_adds_one_parcel_and_reports_capacity(self):
         box = self.env["cdu.box"].with_user(self.admin).create(
             {"max_parcels": 20}
@@ -85,6 +134,20 @@ class TestCduBoxingWorkflow(TransactionCase):
         )
         self.assertIn("1 of 20", result["params"]["message"])
 
+    def test_bag_label_qr_adds_the_parcel_whatever_the_scanner_does_with_the_line_break(self):
+        patient, number = self.prescription.patient_first_name, self.prescription.name
+        for scanned in ("%s\n%s" % (patient, number), patient + number, "%s %s" % (patient, number)):
+            with self.subTest(scanned=scanned):
+                box = self.env["cdu.box"].with_user(self.admin).create({})
+                box.action_scan_bag_label(scanned)
+                self.assertEqual(box.line_ids.bagging_qa_id, self.parcel)
+                box.line_ids.unlink()
+
+        with self.assertRaisesRegex(UserError, "does not match an eligible parcel"):
+            self.env["cdu.box"].with_user(self.admin).create({}).action_scan_bag_label(
+                "Somebody Else" + number
+            )
+
     def test_duplicate_barcode_scan_is_blocked(self):
         box = self.env["cdu.box"].with_user(self.admin).create({})
         box.action_scan_bag_label(self.prescription.name)
@@ -92,11 +155,165 @@ class TestCduBoxingWorkflow(TransactionCase):
         with self.assertRaises(UserError):
             box.action_scan_bag_label(self.prescription.name)
 
+    def test_boxing_accepts_the_slash_free_bag_barcode(self):
+        self.parcel.parcel_reference = "CDU/PARCEL/2026/000123"
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+
+        box.action_scan_bag_label("CDUPARCEL2026000123")
+
+        self.assertEqual(box.line_ids.bagging_qa_id, self.parcel)
+        self.assertEqual(box.parcel_count, 1)
+        with self.assertRaises(UserError):
+            box.action_scan_bag_label("CDUPARCEL2026000123")
+
+    def test_added_parcels_are_removed_from_manual_selection_domain(self):
+        second_parcel = self._create_confirmed_parcel("AVAILABLE")
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        box.action_scan_bag_label(self.prescription.name)
+        box.invalidate_recordset()
+
+        self.assertNotIn(self.parcel, box.available_bagging_qa_ids)
+        self.assertIn(second_parcel, box.available_bagging_qa_ids)
+
+        view = self.env.ref("cdu_elmis.view_cdu_box_form")
+        arch = etree.fromstring(view.arch_db.encode())
+        parcel_field = arch.xpath(
+            ".//field[@name='line_ids']/tree/field[@name='bagging_qa_id']"
+        )
+        self.assertIn("available_bagging_qa_ids", parcel_field[0].get("domain"))
+
+    def test_manual_box_line_rejects_parcel_already_in_any_box(self):
+        first_box = self.env["cdu.box"].with_user(self.admin).create({})
+        first_box.action_scan_bag_label(self.prescription.name)
+        second_box = self.env["cdu.box"].with_user(self.admin).create({})
+
+        with self.assertRaisesRegex(ValidationError, "already been added to box"):
+            self.env["cdu.box.line"].with_user(self.admin).create(
+                {
+                    "box_id": second_box.id,
+                    "bagging_qa_id": self.parcel.id,
+                }
+            )
+
     def test_unknown_barcode_is_rejected(self):
         box = self.env["cdu.box"].with_user(self.admin).create({})
 
         with self.assertRaises(UserError):
             box.action_scan_bag_label("NOT-A-CDU-BAG-LABEL")
+
+    def test_box_documents_are_produced_by_bonolo_health(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        box.action_scan_bag_label(self.prescription.name)
+
+        report_html, _report_type = self.env["ir.actions.report"]._render_qweb_html(
+            "cdu_elmis.report_cdu_box_label",
+            box.ids,
+        )
+        document = lxml_html.fromstring(report_html)
+        produced_by_heading = document.xpath(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), "
+            "' cdu-box-label-heading ')][normalize-space(.) = 'Produced By:']"
+        )
+        produced_by_value = produced_by_heading[0].getnext()
+
+        self.assertEqual(
+            " ".join(produced_by_value.text_content().split()),
+            "Bonolo Health",
+        )
+        barcode_src = document.xpath("//img[@class='cdu-box-label-barcode']/@src")[0]
+        self.assertEqual(parse_qs(urlparse(barcode_src).query)["value"], [box.barcode_reference])
+        self.assertNotIn("/", box.barcode_reference)
+
+        manifest_html, _report_type = self.env[
+            "ir.actions.report"
+        ]._render_qweb_html(
+            "cdu_elmis.report_cdu_box_manifest",
+            box.ids,
+        )
+        manifest_document = lxml_html.fromstring(manifest_html)
+        manifest_produced_by = manifest_document.xpath(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), "
+            "' cdu-box-manifest-field ')][strong[normalize-space(.) = "
+            "'Produced By:']]"
+        )
+        self.assertEqual(
+            " ".join(manifest_produced_by[0].text_content().split()),
+            "Produced By: Bonolo Health",
+        )
+        barcode_src = manifest_document.xpath("//img[@class='cdu-box-manifest-barcode']/@src")[0]
+        self.assertEqual(parse_qs(urlparse(barcode_src).query)["value"], [box.barcode_reference])
+
+    def test_box_document_printing_queues_label_and_manifest_jobs(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        box.action_scan_bag_label(self.prescription.name)
+        box.write(
+            {
+                "state": "confirmed",
+                "confirmed_by": self.admin.id,
+                "confirmed_at": fields.Datetime.now(),
+            }
+        )
+
+        result = box.with_user(self.admin).action_print_box_documents()
+
+        self.assertEqual(result["tag"], "display_notification")
+        print_jobs = self.env["bahmni.print.job"].search(
+            [
+                ("res_model", "=", "cdu.box"),
+                ("res_id", "=", box.id),
+            ],
+            order="label_type",
+        )
+        self.assertEqual(sorted(print_jobs.mapped("label_type")), ["box_label", "box_manifest"])
+        self.assertEqual(set(print_jobs.mapped("state")), {"pending"})
+        box_label = print_jobs.filtered(lambda job: job.label_type == "box_label")
+        manifest = print_jobs.filtered(lambda job: job.label_type == "box_manifest")
+        self.assertEqual(box_label.printer_key, "box_label_printer")
+        self.assertEqual(manifest.printer_key, "document_printer")
+        self.assertEqual(box_label.command_language, "zpl")
+        self.assertEqual(box_label.payload_encoding, "text")
+        self.assertTrue(box_label.payload.startswith("^XA"))
+        self.assertIn(box.name, box_label.payload)
+        barcode = re.search(r"\^BCN,120,Y,N,N\s*\^FD([^\^]+)\^FS", box_label.payload)
+        self.assertIsNotNone(barcode)
+        self.assertEqual(barcode.group(1), box.barcode_reference)
+        self.assertNotIn("/", barcode.group(1))
+        self.assertEqual(manifest.command_language, "pdf")
+        self.assertEqual(manifest.payload_encoding, "base64")
+        pdf_content = base64.b64decode(manifest.payload)
+        self.assertTrue(pdf_content.startswith(b"%PDF-"))
+        report = self.env.ref("cdu_elmis.action_report_cdu_box_manifest")
+        self.assertEqual(report.paperformat_id.format, "A4")
+        page = PdfFileReader(BytesIO(pdf_content)).getPage(0)
+        self.assertAlmostEqual(float(page.mediaBox.getWidth()), 595, delta=2)
+        self.assertAlmostEqual(float(page.mediaBox.getHeight()), 842, delta=2)
+
+    def test_manifest_rejects_label_template_or_wrong_printer(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        template = self.env.ref("cdu_elmis.template_box_manifest_pdf")
+        for language, printer_key in (
+            ("zpl", "document_printer"),
+            ("pdf", "box_label_printer"),
+        ):
+            with self.subTest(language=language, printer_key=printer_key):
+                template.write({
+                    "command_language": language,
+                    "printer_key": printer_key,
+                    "template_body": "^XA\n^FO40,30^FDBox: {box_reference}^FS\n^XZ",
+                })
+                with self.assertRaisesRegex(UserError, "manifest print template must use PDF"):
+                    box._enqueue_box_print_job("box_manifest")
+
+    def test_manifest_rejects_non_pdf_report_content(self):
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+        template = self.env.ref("cdu_elmis.template_box_manifest_pdf")
+        with patch.object(
+            type(self.env["ir.actions.report"]),
+            "_render_qweb_pdf",
+            return_value=(b'<div class="footer">Generated by Collect-N-Go</div>^XA', "pdf"),
+        ):
+            with self.assertRaisesRegex(UserError, "did not render a PDF payload"):
+                box._render_box_pdf_print_payload(template)
 
     def test_boxing_filters_are_registered(self):
         for view_xmlid in (
@@ -113,7 +330,9 @@ class TestCduBoxingWorkflow(TransactionCase):
                 self.assertIn('name="%s"' % filter_name, search_view.arch_db)
 
     def test_dispensed_units_are_computed_and_packs_are_hidden_by_default(self):
-        selection = self.env["cdu.dispense.stock.selection"].create(
+        selection = self.env["cdu.dispense.stock.selection"].with_context(
+            cdu_allow_dispense_line_sync=True
+        ).create(
             {
                 "dispense_id": self.dispense.id,
                 "openmrs_drug_name": "TEST-BOXING-REGIMEN",
