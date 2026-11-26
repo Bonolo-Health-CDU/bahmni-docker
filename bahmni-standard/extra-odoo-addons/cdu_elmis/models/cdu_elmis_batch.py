@@ -672,8 +672,12 @@ class CduBatch(models.Model):
                     continue
                 served_days = min(lines.mapped("actual_supplied_days") or [0])
                 if prescription.next_drug_pickup_date:
-                    prescription.next_drug_pickup_date = (
-                        prescription.next_drug_pickup_date + timedelta(days=int(served_days))
+                    pickup_date = prescription.next_drug_pickup_date
+                    prescription.write(
+                        {
+                            "pickup_date_at_picking": pickup_date,
+                            "next_drug_pickup_date": pickup_date + timedelta(days=int(served_days)),
+                        }
                     )
 
     def _link_elmis_lines_to_summary_lines(self):

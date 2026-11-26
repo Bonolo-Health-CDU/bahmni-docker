@@ -8,6 +8,7 @@ from .collect_go_status import COLLECTED, NEEDS_ATTENTION, RETURNED_TO_CDU
 class CduPrescription(models.Model):
     _inherit = "cdu.prescription"
 
+    pickup_date_at_picking = fields.Date(readonly=True, copy=False)
     dispense_ids = fields.One2many(
         "cdu.dispense",
         "prescription_id",
@@ -219,6 +220,31 @@ class CduPrescription(models.Model):
         return values
 
     def _get_dispensing_back_order_lines(self, dispense):
+        back_order_lines = []
+        for group in self._get_dispensing_groups(dispense).values():
+            back_order = self._get_group_back_order_values(group)
+            if not (
+                self._is_dispensing_positive(back_order["packs"])
+                or self._is_dispensing_positive(back_order["units"])
+                or self._is_dispensing_positive(back_order["days"])
+            ):
+                continue
+            back_order_lines.append(
+                {
+                    "packs": back_order["packs"],
+                    "units": back_order["units"],
+                    "days": back_order["days"],
+                    "summary": self._format_dispensing_back_order_line(
+                        group["medicine"],
+                        back_order["packs"],
+                        back_order["units"],
+                        back_order["days"],
+                    ),
+                }
+            )
+        return back_order_lines
+
+    def _get_dispensing_groups(self, dispense):
         self.ensure_one()
         patient_lines = self.batch_id.patient_picking_line_ids.filtered(
             lambda line: line.prescription_id == self
@@ -262,29 +288,7 @@ class CduPrescription(models.Model):
             group["dispensed_packs"] += dispensed_packs
             group["dispensed_units"] += dispensed_packs * (pack_size or 0.0)
 
-        back_order_lines = []
-        for group in groups.values():
-            back_order = self._get_group_back_order_values(group)
-            if not (
-                self._is_dispensing_positive(back_order["packs"])
-                or self._is_dispensing_positive(back_order["units"])
-                or self._is_dispensing_positive(back_order["days"])
-            ):
-                continue
-            back_order_lines.append(
-                {
-                    "packs": back_order["packs"],
-                    "units": back_order["units"],
-                    "days": back_order["days"],
-                    "summary": self._format_dispensing_back_order_line(
-                        group["medicine"],
-                        back_order["packs"],
-                        back_order["units"],
-                        back_order["days"],
-                    ),
-                }
-            )
-        return back_order_lines
+        return groups
 
     def _new_patient_dispense_group(self, patient_line):
         pack_size = patient_line.pack_size or 0.0
@@ -549,6 +553,12 @@ class CduPrescription(models.Model):
         return qa._action_open()
 
     def action_reprint_dispensing_labels(self):
+        return self._get_confirmed_dispense_for_labels().action_print_labels()
+
+    def action_view_bag_label_pdf(self):
+        return self._get_confirmed_dispense_for_labels().action_view_bag_label_pdf()
+
+    def _get_confirmed_dispense_for_labels(self):
         self.ensure_one()
         self._ensure_cdu_groups(
             "cdu_prescription.group_cdu_dispensing_officer",
@@ -556,7 +566,7 @@ class CduPrescription(models.Model):
         )
         if self.state not in self._POST_DISPENSING_STATES:
             raise UserError(
-                _("Labels can only be reprinted after dispensing has been confirmed.")
+                _("Labels are available after dispensing has been confirmed.")
             )
         dispense = self.env["cdu.dispense"].search(
             [("prescription_id", "=", self.id)],
@@ -564,4 +574,4 @@ class CduPrescription(models.Model):
         )
         if not dispense or dispense.state != "confirmed":
             raise UserError(_("This prescription has no confirmed dispensing record."))
-        return dispense.action_print_labels()
+        return dispense

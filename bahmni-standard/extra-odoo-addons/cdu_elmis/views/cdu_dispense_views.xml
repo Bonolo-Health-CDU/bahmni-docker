@@ -18,6 +18,12 @@
                         class="btn-secondary"
                         groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                         attrs="{'invisible': [('state', 'not in', ('awaiting_bagging_qa', 'awaiting_boxing', 'awaiting_dispatch', 'dispatched', 'collected', 'returned_uncollected'))]}"/>
+                <button name="action_view_bag_label_pdf"
+                        string="View Bag Label PDF"
+                        type="object"
+                        class="btn-secondary"
+                        groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                        attrs="{'invisible': [('state', 'not in', ('awaiting_bagging_qa', 'awaiting_boxing', 'awaiting_dispatch', 'dispatched', 'collected', 'returned_uncollected'))]}"/>
             </xpath>
         </field>
     </record>
@@ -82,6 +88,12 @@
                             string="Reprint Labels"
                             type="object"
                             class="btn-primary"
+                            groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
+                            attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
+                    <button name="action_view_bag_label_pdf"
+                            string="View Bag Label PDF"
+                            type="object"
+                            class="btn-secondary"
                             groups="cdu_prescription.group_cdu_dispensing_officer,cdu_prescription.group_cdu_admin"
                             attrs="{'invisible': [('state', '!=', 'confirmed')]}"/>
                     <button name="action_mark_labels_printed"

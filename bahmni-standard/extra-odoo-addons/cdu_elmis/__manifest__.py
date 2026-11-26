@@ -1,7 +1,7 @@
 {
     "name": "CDU eLMIS Integration",
     "summary": "OpenLMIS stock management foundation for the CDU workflow",
-    "version": "16.0.1.1.3",
+    "version": "16.0.1.1.5",
     "category": "Healthcare",
     "author": "Ministry of Health",
     "license": "LGPL-3",

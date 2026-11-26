@@ -1,4 +1,6 @@
 import base64
+import json
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -58,6 +60,7 @@ class CduDispense(models.Model):
         store=True,
         readonly=True,
     )
+    current_pickup_date = fields.Date(compute="_compute_current_pickup_date")
     duration_days = fields.Integer(
         string="Duration Days",
         related="prescription_id.cdu_days_supply",
@@ -153,6 +156,50 @@ class CduDispense(models.Model):
     def _compute_labels_printed(self):
         for dispense in self:
             dispense.labels_printed = bool(dispense.labels_printed_at)
+
+    @api.depends(
+        "prescription_id",
+        "prescription_id.pickup_date_at_picking",
+        "prescription_id.prescription_date",
+        "prescription_id.next_clinical_visit_date",
+        "next_drug_pickup_date",
+        "batch_id.picking_confirmed_at",
+        "batch_id.patient_picking_line_ids.prescription_id",
+        "batch_id.patient_picking_line_ids.facility_days_supply",
+        "batch_id.patient_picking_line_ids.cdu_days",
+    )
+    def _compute_current_pickup_date(self):
+        for dispense in self:
+            pickup_date = dispense.prescription_id.pickup_date_at_picking
+            if not pickup_date:
+                pickup_date = (
+                    dispense._get_legacy_current_pickup_date()
+                    if dispense.batch_id.picking_confirmed_at
+                    else dispense.next_drug_pickup_date
+                )
+            dispense.current_pickup_date = pickup_date
+
+    def _get_legacy_current_pickup_date(self):
+        prescription = self.prescription_id
+        patient_lines = self.batch_id.patient_picking_line_ids.filtered(
+            lambda line: line.prescription_id == prescription
+        )
+        pickup_dates = set()
+        for line in patient_lines:
+            # Picking lines retain the intervals on both sides of the original pickup.
+            if prescription.prescription_date and line.facility_days_supply > 0:
+                pickup_dates.add(
+                    prescription.prescription_date + timedelta(days=line.facility_days_supply)
+                )
+            if prescription.next_clinical_visit_date and line.cdu_days > 0:
+                pickup_dates.add(
+                    prescription.next_clinical_visit_date - timedelta(days=line.cdu_days)
+                )
+        if len(pickup_dates) == 1:
+            pickup_date = pickup_dates.pop()
+            if not self.next_drug_pickup_date or pickup_date <= self.next_drug_pickup_date:
+                return pickup_date
+        return False
 
     def _ensure_dispensing_access(self):
         if not (
@@ -594,6 +641,20 @@ class CduDispense(models.Model):
             },
         }
 
+    def action_view_bag_label_pdf(self):
+        self.ensure_one()
+        self._ensure_dispensing_access()
+        if self.state != "confirmed":
+            raise UserError(_("Confirm dispensing before viewing the bag label."))
+
+        report = self.env.ref("cdu_elmis.action_report_cdu_dispense_labels")
+        query = urls.url_encode({"context": json.dumps({"cdu_label_layout": "bag"})})
+        return {
+            "type": "ir.actions.act_url",
+            "target": "new",
+            "url": f"/report/pdf/{report.report_name}/{self.id}?{query}",
+        }
+
     def _enqueue_dispensing_print_jobs(self, label_layout="all"):
         label_types = self._get_label_types_for_layout(label_layout)
         print_jobs = self.env["bahmni.print.job"]
@@ -712,7 +773,7 @@ class CduDispense(models.Model):
         if line:
             medicine_name = line.selected_orderable_name or line.openmrs_drug_name or ""
             dosage_instructions = line.dosage_instructions or ""
-        return {
+        values = {
             "facility_name": prescription.facility_name or self.env.company.name,
             "facility_code": prescription.facility_code or "",
             "patient_name": self.patient_name or "",
@@ -736,6 +797,46 @@ class CduDispense(models.Model):
             "printed_at": self._format_print_datetime(printed_at),
             "qr_value": self.get_label_qr_value(),
         }
+        if not line:
+            appointment_label, appointment_date = self.get_bag_label_next_appointment()
+            values.update(
+                current_pickup_date=self._format_print_date(self.current_pickup_date),
+                next_appointment_label=appointment_label,
+                next_appointment_date=self._format_print_date(appointment_date),
+            )
+        return values
+
+    def get_bag_label_next_appointment(self):
+        self.ensure_one()
+        current_pickup = self.current_pickup_date
+        collection_label = _("Next Collection Date")
+        next_pickup = self.next_drug_pickup_date
+        if current_pickup and next_pickup and next_pickup <= current_pickup:
+            next_pickup = False
+        if not current_pickup or self.state != "confirmed":
+            return collection_label, next_pickup
+
+        prescription = self.prescription_id
+        medicine_groups = [
+            group
+            for (source, _line_id), group in prescription._get_dispensing_groups(self).items()
+            if source == "patient"
+        ]
+        if not medicine_groups or any(group["daily_dose"] <= 0 for group in medicine_groups):
+            return collection_label, next_pickup
+
+        supplied_days = min(
+            group["dispensed_units"] / group["daily_dose"] for group in medicine_groups
+        )
+        visit = prescription.next_clinical_visit_date
+        if visit and visit > current_pickup:
+            days_to_visit = (visit - current_pickup).days
+            if not prescription._is_dispensing_positive(days_to_visit - supplied_days):
+                return _("Next Clinical Visit"), visit
+
+        # The medicine with the shortest supply determines the next collection.
+        days = int(supplied_days)
+        return collection_label, current_pickup + timedelta(days=days) if days else False
 
     def _format_print_date(self, value):
         return fields.Date.to_string(value) if value else ""

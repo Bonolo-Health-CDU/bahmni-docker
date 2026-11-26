@@ -364,12 +364,13 @@
                                 </div>
                                 <div class="cdu-bag-dates">
                                     <div>
-                                        Next Collection:<br/>
-                                        <span t-field="dispense.next_drug_pickup_date"/>
+                                        Current Pickup Date:<br/>
+                                        <span t-field="dispense.current_pickup_date"/>
                                     </div>
                                     <div style="margin-top: 6mm;">
-                                        Collection Date:<br/>
-                                        <span t-field="prescription.prescription_date"/>
+                                        <t t-set="next_appointment" t-value="dispense.get_bag_label_next_appointment()"/>
+                                        <span t-out="next_appointment[0]"/>:<br/>
+                                        <span t-if="next_appointment[1]" t-out="next_appointment[1]" t-options="{'widget': 'date'}"/>
                                     </div>
                                 </div>
                             </div>

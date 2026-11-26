@@ -300,21 +300,22 @@ class CduPrescription(models.Model):
                         }
                     )
             elif prescription.regimen_prescribed_raw or prescription.dosage_instructions:
-                raw_product = (prescription.regimen_prescribed_raw or "").split(
-                    "=", 1
-                )[-1].strip()
                 values.append(
                     {
                         "prescription_id": prescription.id,
                         "sequence": 10,
-                        "imported_product_name": raw_product or False,
+                        "imported_product_name": prescription._get_imported_regimen_name(),
                         "dosage_instructions": prescription.dosage_instructions,
                         "source": "legacy",
                     }
                 )
             if values:
                 ProductLine.with_context(cdu_allow_product_line_sync=True).create(values)
-    
+
+    def _get_imported_regimen_name(self):
+        self.ensure_one()
+        return (self.regimen_prescribed_raw or "").split("=", 1)[-1].strip() or False
+
     def _check_required_next_drug_pickup_date(self):
         for prescription in self:
             if not prescription.next_drug_pickup_date:

@@ -24,6 +24,8 @@ class CduBox(models.Model):
         tracking=True,
     )
     next_drug_pickup_date = fields.Date(string="Next Drug Pickup Date", tracking=True)
+    current_pickup_date_from = fields.Date(compute="_compute_current_pickup_date_range")
+    current_pickup_date_to = fields.Date(compute="_compute_current_pickup_date_range")
     max_parcels = fields.Integer(default=20, required=True, tracking=True)
     line_ids = fields.One2many("cdu.box.line", "box_id", string="Parcels")
     available_bagging_qa_ids = fields.Many2many(
@@ -151,6 +153,14 @@ class CduBox(models.Model):
     def _compute_parcel_count(self):
         for box in self:
             box.parcel_count = len(box.line_ids)
+
+    @api.depends("line_ids.current_pickup_date")
+    def _compute_current_pickup_date_range(self):
+        for box in self:
+            dates = box.line_ids.mapped("current_pickup_date")
+            complete = dates and all(dates)
+            box.current_pickup_date_from = min(dates) if complete else False
+            box.current_pickup_date_to = max(dates) if complete else False
 
     @api.depends("line_ids.bagging_qa_id")
     def _compute_available_bagging_qa_ids(self):
@@ -668,6 +678,12 @@ class CduBox(models.Model):
             if self.next_drug_pickup_date
             else ""
         )
+        collection_date_range = fields.Date.to_string(self.current_pickup_date_from)
+        if self.current_pickup_date_to != self.current_pickup_date_from:
+            collection_date_range = _("%(start)s to %(end)s") % {
+                "start": collection_date_range,
+                "end": fields.Date.to_string(self.current_pickup_date_to),
+            }
         return {
             "box_reference": self.name or "",
             "box_barcode": self.barcode_reference,
@@ -675,6 +691,7 @@ class CduBox(models.Model):
             "route_label": self.get_route_label(),
             "collection_point": self.collection_point_id.display_name or "",
             "collection_date": collection_date,
+            "collection_date_range": collection_date_range,
             "production_date": production_date,
             "parcel_count": self.parcel_count,
             "produced_by": "Bonolo Health",
@@ -997,6 +1014,7 @@ class CduBoxLine(models.Model):
         store=True,
         readonly=True,
     )
+    current_pickup_date = fields.Date(related="bagging_qa_id.dispense_id.current_pickup_date")
     collect_go_parcel_status_type = fields.Integer(
         string="Collect-and-Go Status Type",
         readonly=True,

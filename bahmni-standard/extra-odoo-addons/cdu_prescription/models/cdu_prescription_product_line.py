@@ -34,6 +34,9 @@ class CduPrescriptionProductLine(models.Model):
         readonly=True,
         help="Original product or regimen text received from the source prescription.",
     )
+    imported_regimen_display = fields.Char(
+        compute="_compute_imported_regimen_display",
+    )
     dosage_instructions = fields.Text(string="Dosage / Instructions")
     source = fields.Selection(
         [
@@ -45,6 +48,27 @@ class CduPrescriptionProductLine(models.Model):
         required=True,
         readonly=True,
     )
+
+    @api.depends(
+        "imported_product_name",
+        "prescription_id.regimen_prescribed_raw",
+        "prescription_id.product_line_ids.imported_product_name",
+    )
+    def _compute_imported_regimen_display(self):
+        for line in self:
+            prescription = line.prescription_id
+            if line.imported_product_name or not prescription:
+                line.imported_regimen_display = line.imported_product_name
+                continue
+
+            imported_lines = prescription.product_line_ids.filtered("imported_product_name")
+            imported_names = list(dict.fromkeys(imported_lines.mapped("imported_product_name")))
+            if len(imported_names) == 1:
+                line.imported_regimen_display = imported_names[0]
+            else:
+                line.imported_regimen_display = (
+                    prescription._get_imported_regimen_name() or ", ".join(imported_names)
+                )
 
     def init(self):
         """Preserve the former single product/dosage fields as one child row."""

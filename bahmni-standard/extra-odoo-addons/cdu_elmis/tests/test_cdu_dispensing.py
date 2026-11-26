@@ -1,13 +1,16 @@
 import base64
+import json
 import re
 from datetime import timedelta
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 from lxml import etree, html as lxml_html
 
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import Form, TransactionCase, tagged
+from odoo.tools.misc import format_date
 
 
 @tagged("post_install", "-at_install", "cdu_dispensing")
@@ -223,6 +226,44 @@ class TestCduDispensingWorkflow(TransactionCase):
         self.assertEqual(bag_job.command_language, "zpl")
         self.assertIn(first_prescription.name, bag_job.payload)
 
+    def test_bag_label_uses_current_pickup_and_confirmed_days_of_supply(self):
+        for packs, title, offset in (
+            (1, "Next Collection Date", 30),
+            (2, "Next Clinical Visit", 55),
+        ):
+            with self.subTest(packs=packs):
+                self.batch = self.env["cdu.batch"].create({})
+                prescription = self._create_prescription("LABEL-DATES-%s" % packs, 10)
+                current_pickup = prescription.next_drug_pickup_date
+                prescription.next_clinical_visit_date = current_pickup + timedelta(days=55)
+                planned_pickup = current_pickup + timedelta(days=60)
+                self._create_patient_picking_context(prescription)
+                prescription.write({
+                    "pickup_date_at_picking": current_pickup,
+                    "next_drug_pickup_date": planned_pickup,
+                })
+                self.batch.picking_confirmed_at = fields.Datetime.now()
+                dispense = self._create_ready_dispense(prescription)
+                dispense.stock_selection_ids.quantity_dispensed = packs
+                dispense.with_user(self.admin).action_confirm_dispensing()
+
+                job = dispense.print_job_ids.filtered(lambda job: job.label_type == "bag_label")
+                expected_date = current_pickup + timedelta(days=offset)
+                self.assertIn(f"Current Pickup Date: {current_pickup}", job.payload)
+                self.assertIn(f"{title}: {expected_date}", job.payload)
+
+                report_html, _report_type = self.env["ir.actions.report"].with_context(
+                    cdu_label_layout="bag"
+                )._render_qweb_html("cdu_elmis.report_cdu_dispense_labels", dispense.ids)
+                report = lxml_html.fromstring(report_html)
+                dates = report.xpath("//div[@class='cdu-bag-dates']/div")
+                for row, label, value in zip(
+                    dates, ("Current Pickup Date", title), (current_pickup, expected_date)
+                ):
+                    self.assertIn(label, row.text_content())
+                    self.assertIn(format_date(self.env, value), row.text_content())
+                self.assertEqual(len(dates), 2)
+
     def _decode_bag_label_qr(self, payload):
         field = re.search(r"\^FH_\^FDLA,((?:_[0-9A-F]{2})+)\^FS", payload)
         self.assertIsNotNone(field, "Bag label must encode its QR field using ZPL field hex")
@@ -273,13 +314,28 @@ class TestCduDispensingWorkflow(TransactionCase):
             ("prescription_id", "=", prescription.id),
         ]), 1)
 
-    def test_bag_pdf_uses_the_same_tracking_barcode_and_qa_qr(self):
+    def test_bag_pdf_preview_uses_the_same_tracking_barcode_and_qa_qr(self):
         prescription = self._create_prescription("BAG-PDF-BARCODE", 10)
         dispense = self._create_ready_dispense(prescription)
+        with self.assertRaisesRegex(UserError, "Confirm dispensing before viewing"):
+            dispense.with_user(self.admin).action_view_bag_label_pdf()
+
+        dispense.state = "confirmed"
+        prescription.state = "awaiting_bagging_qa"
+        qa = self._create_ready_bagging_qa(prescription, dispense)
+        action = dispense.with_user(self.admin).action_view_bag_label_pdf()
+        self.assertEqual(qa.with_user(self.admin).action_view_bag_label_pdf(), action)
+        self.assertEqual(prescription.with_user(self.admin).action_view_bag_label_pdf(), action)
+        self.assertEqual(action["type"], "ir.actions.act_url")
+        self.assertEqual(action["target"], "new")
+        preview = urlsplit(action["url"])
+        self.assertEqual(preview.path, f"/report/pdf/cdu_elmis.report_cdu_dispense_labels/{dispense.id}")
+        report_context = json.loads(parse_qs(preview.query)["context"][0])
+
         barcode = dispense.get_bag_barcode_value()
         with patch.object(type(dispense), "get_barcode_data_uri", return_value="data:image/png;base64,") as render_barcode:
             report_html, _ = self.env["ir.actions.report"].with_context(
-                cdu_label_layout="bag"
+                **report_context
             )._render_qweb_html("cdu_elmis.report_cdu_dispense_labels", dispense.ids)
 
         self.assertEqual(render_barcode.call_args_list[0].args, (barcode,))
@@ -288,6 +344,9 @@ class TestCduDispensingWorkflow(TransactionCase):
         caption = document.xpath("//div[@class='cdu-barcode-caption']")[0]
         self.assertEqual(caption.text_content().strip(), barcode)
         self.assertNotIn("/", barcode)
+        self.assertEqual(len(document.xpath("//div[@class='page cdu-print-page']")), 1)
+        self.assertFalse(dispense.print_job_ids)
+        self.assertFalse(dispense.labels_printed)
 
     def test_bag_label_qr_passes_qa_with_separate_patient_and_prescription(self):
         prescription = self._create_prescription("QR-LINES", 10)
@@ -1090,6 +1149,7 @@ class TestCduDispensingWorkflow(TransactionCase):
 
     def test_picking_rounds_packs_per_patient_in_defaults_report_and_allocation(self):
         picking, fulfilment = self._create_patient_rounded_picking()
+        pickup_dates = self.batch.prescription_ids.mapped("next_drug_pickup_date")
 
         self.assertEqual(picking.required_units, 75)
         self.assertEqual(picking.quantity_to_pick, 4)
@@ -1128,6 +1188,11 @@ class TestCduDispensingWorkflow(TransactionCase):
             self.assertEqual(call.kwargs["items"][0]["quantity"], 120)
         self.assertEqual(self.batch.patient_picking_line_ids.mapped("picked_units"), [60, 60])
         self.assertEqual(self.batch.patient_picking_line_ids.mapped("back_order_days"), [0, 0])
+        self.assertEqual(self.batch.prescription_ids.mapped("pickup_date_at_picking"), pickup_dates)
+        self.assertEqual(
+            self.batch.prescription_ids.mapped("next_drug_pickup_date"),
+            [pickup + timedelta(days=60) for pickup in pickup_dates],
+        )
 
     def test_picking_recalculates_each_patient_when_pack_size_changes(self):
         picking, fulfilment = self._create_patient_rounded_picking()

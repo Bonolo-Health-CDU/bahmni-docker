@@ -338,6 +338,10 @@ class CduBaggingQa(models.Model):
             raise UserError(_("This Bagging / QA record is not linked to a dispense record."))
         return dispenses.action_print_labels()
 
+    def action_view_bag_label_pdf(self):
+        self.ensure_one()
+        return self.dispense_id.action_view_bag_label_pdf()
+
     def _matches_bag_label_qr(self, scanned_value):
         """Whether a scan is this parcel's bag label QR (see bag_label_qr)."""
         self.ensure_one()

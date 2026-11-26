@@ -63,8 +63,8 @@ PRINT {copies}
 ^FO24,175^FDPatient: {patient_name}^FS
 ^FO24,215^FDPickup:^FS
 ^FO24,250^FB520,2,0,L,0^FD{pickup_point}^FS
-^FO24,325^FDNext: {next_collection_date}^FS
-^FO360,325^FDCollected: {collection_date}^FS
+^FO24,325^FDCurrent Pickup Date: {current_pickup_date}^FS
+^FO24,360^FD{next_appointment_label}: {next_appointment_date}^FS
 ^CF0,24
 ^FO590,250^FDProduced By:^FS
 ^FO590,282^FDBonolo Health^FS
@@ -102,9 +102,9 @@ PRINT {copies}
 ^CF0,42
 ^FO40,450^FB720,4,0,L,0^FD{collection_point}^FS
 ^CF0,34
-^FO40,710^FDCollection Date:^FS
+^FO40,710^FDParcels Collection Date Range:^FS
 ^CF0,42
-^FO40,760^FD{collection_date} to {collection_date}^FS
+^FO40,760^FD{collection_date_range}^FS
 ^CF0,34
 ^FO40,850^FDParcels: {parcel_count}^FS
 ^FO40,930^FDProduced By:^FS

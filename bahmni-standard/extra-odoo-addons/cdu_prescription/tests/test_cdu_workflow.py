@@ -4,7 +4,7 @@ from lxml import etree
 
 from odoo import Command, fields
 from odoo.exceptions import AccessError, ValidationError
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import Form, TransactionCase, tagged
 
 
 @tagged("post_install", "-at_install", "cdu_workflow")
@@ -190,7 +190,7 @@ class TestCduPrescriptionWorkflow(TransactionCase):
             self.assertIn('name="%s"' % filter_name, report_search_view.arch_db)
 
     def test_prescription_uses_dynamic_product_lines_with_independent_dosage(self):
-        prescription = self._create_prescription()
+        prescription = self._create_prescription(regimen_prescribed_raw="TEST = TEST-REGIMEN")
         imported_line = prescription.product_line_ids
         product = self.env["product.template"].create(
             {
@@ -199,16 +199,17 @@ class TestCduPrescriptionWorkflow(TransactionCase):
                 "cdu_is_drug": True,
             }
         ).product_variant_id
-        second_line = self.env["cdu.prescription.product.line"].create(
-            {
-                "prescription_id": prescription.id,
-                "sequence": 20,
-                "product_id": product.id,
-                "dosage_instructions": "Take two tablets at night.",
-            }
-        )
+        with Form(prescription.with_user(self.data_clerk)) as form:
+            with form.product_line_ids.new() as line:
+                self.assertEqual(line.imported_regimen_display, "TEST-REGIMEN")
+                line.product_id = product
+                line.dosage_instructions = "Take two tablets at night."
+        second_line = prescription.product_line_ids - imported_line
 
         self.assertEqual(imported_line.imported_product_name, "TEST-REGIMEN")
+        self.assertEqual(second_line.product_id, product)
+        self.assertFalse(second_line.imported_product_name)
+        self.assertEqual(second_line.imported_regimen_display, "TEST-REGIMEN")
         self.assertEqual(
             imported_line.dosage_instructions,
             "Take one tablet daily.",
@@ -361,6 +362,7 @@ class TestCduPrescriptionWorkflow(TransactionCase):
         self.assertIn("cdu_generic_catalog_label", product_field.get("context"))
         self.assertIn("no_create", product_field.get("options"))
         self.assertIn("no_open", product_field.get("options"))
+        self.assertTrue(tree.xpath("./field[@name='imported_regimen_display'][@readonly='1']"))
         self.assertTrue(
             arch.xpath(".//field[@name='cdu_days_supply'][@string='Duration Days']")
         )

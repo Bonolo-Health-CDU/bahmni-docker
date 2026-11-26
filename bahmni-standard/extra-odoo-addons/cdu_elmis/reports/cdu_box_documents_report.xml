@@ -119,11 +119,13 @@
                             <div class="cdu-box-label-value"><span t-field="box.collection_point_id"/></div>
                         </div>
                         <div style="margin-bottom: 4mm;">
-                            <div class="cdu-box-label-heading">Collection Date:</div>
+                            <div class="cdu-box-label-heading">Parcels Collection Date Range:</div>
                             <div class="cdu-box-label-value">
-                                <span t-field="box.next_drug_pickup_date"/>
-                                <span> to </span>
-                                <span t-field="box.next_drug_pickup_date"/>
+                                <span t-field="box.current_pickup_date_from"/>
+                                <t t-if="box.current_pickup_date_to != box.current_pickup_date_from">
+                                    <span> to </span>
+                                    <span t-field="box.current_pickup_date_to"/>
+                                </t>
                             </div>
                         </div>
                         <div>
@@ -244,9 +246,11 @@
                                 </div>
                                 <div class="cdu-box-manifest-field">
                                     <strong>Collection Date:</strong>
-                                    <span t-field="box.next_drug_pickup_date"/>
-                                    <span> to </span>
-                                    <span t-field="box.next_drug_pickup_date"/>
+                                    <span t-field="box.current_pickup_date_from"/>
+                                    <t t-if="box.current_pickup_date_to != box.current_pickup_date_from">
+                                        <span> to </span>
+                                        <span t-field="box.current_pickup_date_to"/>
+                                    </t>
                                 </div>
                                 <div class="cdu-box-manifest-field">
                                     <strong>Produced By:</strong>
@@ -293,7 +297,7 @@
                             <tbody>
                                 <tr t-foreach="box.line_ids.sorted(lambda line: ((line.parcel_reference or ''), line.id))" t-as="line">
                                     <td><span t-field="line.parcel_reference"/></td>
-                                    <td><span t-field="line.next_drug_pickup_date"/></td>
+                                    <td><span t-field="line.current_pickup_date"/></td>
                                     <td><span t-field="line.patient_name"/></td>
                                     <td style="text-align: center;">1</td>
                                     <td><span class="cdu-box-manifest-blank"/></td>

@@ -11,6 +11,7 @@ from PyPDF2 import PdfFileReader
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools.misc import format_date
 
 
 @tagged("post_install", "-at_install", "cdu_boxing")
@@ -242,6 +243,54 @@ class TestCduBoxingWorkflow(TransactionCase):
         )
         barcode_src = manifest_document.xpath("//img[@class='cdu-box-manifest-barcode']/@src")[0]
         self.assertEqual(parse_qs(urlparse(barcode_src).query)["value"], [box.barcode_reference])
+
+    def test_box_label_uses_current_pickup_range_of_packed_parcels(self):
+        other_parcel = self._create_confirmed_parcel("RANGE")
+        later_date = self.prescription.next_drug_pickup_date
+        earlier_date = later_date - timedelta(days=7)
+        batch = self.env["cdu.batch"].create({"picking_confirmed_at": fields.Datetime.now()})
+        self.prescription.batch_id = batch
+        patient_line = self.env["cdu.batch.patient.line"].create(
+            {
+                "batch_id": batch.id,
+                "prescription_id": self.prescription.id,
+                "facility_days_supply": (earlier_date - self.prescription.prescription_date).days,
+                "recalculated_next_drug_pickup_date": later_date + timedelta(days=7),
+                "served_days": 7,
+            }
+        )
+        box = self.env["cdu.box"].with_user(self.admin).create({})
+
+        box.action_scan_parcel(other_parcel.id)
+        self.assertIn(
+            f"^FD{later_date}^FS", box._enqueue_box_print_job("box_label").payload
+        )
+        box.action_scan_parcel(self.parcel.id)
+
+        job = box._enqueue_box_print_job("box_label")
+        self.assertIn("^FDParcels Collection Date Range:^FS", job.payload)
+        self.assertIn(f"^FD{earlier_date} to {later_date}^FS", job.payload)
+        report_html, _report_type = self.env["ir.actions.report"]._render_qweb_html(
+            "cdu_elmis.report_cdu_box_label", box.ids
+        )
+        report = lxml_html.fromstring(report_html)
+        date_range = report.xpath(
+            "//div[@class='cdu-box-label-heading']"
+            "[normalize-space(.) = 'Parcels Collection Date Range:']"
+            "/following-sibling::div[1]"
+        )[0]
+        self.assertEqual(
+            " ".join(date_range.text_content().split()),
+            f"{format_date(self.env, earlier_date)} to {format_date(self.env, later_date)}",
+        )
+        box.line_ids.filtered(lambda line: line.bagging_qa_id == other_parcel).unlink()
+        self.assertIn(
+            f"^FD{earlier_date}^FS", box._enqueue_box_print_job("box_label").payload
+        )
+        box.action_scan_parcel(other_parcel.id)
+        patient_line.facility_days_supply = 0
+        self.assertFalse(box.current_pickup_date_from)
+        self.assertFalse(box.current_pickup_date_to)
 
     def test_box_document_printing_queues_label_and_manifest_jobs(self):
         box = self.env["cdu.box"].with_user(self.admin).create({})
